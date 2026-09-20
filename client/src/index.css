@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors from your references */
+  --color-brand: #c91820;
+  --color-brand-hover: #ab141b;
+  --color-brand-soft: #fff0f1;
+
+  --color-action: #005b96;
+  --color-action-hover: #004875;
+  --color-action-soft: #eaf4fb;
+
+  --color-accent: #ff4b00;
+
+  --color-canvas: #f4f4f4;
+  --color-surface: #ffffff;
+  --color-selected: #e9ecef;
+  --color-field: #f5f5f9;
+  --color-line: #dfe3e8;
+
+  --color-ink: #171717;
+  --color-muted: #626b75;
+
+  /* Update existing red utilities */
+  --color-red-50: #fff0f1;
+  --color-red-100: #ffe0e3;
+  --color-red-200: #ffc1c7;
+  --color-red-300: #f59da5;
+  --color-red-400: #ef7883;
+  --color-red-500: #df3542;
+  --color-red-600: #c91820;
+  --color-red-700: #ab141b;
+  --color-red-800: #8b1118;
+  --color-red-900: #6a1015;
+
+  /* Neutral backgrounds, borders, and text */
+  --color-slate-50: #fafafa;
+  --color-slate-100: #f4f4f4;
+  --color-slate-200: #dfe3e8;
+  --color-slate-300: #c5cdd6;
+  --color-slate-400: #858e99;
+  --color-slate-500: #626b75;
+  --color-slate-600: #4e5863;
+  --color-slate-700: #353d46;
+  --color-slate-800: #252b32;
+  --color-slate-900: #171717;
+  --color-slate-950: #101419;
+
+  /* Orange accent */
+  --color-orange-400: #ff7540;
+  --color-orange-500: #ff4b00;
+  --color-orange-600: #d94000;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background-color: var(--color-action);
+    color: #ffffff;
+  }
+}
+
+@layer utilities {
+  /* Existing secondary action buttons */
+  button.bg-slate-900,
+  a.bg-slate-900 {
+    background-color: var(--color-action);
+    color: #ffffff;
+  }
+
+  button.bg-slate-900:hover,
+  a.bg-slate-900:hover {
+    background-color: var(--color-action-hover);
+  }
+
+  /* Existing login side panel: same size and structure */
+  aside.bg-slate-900 {
+    background-color: var(--color-action);
+    color: #ffffff;
+  }
+
+  aside.bg-slate-900 .text-slate-300 {
+    color: #e3f0fa;
+  }
+
+  aside.bg-slate-900 .text-red-400 {
+    color: #ffffff;
+  }
+
+  /* Existing loading/error screens */
+  main.bg-slate-950 {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+  }
+
+  /* Existing inputs: colors only */
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    background-color: var(--color-field);
+    border-color: #bed5e6;
+    color: var(--color-ink);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-muted);
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):focus,
+  textarea:focus,
+  select:focus {
+    border-color: var(--color-action);
+    outline-color: var(--color-action);
+    --tw-ring-color: #005b9626;
+  }
+
+  input[aria-invalid="true"],
+  textarea[aria-invalid="true"],
+  select[aria-invalid="true"] {
+    border-color: var(--color-brand);
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--color-action);
+  }
+
+  /* Existing tables: colors only */
+  #page-content table thead {
+    background-color: var(--color-brand);
+    color: #ffffff;
+  }
+
+  #page-content table thead th {
+    color: #ffffff;
+  }
+
+  #page-content table tbody tr:hover {
+    background-color: #f0f6fa;
+  }
+}

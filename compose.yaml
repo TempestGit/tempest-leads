@@ -1,0 +1,15 @@
+# Local development database only.
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: tempest_leads
+      MYSQL_USER: tempest
+      MYSQL_PASSWORD: local_dev_only
+      MYSQL_ROOT_PASSWORD: local_root_only
+    ports:
+      - '127.0.0.1:3306:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+volumes:
+  mysql_data:
