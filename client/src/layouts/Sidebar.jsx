@@ -13,7 +13,7 @@ export default function Sidebar({ user, onNavigate }) {
         </p>
 
         <p className="mt-1 text-[10px] tracking-[0.2em] text-sidebar-muted">
-          ACQUISITION CRM
+          ACQUISITION CRM TEST
         </p>
       </div>
 
