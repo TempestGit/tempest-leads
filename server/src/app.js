@@ -6,6 +6,7 @@ import { csrfProtection } from './middleware/csrfProtection.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import companiesRoutes from './modules/companies/companies.routes.js';
 import contactsRoutes from './modules/contacts/contacts.routes.js';
+import leadsRoutes from './modules/leads/leads.routes.js';
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use('/api', csrfProtection);
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companiesRoutes);
 app.use('/api/contacts', contactsRoutes);
+app.use('/api/leads', leadsRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({

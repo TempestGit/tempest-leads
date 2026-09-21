@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { createContact } from './contacts.api';
+
+import {
+  createContact,
+  updateContact,
+} from './contacts.api';
 
 const defaults = {
   name: '',
@@ -25,44 +29,125 @@ const fields = [
 ];
 
 const inputClass =
-  'mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm';
+  'mt-2 w-full rounded-lg border border-line-strong bg-field px-3 py-2.5 text-sm text-ink placeholder:text-muted';
+
+function getDefaultValues(contact) {
+  if (!contact) {
+    return { ...defaults };
+  }
+
+  return {
+    name: contact.name ?? '',
+    designation: contact.designation ?? '',
+    department: contact.department ?? '',
+    phone: contact.phone ?? '',
+    whatsapp: contact.whatsapp ?? '',
+    email: contact.email ?? '',
+    linkedin: contact.linkedin ?? '',
+    decision_maker: Boolean(Number(contact.decision_maker)),
+    notes: contact.notes ?? '',
+  };
+}
 
 export default function ContactForm({
   companyId,
+  contact = null,
   onCreated,
+  onUpdated,
   onCancel,
 }) {
+  const isEditing = contact !== null;
+
   const [error, setError] = useState('');
+  const [hasConflict, setHasConflict] = useState(false);
+
+  // Keep the version associated with the values initially loaded.
+  // A background refetch must not silently advance the edit version.
+  const [editingVersion] = useState(() => contact?.version);
 
   const {
     register,
     handleSubmit,
+    clearErrors,
     setError: setFieldError,
     formState: { errors, isSubmitting },
   } = useForm({
-    defaultValues: defaults,
+    defaultValues: getDefaultValues(contact),
   });
 
   async function submit(values) {
-    setError('');
+    if (hasConflict) {
+      return;
+    }
 
-    let result;
+    setError('');
+    clearErrors();
+
+    const profile = {
+      name: values.name.trim(),
+      designation: values.designation.trim(),
+      department: values.department.trim(),
+      phone: values.phone.trim(),
+      whatsapp: values.whatsapp.trim(),
+      email: values.email.trim().toLowerCase(),
+      linkedin: values.linkedin.trim(),
+      decision_maker: values.decision_maker,
+      notes: values.notes.trim(),
+    };
+
+    let savedContact;
 
     try {
-      result = await createContact({
-        ...values,
-        company_id: String(companyId),
-      });
+      if (isEditing) {
+        savedContact = await updateContact(contact.id, {
+          ...profile,
+          version: editingVersion,
+        });
+      } else {
+        if (
+          companyId === undefined ||
+          companyId === null ||
+          companyId === ''
+        ) {
+          setError('Open a company before adding a contact.');
+          return;
+        }
+
+        savedContact = await createContact({
+          ...profile,
+          company_id: String(companyId),
+        });
+      }
     } catch (requestError) {
-      setError(requestError.message);
+      if (isEditing && requestError.status === 409) {
+        setHasConflict(true);
+        setError(
+          'This contact was updated after you opened it. ' +
+            'Your entries are still visible below. Copy any changes ' +
+            'you need to keep, then cancel and reopen the edit form ' +
+            'after loading the latest contact details.',
+        );
+      } else {
+        setError(
+          requestError.message || 'Unable to save the contact.',
+        );
+      }
 
       for (const [field, messages] of Object.entries(
         requestError.errors || {},
       )) {
-        if (field in defaults && messages?.length) {
+        if (!Object.prototype.hasOwnProperty.call(defaults, field)) {
+          continue;
+        }
+
+        const message = Array.isArray(messages)
+          ? messages[0]
+          : messages;
+
+        if (typeof message === 'string' && message) {
           setFieldError(field, {
             type: 'server',
-            message: messages[0],
+            message,
           });
         }
       }
@@ -70,16 +155,21 @@ export default function ContactForm({
       return;
     }
 
-    onCreated(result.data);
+    // API helpers already return result.data.
+    if (isEditing) {
+      onUpdated?.(savedContact);
+    } else {
+      onCreated?.(savedContact);
+    }
   }
 
   return (
     <form
       onSubmit={handleSubmit(submit)}
-      className="mt-5 rounded-lg border border-slate-200 p-4 sm:p-5"
+      className="mt-5 rounded-lg border border-line p-4 sm:p-5"
     >
-      <h3 className="font-semibold text-slate-900">
-        Add contact
+      <h3 className="font-semibold text-ink">
+        {isEditing ? 'Edit contact' : 'Add contact'}
       </h3>
 
       <fieldset disabled={isSubmitting} className="mt-5">
@@ -88,7 +178,7 @@ export default function ContactForm({
             <div key={name}>
               <label
                 htmlFor={`contact-${name}`}
-                className="text-sm font-medium text-slate-700"
+                className="text-sm font-medium text-subtle"
               >
                 {label}
               </label>
@@ -104,7 +194,9 @@ export default function ContactForm({
                 }
                 aria-invalid={Boolean(errors[name])}
                 aria-describedby={
-                  errors[name] ? `contact-error-${name}` : undefined
+                  errors[name]
+                    ? `contact-error-${name}`
+                    : undefined
                 }
                 className={inputClass}
                 {...register(name, {
@@ -120,7 +212,7 @@ export default function ContactForm({
               {errors[name] && (
                 <p
                   id={`contact-error-${name}`}
-                  className="mt-1 text-sm text-red-600"
+                  className="mt-1 text-sm text-danger"
                 >
                   {errors[name].message}
                 </p>
@@ -129,10 +221,10 @@ export default function ContactForm({
           ))}
 
           <div className="sm:col-span-2">
-            <label className="flex items-center gap-2 text-sm text-slate-700">
+            <label className="flex items-center gap-2 text-sm text-subtle">
               <input
                 type="checkbox"
-                className="size-4"
+                className="size-4 accent-brand"
                 {...register('decision_maker')}
               />
               This contact is a decision-maker
@@ -142,7 +234,7 @@ export default function ContactForm({
           <div className="sm:col-span-2">
             <label
               htmlFor="contact-notes"
-              className="text-sm font-medium text-slate-700"
+              className="text-sm font-medium text-subtle"
             >
               Notes
             </label>
@@ -151,12 +243,19 @@ export default function ContactForm({
               id="contact-notes"
               rows={3}
               maxLength={5000}
+              aria-invalid={Boolean(errors.notes)}
+              aria-describedby={
+                errors.notes ? 'contact-error-notes' : undefined
+              }
               className={inputClass}
               {...register('notes')}
             />
 
             {errors.notes && (
-              <p className="mt-1 text-sm text-red-600">
+              <p
+                id="contact-error-notes"
+                className="mt-1 text-sm text-danger"
+              >
                 {errors.notes.message}
               </p>
             )}
@@ -166,7 +265,7 @@ export default function ContactForm({
         {error && (
           <p
             role="alert"
-            className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700"
+            className="mt-4 rounded-lg bg-danger-soft p-3 text-sm text-[var(--crm-danger-text)]"
           >
             {error}
           </p>
@@ -176,16 +275,21 @@ export default function ContactForm({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold"
+            className="rounded-lg border border-line-strong px-4 py-2.5 text-sm font-semibold text-subtle"
           >
             Cancel
           </button>
 
           <button
             type="submit"
-            className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+            disabled={isSubmitting || hasConflict}
+            className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-surface hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting ? 'Saving…' : 'Create contact'}
+            {isSubmitting
+              ? 'Saving…'
+              : isEditing
+                ? 'Save changes'
+                : 'Create contact'}
           </button>
         </div>
       </fieldset>

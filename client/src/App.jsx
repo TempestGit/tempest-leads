@@ -15,6 +15,13 @@ import DashboardPage from './features/dashboard/DashboardPage';
 import CompaniesPage from './features/companies/CompaniesPage';
 import CompanyDetailPage from './features/companies/CompanyDetailPage';
 import ContactsPage from './features/contacts/ContactsPage';
+import ContactDetailPage from './features/contacts/ContactDetailPage';
+import LeadsPage from './features/leads/LeadsPage';
+import CreateLeadPage from './features/leads/CreateLeadPage';
+import LeadDetailPage from './features/leads/LeadDetailPage';
+
+
+
 
 function CompanyDetailRoute() {
   const { id } = useParams();
@@ -56,6 +63,10 @@ export default function App() {
             element={<CompanyDetailRoute />}
           />
           <Route path="/contacts" element={<ContactsPage />} />
+          <Route path="contacts/:id" element={<ContactDetailPage />} />
+          <Route path="leads" element={<LeadsPage />} />
+          <Route path="leads/new" element={<CreateLeadPage />} />
+          <Route path="leads/:id" element={<LeadDetailPage />} />
         </Route>
       </Route>
 

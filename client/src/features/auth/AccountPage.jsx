@@ -46,20 +46,20 @@ export default function AccountPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <section className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
-        <p className="text-sm font-bold tracking-widest text-red-600">
+      <section className="mx-auto max-w-2xl rounded-2xl border border-line bg-surface p-6 shadow-sm shadow-line sm:p-10">
+        <p className="text-sm font-bold tracking-widest text-brand">
           TEMPEST LEADS
         </p>
 
-        <h1 className="mt-4 text-3xl font-bold text-slate-900">
+        <h1 className="mt-4 text-3xl font-bold text-ink">
           Welcome, {user.name}
         </h1>
 
-        <p className="mt-3 text-slate-600">
+        <p className="mt-3 text-subtle">
           You are signed in.
         </p>
 
-        <dl className="mt-8 divide-y divide-slate-200">
+        <dl className="mt-8 divide-y divide-line">
           {[
             ['Name', user.name],
             ['Email', user.email],
@@ -73,8 +73,8 @@ export default function AccountPage() {
               key={label}
               className="grid gap-1 py-4 sm:grid-cols-[100px_1fr]"
             >
-              <dt className="text-sm text-slate-500">{label}</dt>
-              <dd className="break-words font-medium text-slate-900">
+              <dt className="text-sm text-muted">{label}</dt>
+              <dd className="break-words font-medium text-ink">
                 {value}
               </dd>
             </div>
@@ -84,7 +84,7 @@ export default function AccountPage() {
         {error && (
           <p
             role="alert"
-            className="mt-6 rounded-lg bg-red-50 p-3 text-sm text-red-700"
+            className="mt-6 rounded-lg bg-danger-soft p-3 text-sm text-[var(--crm-danger-text)]"
           >
             {error}
           </p>
@@ -94,7 +94,7 @@ export default function AccountPage() {
           type="button"
           onClick={handleLogout}
           disabled={isLoggingOut}
-          className="mt-8 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+          className="mt-8 inline-flex items-center gap-2 rounded-lg bg-secondary px-5 py-3 font-semibold text-surface hover:bg-secondary-hover disabled:opacity-50"
         >
           {isLoggingOut ? (
             <LoaderCircle size={18} className="animate-spin" />

@@ -31,7 +31,7 @@ const defaults = {
 };
 
 const inputClass =
-  'mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-100';
+  'mt-2 w-full rounded-lg border border-line-strong bg-surface px-3 py-2.5 text-ink focus:border-focus focus:outline-none focus:ring-2 focus:ring-brand-soft';
 
 export default function CompanyForm({
   company = null,
@@ -92,12 +92,12 @@ async function submit(values) {
 }
 
   return (
-    <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-slate-900">
+    <section className="mt-6 rounded-xl border border-line bg-surface p-5 sm:p-6">
+        <h2 className="text-lg font-semibold text-ink">
             {company ? 'Edit company' : 'Add company'}
         </h2>
 
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-subtle">
             {company
                 ? 'Update the company information. Fields marked * are required.'
                 : 'You will be assigned as the account owner. Fields marked * are required.'}
@@ -110,7 +110,7 @@ async function submit(values) {
               <div key={name}>
                 <label
                   htmlFor={`company-${name}`}
-                  className="text-sm font-medium text-slate-700"
+                  className="text-sm font-medium text-subtle"
                 >
                   {label}{required ? ' *' : ''}
                 </label>
@@ -139,7 +139,7 @@ async function submit(values) {
                 {errors[name] && (
                   <p
                     id={`error-${name}`}
-                    className="mt-1 text-sm text-red-600"
+                    className="mt-1 text-sm text-danger"
                   >
                     {errors[name].message}
                   </p>
@@ -150,7 +150,7 @@ async function submit(values) {
             <div>
               <label
                 htmlFor="company-reconnect"
-                className="text-sm font-medium text-slate-700"
+                className="text-sm font-medium text-subtle"
               >
                 Reconnect date
               </label>
@@ -163,7 +163,7 @@ async function submit(values) {
               />
 
               {errors.reconnect_date && (
-                <p className="mt-1 text-sm text-red-600">
+                <p className="mt-1 text-sm text-danger">
                   {errors.reconnect_date.message}
                 </p>
               )}
@@ -176,7 +176,7 @@ async function submit(values) {
               <div key={name} className="sm:col-span-2">
                 <label
                   htmlFor={`company-${name}`}
-                  className="text-sm font-medium text-slate-700"
+                  className="text-sm font-medium text-subtle"
                 >
                   {label}
                 </label>
@@ -190,7 +190,7 @@ async function submit(values) {
                 />
 
                 {errors[name] && (
-                  <p className="mt-1 text-sm text-red-600">
+                  <p className="mt-1 text-sm text-danger">
                     {errors[name].message}
                   </p>
                 )}
@@ -201,7 +201,7 @@ async function submit(values) {
           {error && (
             <p
               role="alert"
-              className="mt-5 rounded-lg bg-red-50 p-3 text-sm text-red-700"
+              className="mt-5 rounded-lg bg-danger-soft p-3 text-sm text-[var(--crm-danger-text)]"
             >
               {error}
             </p>
@@ -211,14 +211,14 @@ async function submit(values) {
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+              className="rounded-lg border border-line-strong px-4 py-2.5 text-sm font-semibold text-subtle"
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-surface hover:bg-brand-hover disabled:opacity-50"
             >
               {isSubmitting
                 ? 'Saving…'

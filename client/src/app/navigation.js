@@ -32,6 +32,7 @@ export const navigation = [
         label: 'Leads & Pipeline',
         to: '/leads',
         icon: Target,
+        enabled: true,
       },
       {
         label: 'Companies',

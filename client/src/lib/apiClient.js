@@ -1,72 +1,227 @@
 let csrfToken = null;
 
+/*
+|--------------------------------------------------------------------------
+| Set CSRF Token
+|--------------------------------------------------------------------------
+*/
+
 export function setCsrfToken(token) {
-  csrfToken = typeof token === 'string' ? token : null;
+  csrfToken =
+    typeof token === "string" &&
+    token.trim()
+      ? token.trim()
+      : null;
 }
 
+/*
+|--------------------------------------------------------------------------
+| API Error
+|--------------------------------------------------------------------------
+*/
+
 export class ApiError extends Error {
-  constructor(message, status, errors = null) {
+  constructor(
+    status,
+    message = "API request failed.",
+    errors = [],
+  ) {
     super(message);
-    this.name = 'ApiError';
+
+    this.name = "ApiError";
     this.status = status;
-    this.errors = errors;
+    this.errors =
+      Array.isArray(errors)
+        ? errors
+        : [];
   }
 }
+
+/*
+|--------------------------------------------------------------------------
+| API Request
+|--------------------------------------------------------------------------
+*/
 
 export async function apiRequest(
   path,
-  { method = 'GET', body, signal } = {},
+  {
+    method = "GET",
+    body,
+    signal,
+    headers = {},
+  } = {},
 ) {
-  const headers = {
-    Accept: 'application/json',
+  const normalizedMethod =
+    String(method)
+      .trim()
+      .toUpperCase();
+
+  const hasBody =
+    body !== undefined &&
+    body !== null;
+
+  const requestHeaders = {
+    ...(hasBody
+      ? {
+          "Content-Type":
+            "application/json",
+        }
+      : {}),
+
+    ...(
+      csrfToken &&
+      normalizedMethod !== "GET" &&
+      normalizedMethod !== "HEAD"
+        ? {
+            "X-CSRF-Token":
+              csrfToken,
+          }
+        : {}
+    ),
+
+    ...headers,
   };
-
-  const isMutation = !['GET', 'HEAD', 'OPTIONS'].includes(method);
-
-  if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-  }
-
-  if (isMutation && csrfToken) {
-    headers['X-CSRF-Token'] = csrfToken;
-  }
 
   let response;
 
   try {
-    response = await fetch(`/api${path}`, {
-      method,
-      headers,
-      credentials: 'include',
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal,
-    });
+    response =
+      await fetch(
+        `/api${path}`,
+        {
+          method:
+            normalizedMethod,
+
+          credentials:
+            "include",
+
+          signal,
+
+          headers:
+            requestHeaders,
+
+          ...(hasBody
+            ? {
+                body:
+                  JSON.stringify(
+                    body,
+                  ),
+              }
+            : {}),
+        },
+      );
   } catch (error) {
-    if (error.name === 'AbortError') throw error;
+    /*
+    |--------------------------------------------------------------------------
+    | Abort
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      error?.name ===
+      "AbortError"
+    ) {
+      throw error;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Network Error
+    |--------------------------------------------------------------------------
+    */
 
     throw new ApiError(
-      'Cannot reach the server. Check that the backend is running.',
       0,
+      "Unable to connect to the server. Please check your connection and try again.",
     );
   }
 
-  if (response.status === 204) {
+  /*
+  |--------------------------------------------------------------------------
+  | No Content
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    response.status === 204
+  ) {
     return null;
   }
 
-  const data = await response.json().catch(() => null);
+  /*
+  |--------------------------------------------------------------------------
+  | Read Response
+  |--------------------------------------------------------------------------
+  */
+
+  const contentType =
+    response.headers.get(
+      "content-type",
+    ) || "";
+
+  let data = null;
+
+  if (
+    contentType.includes(
+      "application/json",
+    )
+  ) {
+    try {
+      data =
+        await response.json();
+    } catch {
+      data = null;
+    }
+  } else {
+    const text =
+      await response.text();
+
+    if (text) {
+      data = {
+        message: text,
+      };
+    }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Failed Response
+  |--------------------------------------------------------------------------
+  */
 
   if (!response.ok) {
+    const message =
+      data?.message ||
+      data?.error?.message ||
+      data?.error ||
+      `API request failed with status ${response.status}.`;
+
+    const errors =
+      Array.isArray(
+        data?.errors,
+      )
+        ? data.errors
+        : [];
+
     throw new ApiError(
-      data?.message || 'The request could not be completed.',
       response.status,
-      data?.errors,
+      message,
+      errors,
     );
   }
 
-  if (!data) {
-    throw new ApiError('The server returned an invalid response.', 502);
+  /*
+  |--------------------------------------------------------------------------
+  | Successful Empty Response
+  |--------------------------------------------------------------------------
+  */
+
+  if (data === null) {
+    return {};
   }
 
   return data;
 }
+
+export default apiRequest;

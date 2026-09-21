@@ -1,50 +1,160 @@
 import {
+  contactIdSchema,
   createContactSchema,
   listContactsSchema,
+  updateContactSchema,
 } from './contacts.validation.js';
 
 import {
   createContact,
+  getContact,
   listContacts,
+  updateContact,
 } from './contacts.service.js';
 
-export async function index(req, res) {
-  const result = listContactsSchema.safeParse(req.query);
+function validationError(res, error) {
+  const errors = {};
 
-  if (!result.success) {
-    return res.status(400).json({
-      message: 'Invalid search or pagination parameters.',
-      errors: result.error.flatten().fieldErrors,
-    });
+  for (const issue of error.issues) {
+    const field = issue.path.join('.') || '_form';
+
+    if (!errors[field]) {
+      errors[field] = [];
+    }
+
+    errors[field].push(issue.message);
   }
 
-  res.json(await listContacts(req.user, result.data));
+  return res.status(400).json({
+    message: 'Please check the submitted values.',
+    errors,
+  });
 }
 
-export async function create(req, res) {
-  const result = createContactSchema.safeParse(req.body);
+function contactNotFound(res) {
+  return res.status(404).json({
+    message: 'Contact not found or you do not have access.',
+  });
+}
 
-  if (!result.success) {
-    return res.status(400).json({
-      message: 'Please check the contact information.',
-      errors: result.error.flatten().fieldErrors,
-    });
-  }
-
+/*
+ * GET /api/contacts
+ */
+export async function index(req, res, next) {
   try {
-    const contact = await createContact(req.user, result.data);
+    const parsed = listContactsSchema.safeParse(req.query);
 
-    res.status(201).json({
-      message: 'Contact created successfully.',
+    if (!parsed.success) {
+      return validationError(res, parsed.error);
+    }
+
+    const result = await listContacts(req.user, parsed.data);
+
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+/*
+ * POST /api/contacts
+ */
+export async function create(req, res, next) {
+  try {
+    const parsed = createContactSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return validationError(res, parsed.error);
+    }
+
+    const contact = await createContact(req.user, parsed.data);
+
+    return res.status(201).json({
       data: contact,
     });
   } catch (error) {
     if (error.code === 'CONTACT_COMPANY_FORBIDDEN') {
       return res.status(404).json({
-        message: error.message,
+        message: 'Company not found or you do not have access.',
       });
     }
 
-    throw error;
+    return next(error);
+  }
+}
+
+/*
+ * GET /api/contacts/:id
+ */
+export async function show(req, res, next) {
+  try {
+    const parsedId = contactIdSchema.safeParse(req.params.id);
+
+    if (!parsedId.success) {
+      return res.status(400).json({
+        message: 'Invalid contact ID.',
+      });
+    }
+
+    const contact = await getContact(req.user, parsedId.data);
+
+    if (!contact) {
+      return contactNotFound(res);
+    }
+
+    return res.json({
+      data: contact,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+/*
+ * PUT /api/contacts/:id
+ */
+export async function update(req, res, next) {
+  try {
+    const parsedId = contactIdSchema.safeParse(req.params.id);
+
+    if (!parsedId.success) {
+      return res.status(400).json({
+        message: 'Invalid contact ID.',
+      });
+    }
+
+    const parsedBody = updateContactSchema.safeParse(req.body);
+
+    if (!parsedBody.success) {
+      return validationError(res, parsedBody.error);
+    }
+
+    const result = await updateContact(
+      req.user,
+      parsedId.data,
+      parsedBody.data,
+    );
+
+    if (result.status === 'not_found') {
+      return contactNotFound(res);
+    }
+
+    if (result.status === 'conflict') {
+      return res.status(409).json({
+        code: 'CONTACT_VERSION_CONFLICT',
+        message:
+          'This contact was updated after you opened it. Reload the latest details before editing again.',
+      });
+    }
+
+    if (result.status !== 'updated' || !result.contact) {
+      throw new Error('Unexpected contact update result.');
+    }
+
+    return res.json({
+      data: result.contact,
+    });
+  } catch (error) {
+    return next(error);
   }
 }

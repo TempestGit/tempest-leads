@@ -78,7 +78,7 @@ export default function CompanyDetailPage() {
     return (
       <div>
         {backLink}
-        <p role="status" className="mt-6 text-slate-600">
+        <p role="status" className="mt-6 text-subtle">
           Loading company details…
         </p>
       </div>
@@ -90,8 +90,8 @@ export default function CompanyDetailPage() {
       <div>
         {backLink}
 
-        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6">
-          <p role="alert" className="text-red-700">
+        <div className="mt-6 rounded-xl border border-line bg-surface p-6">
+          <p role="alert" className="text-[var(--crm-danger-text)]">
             {query.error.message}
           </p>
 
@@ -140,11 +140,11 @@ export default function CompanyDetailPage() {
 
       <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="break-words text-2xl font-bold text-slate-900">
+          <h1 className="break-words text-2xl font-bold text-ink">
             {company.name}
           </h1>
 
-          <p className="mt-2 break-all text-xs text-slate-500">
+          <p className="mt-2 break-all text-xs text-muted">
             {company.company_code}
           </p>
         </div>
@@ -156,7 +156,7 @@ export default function CompanyDetailPage() {
               setSuccess('');
               setEditingCompany({ ...company });
             }}
-            className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+            className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-surface hover:bg-brand-hover"
           >
             Edit company
           </button>
@@ -166,7 +166,7 @@ export default function CompanyDetailPage() {
       {success && (
         <p
           role="status"
-          className="mt-5 rounded-lg bg-green-50 p-3 text-sm text-green-800"
+          className="mt-5 rounded-lg bg-success-soft p-3 text-sm text-[var(--crm-success-text)]"
         >
           {success}
         </p>
@@ -180,26 +180,26 @@ export default function CompanyDetailPage() {
           onCancel={cancelEditing}
         />
       ) : (
-        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-          <h2 className="text-lg font-semibold text-slate-900">
+        <section className="mt-6 rounded-xl border border-line bg-surface p-5 sm:p-6">
+          <h2 className="text-lg font-semibold text-ink">
             Company information
           </h2>
 
           <dl className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2">
             {fields.map(([label, value]) => (
               <div key={label} className="min-w-0">
-                <dt className="text-xs font-medium text-slate-500">
+                <dt className="text-xs font-medium text-muted">
                   {label}
                 </dt>
 
-                <dd className="mt-1 break-words text-sm text-slate-900">
+                <dd className="mt-1 break-words text-sm text-ink">
                   {value || '—'}
                 </dd>
               </div>
             ))}
 
             <div className="min-w-0 sm:col-span-2">
-              <dt className="text-xs font-medium text-slate-500">
+              <dt className="text-xs font-medium text-muted">
                 Website
               </dt>
 
@@ -224,11 +224,11 @@ export default function CompanyDetailPage() {
               ['Potential requirement', company.potential_requirement],
             ].map(([label, value]) => (
               <div key={label} className="min-w-0 sm:col-span-2">
-                <dt className="text-xs font-medium text-slate-500">
+                <dt className="text-xs font-medium text-muted">
                   {label}
                 </dt>
 
-                <dd className="mt-1 text-sm whitespace-pre-wrap break-words text-slate-900">
+                <dd className="mt-1 text-sm whitespace-pre-wrap break-words text-ink">
                   {value || '—'}
                 </dd>
               </div>

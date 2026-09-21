@@ -24,9 +24,9 @@ export default function CompanyContactsPanel({ companyId }) {
   }
 
   return (
-    <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+    <section className="mt-6 rounded-xl border border-line bg-surface p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-slate-900">
+        <h2 className="text-lg font-semibold text-ink">
           Company contacts
         </h2>
 
@@ -37,7 +37,7 @@ export default function CompanyContactsPanel({ companyId }) {
               setSuccess('');
               setShowForm(true);
             }}
-            className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+            className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-surface hover:bg-brand-hover"
           >
             Add contact
           </button>
@@ -47,7 +47,7 @@ export default function CompanyContactsPanel({ companyId }) {
       {success && (
         <p
           role="status"
-          className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-800"
+          className="mt-4 rounded-lg bg-success-soft p-3 text-sm text-[var(--crm-success-text)]"
         >
           {success}
         </p>

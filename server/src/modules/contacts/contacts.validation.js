@@ -1,61 +1,183 @@
 import { z } from 'zod';
-import { companyIdSchema } from '../companies/companies.validation.js';
 
-const optionalText = (max) =>
-  z.string().trim().max(max).optional().default('');
+const MAX_UNSIGNED_BIGINT = 18446744073709551615n;
 
-const phoneSchema = optionalText(30).refine(
-  (value) =>
-    value === '' ||
-    (/^\+?[\d\s().-]+$/.test(value) &&
-      value.replace(/\D/g, '').length >= 6),
-  'Enter a valid phone number.',
-);
+function databaseId(label) {
+  return z
+    .string()
+    .regex(/^[1-9]\d{0,19}$/, `${label} is invalid.`)
+    .refine((value) => {
+      try {
+        return BigInt(value) <= MAX_UNSIGNED_BIGINT;
+      } catch {
+        return false;
+      }
+    }, `${label} is invalid.`);
+}
 
-const emailSchema = z
-  .union([
-    z.literal(''),
-    z.string().trim().toLowerCase().email().max(190),
-  ])
+export const contactIdSchema = databaseId('Contact ID');
+
+const companyIdSchema = databaseId('Company ID');
+
+function optionalText(maxLength, label) {
+  return z
+    .string()
+    .trim()
+    .max(
+      maxLength,
+      `${label} must not exceed ${maxLength} characters.`,
+    )
+    .optional()
+    .default('');
+}
+
+function optionalPhone(label) {
+  return optionalText(30, label).refine(
+    (value) => {
+      if (!value) {
+        return true;
+      }
+
+      const allowedCharacters = /^[+\d\s().-]+$/;
+      const digitCount = value.replace(/\D/g, '').length;
+
+      return allowedCharacters.test(value) && digitCount >= 6;
+    },
+    `Enter a valid ${label.toLowerCase()}.`,
+  );
+}
+
+const optionalEmail = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(190, 'Email must not exceed 190 characters.')
+  .refine(
+    (value) => value === '' || z.email().safeParse(value).success,
+    'Enter a valid email address.',
+  )
   .optional()
   .default('');
 
-const linkedinSchema = optionalText(500).refine((value) => {
-  if (!value) return true;
+const optionalLinkedIn = optionalText(
+  500,
+  'LinkedIn URL',
+).refine(
+  (value) => {
+    if (!value) {
+      return true;
+    }
 
-  try {
-    const url = new URL(value);
+    try {
+      const url = new URL(value);
+      const hostname = url.hostname.toLowerCase();
 
-    return (
-      url.protocol === 'https:' &&
-      !url.username &&
-      !url.password &&
-      (url.hostname === 'linkedin.com' ||
-        url.hostname.endsWith('.linkedin.com'))
-    );
-  } catch {
-    return false;
-  }
-}, 'Enter a valid HTTPS LinkedIn URL.');
+      const isLinkedIn =
+        hostname === 'linkedin.com' ||
+        hostname.endsWith('.linkedin.com');
 
+      return (
+        url.protocol === 'https:' &&
+        isLinkedIn &&
+        !url.username &&
+        !url.password
+      );
+    } catch {
+      return false;
+    }
+  },
+  'Enter a valid HTTPS LinkedIn URL.',
+);
+
+/*
+ * Fields shared by contact creation and editing.
+ *
+ * Ownership, company assignment, and communication status
+ * are handled separately from ordinary profile edits.
+ */
+const contactFields = {
+  name: z
+    .string()
+    .trim()
+    .min(2, 'Contact name must contain at least 2 characters.')
+    .max(150, 'Contact name must not exceed 150 characters.'),
+
+  designation: optionalText(150, 'Designation'),
+
+  department: optionalText(100, 'Department'),
+
+  phone: optionalPhone('Phone number'),
+
+  whatsapp: optionalPhone('WhatsApp number'),
+
+  email: optionalEmail,
+
+  linkedin: optionalLinkedIn,
+
+  decision_maker: z.boolean().optional().default(false),
+
+  notes: optionalText(5000, 'Notes'),
+};
+
+/*
+ * POST /api/contacts
+ */
 export const createContactSchema = z
   .object({
     company_id: companyIdSchema,
-    name: z.string().trim().min(2).max(150),
-    designation: optionalText(150),
-    department: optionalText(100),
-    phone: phoneSchema,
-    whatsapp: phoneSchema,
-    email: emailSchema,
-    linkedin: linkedinSchema,
-    decision_maker: z.boolean().default(false),
-    notes: optionalText(5000),
+    ...contactFields,
   })
   .strict();
 
-export const listContactsSchema = z.object({
-  company_id: companyIdSchema.optional(),
-  search: z.string().trim().max(100).optional().default(''),
-  page: z.coerce.number().int().min(1).max(100000).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(10),
-});
+/*
+ * PUT /api/contacts/:id
+ *
+ * The client sends the version loaded with the contact.
+ * The repository will compare it with the database version
+ * inside the update transaction.
+ *
+ * This is a full profile update, not a partial PATCH.
+ */
+export const updateContactSchema = z
+  .object({
+    ...contactFields,
+
+    version: z
+      .number()
+      .int('Contact version must be an integer.')
+      .min(1, 'Contact version is invalid.')
+      .max(4294967294, 'Contact version is invalid.'),
+  })
+  .strict();
+
+/*
+ * GET /api/contacts
+ */
+export const listContactsSchema = z
+  .object({
+    company_id: companyIdSchema.optional(),
+
+    search: z
+      .string()
+      .trim()
+      .max(100, 'Search must not exceed 100 characters.')
+      .optional()
+      .default(''),
+
+    page: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100000)
+      .optional()
+      .default(1),
+
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .default(10),
+  })
+  .strict();

@@ -21,10 +21,10 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-canvas">
       <a
         href="#page-content"
-        className="sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:not-sr-only focus:rounded-lg focus:bg-white focus:p-3 focus:text-action"
+        className="sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:not-sr-only focus:rounded-lg focus:bg-surface focus:p-3 focus:text-action"
       >
         Skip to content
       </a>

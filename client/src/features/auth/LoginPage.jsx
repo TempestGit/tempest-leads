@@ -32,7 +32,7 @@ const loginSchema = z.object({
 });
 
 const inputClass =
-  'mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-slate-900 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-100 disabled:opacity-60';
+  'mt-2 w-full rounded-lg border border-line-strong bg-field px-3 py-3 text-ink outline-none focus:border-focus focus:ring-2 focus:ring-brand-soft disabled:opacity-60';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -78,7 +78,7 @@ export default function LoginPage() {
 
   if (session.isPending) {
     return (
-      <main className="grid min-h-screen place-items-center bg-slate-950 text-white">
+      <main className="grid min-h-screen place-items-center bg-canvas text-ink">
         <p role="status">Checking your session…</p>
       </main>
     );
@@ -89,31 +89,31 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-screen bg-white lg:grid-cols-2">
+    <main className="grid min-h-screen bg-surface lg:grid-cols-2">
       <section className="flex flex-col px-6 py-8 sm:px-12">
         <div>
-          <p className="text-xl font-extrabold tracking-wide text-slate-900">
-            TEMPEST <span className="text-red-600">LEADS</span>
+          <p className="text-xl font-extrabold tracking-wide text-ink">
+            TEMPEST <span className="text-brand">LEADS</span>
           </p>
 
-          <p className="mt-1 text-xs tracking-widest text-slate-500">
+          <p className="mt-1 text-xs tracking-widest text-muted">
             ACQUISITION CRM
           </p>
         </div>
 
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-12">
-          <h1 className="text-3xl font-bold text-slate-900">
+          <h1 className="text-3xl font-bold text-ink">
             Welcome back
           </h1>
 
-          <p className="mt-3 text-slate-600">
+          <p className="mt-3 text-subtle">
             Sign in with your Tempest Leads account.
           </p>
 
           {session.isError && (
             <div
               role="alert"
-              className="mt-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-900"
+              className="mt-6 rounded-lg bg-warning-soft p-4 text-sm text-[var(--crm-warning-text)]"
             >
               {session.error.message}
 
@@ -131,7 +131,7 @@ export default function LoginPage() {
           {submitError && (
             <div
               role="alert"
-              className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700"
+              className="mt-6 rounded-lg bg-danger-soft p-4 text-sm text-danger"
             >
               {submitError}
             </div>
@@ -145,7 +145,7 @@ export default function LoginPage() {
             <div>
               <label
                 htmlFor="email"
-                className="text-sm font-semibold text-slate-700"
+                className="text-sm font-semibold text-subtle"
               >
                 Email address
               </label>
@@ -166,7 +166,7 @@ export default function LoginPage() {
               {errors.email && (
                 <p
                   id="email-error"
-                  className="mt-2 text-sm text-red-600"
+                  className="mt-2 text-sm text-danger"
                 >
                   {errors.email.message}
                 </p>
@@ -176,7 +176,7 @@ export default function LoginPage() {
             <div>
               <label
                 htmlFor="password"
-                className="text-sm font-semibold text-slate-700"
+                className="text-sm font-semibold text-subtle"
               >
                 Password
               </label>
@@ -202,12 +202,12 @@ export default function LoginPage() {
                     showPassword ? 'Hide password' : 'Show password'
                   }
                   aria-controls="password"
-                  className="absolute right-3 top-5 rounded p-1 text-slate-500 focus-visible:outline-2 focus-visible:outline-red-600"
+                  className="absolute right-3 top-5 rounded p-1 text-muted focus-visible:outline-2 focus-visible:outline-focus"
                 >
                   {showPassword ? (
-                    <EyeOff size={20} />
+                    <EyeOff size={20} aria-hidden="true" />
                   ) : (
-                    <Eye size={20} />
+                    <Eye size={20} aria-hidden="true" />
                   )}
                 </button>
               </div>
@@ -215,18 +215,18 @@ export default function LoginPage() {
               {errors.password && (
                 <p
                   id="password-error"
-                  className="mt-2 text-sm text-red-600"
+                  className="mt-2 text-sm text-danger"
                 >
                   {errors.password.message}
                 </p>
               )}
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-slate-600">
+            <label className="flex items-center gap-2 text-sm text-subtle">
               <input
                 type="checkbox"
                 disabled={isSubmitting}
-                className="size-4 accent-red-600"
+                className="size-4 accent-brand"
                 {...register('rememberMe')}
               />
               Remember me
@@ -235,7 +235,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-3 font-semibold text-surface hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting && (
                 <LoaderCircle
@@ -251,9 +251,9 @@ export default function LoginPage() {
         </div>
       </section>
 
-      <aside className="hidden items-end bg-slate-900 p-16 text-white lg:flex">
+      <aside className="hidden items-end bg-sidebar p-16 text-sidebar-ink lg:flex">
         <div className="max-w-lg">
-          <p className="text-sm font-semibold tracking-widest text-red-400">
+          <p className="text-sm font-semibold tracking-widest text-sidebar-accent">
             TEMPEST ADVERTISING
           </p>
 
@@ -261,7 +261,7 @@ export default function LoginPage() {
             Turn every opportunity into a clear next move.
           </h2>
 
-          <p className="mt-6 leading-relaxed text-slate-300">
+          <p className="mt-6 leading-relaxed text-sidebar-muted">
             Manage acquisition, client onboarding, and long-term
             relationships in one workspace.
           </p>

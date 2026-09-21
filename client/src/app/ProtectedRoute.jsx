@@ -6,7 +6,7 @@ export default function ProtectedRoute() {
 
   if (session.isPending) {
     return (
-      <main className="grid min-h-screen place-items-center bg-slate-950 text-white">
+      <main className="grid min-h-screen place-items-center bg-canvas text-ink">
         <p role="status">Checking your session…</p>
       </main>
     );
@@ -14,13 +14,13 @@ export default function ProtectedRoute() {
 
   if (session.isError) {
     return (
-      <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-white">
+      <main className="grid min-h-screen place-items-center bg-canvas p-6 text-ink">
         <div className="max-w-md text-center">
           <h1 className="text-xl font-semibold">
             Could not check your session
           </h1>
 
-          <p className="mt-3 text-slate-300" role="alert">
+          <p className="mt-3 text-subtle" role="alert">
             {session.error.message}
           </p>
 
@@ -28,7 +28,7 @@ export default function ProtectedRoute() {
             type="button"
             onClick={() => session.refetch()}
             disabled={session.isFetching}
-            className="mt-6 rounded-lg bg-red-600 px-5 py-3 font-semibold disabled:opacity-50"
+            className="mt-6 rounded-lg bg-brand text-surface px-5 py-3 font-semibold disabled:opacity-50"
           >
             {session.isFetching ? 'Retrying…' : 'Try again'}
           </button>

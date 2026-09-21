@@ -6,17 +6,18 @@ import {
   index,
   create,
   show,
-  update,
-} from './contacts.controller.js';
+  owners,
+} from './leads.controller.js';
 
 const router = Router();
 
 router.use(authenticate);
 
+// Static routes must come before /:id.
+router.get('/owners', owners);
+
 router.get('/', index);
 router.post('/', create);
-
 router.get('/:id', show);
-router.put('/:id', update);
 
 export default router;

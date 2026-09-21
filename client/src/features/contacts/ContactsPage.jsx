@@ -39,11 +39,11 @@ export default function ContactsPage({ companyId = null }) {
     <div className={companyId ? '' : 'mx-auto max-w-7xl'}>
       {!companyId && (
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-ink">
             Contact Master
           </h1>
 
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-subtle">
             View contacts across your accessible company records.
           </p>
 
@@ -68,26 +68,26 @@ export default function ContactsPage({ companyId = null }) {
             onChange={(event) => setSearchInput(event.target.value)}
             maxLength={100}
             placeholder="Search name, email, phone, or company"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            className="w-full rounded-lg border border-line-strong px-3 py-2.5 text-sm"
           />
         </label>
 
         <button
           type="submit"
-          className="rounded-lg bg-action px-4 py-2.5 text-sm font-semibold text-white hover:bg-action-hover"
+          className="rounded-lg bg-action px-4 py-2.5 text-sm font-semibold text-surface hover:bg-action-hover"
         >
           Search
         </button>
       </form>
 
-      <div className="mt-5 rounded-xl border border-slate-200 bg-white">
+      <div className="mt-5 rounded-xl border border-line bg-surface">
         {query.isPending ? (
-          <p role="status" className="p-6 text-slate-600">
+          <p role="status" className="p-6 text-subtle">
             Loading contacts…
           </p>
         ) : query.isError ? (
           <div className="p-6">
-            <p role="alert" className="text-red-700">
+            <p role="alert" className="text-[var(--crm-danger-text)]">
               {query.error.message}
             </p>
 
@@ -110,22 +110,25 @@ export default function ContactsPage({ companyId = null }) {
             )}
           </div>
         ) : contacts.length === 0 ? (
-          <p className="p-6 text-sm text-slate-600">
+          <p className="p-6 text-sm text-subtle">
             {filters.search
               ? 'No contacts match your search.'
               : 'No contacts have been added yet.'}
           </p>
         ) : (
-          <ul className="divide-y divide-slate-200">
+          <ul className="divide-y divide-line">
             {contacts.map((contact) => (
               <li key={contact.id} className="p-4 sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-900">
+                    <Link
+                      to={`/contacts/${contact.id}`}
+                      className="font-semibold text-action hover:underline"
+                    >
                       {contact.name}
-                    </p>
+                    </Link>
 
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-1 text-sm text-subtle">
                       {contact.designation || 'Designation not provided'}
                       {contact.department
                         ? ` · ${contact.department}`
@@ -140,7 +143,7 @@ export default function ContactsPage({ companyId = null }) {
                   )}
                 </div>
 
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-subtle">
                   {contact.company_name}
                 </p>
 
@@ -159,10 +162,10 @@ export default function ContactsPage({ companyId = null }) {
                     ],
                   ].map(([label, value]) => (
                     <div key={label} className="min-w-0">
-                      <dt className="text-xs text-slate-500">
+                      <dt className="text-xs text-muted">
                         {label}
                       </dt>
-                      <dd className="mt-1 break-words text-slate-900">
+                      <dd className="mt-1 break-words text-ink">
                         {value || '—'}
                       </dd>
                     </div>
@@ -170,7 +173,7 @@ export default function ContactsPage({ companyId = null }) {
                 </dl>
 
                 {contact.notes && (
-                  <p className="mt-4 text-sm whitespace-pre-wrap break-words text-slate-600">
+                  <p className="mt-4 text-sm whitespace-pre-wrap break-words text-subtle">
                     {contact.notes}
                   </p>
                 )}
@@ -180,8 +183,8 @@ export default function ContactsPage({ companyId = null }) {
         )}
 
         {pagination && !query.isError && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 p-4 text-sm">
-            <p className="text-slate-600">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line p-4 text-sm">
+            <p className="text-subtle">
               {pagination.total} contacts · Page {pagination.page} of{' '}
               {pagination.totalPages}
             </p>
@@ -196,7 +199,7 @@ export default function ContactsPage({ companyId = null }) {
                     page: current.page - 1,
                   }))
                 }
-                className="rounded-lg border px-3 py-2 disabled:opacity-40"
+                className="rounded-lg border border-line-strong px-3 py-2 disabled:opacity-40"
               >
                 Previous
               </button>
@@ -213,7 +216,7 @@ export default function ContactsPage({ companyId = null }) {
                     page: current.page + 1,
                   }))
                 }
-                className="rounded-lg border px-3 py-2 disabled:opacity-40"
+                className="rounded-lg border border-line-strong px-3 py-2 disabled:opacity-40"
               >
                 Next
               </button>
