@@ -7,6 +7,9 @@ import authRoutes from './modules/auth/auth.routes.js';
 import companiesRoutes from './modules/companies/companies.routes.js';
 import contactsRoutes from './modules/contacts/contacts.routes.js';
 import leadsRoutes from './modules/leads/leads.routes.js';
+import activitiesRoutes from './modules/activities/activities.routes.js';
+import followUpsRoutes from './modules/follow-ups/followUps.routes.js';
+import meetingsRoutes from './modules/meetings/meetings.routes.js';
 
 const app = express();
 
@@ -52,6 +55,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/companies', companiesRoutes);
 app.use('/api/contacts', contactsRoutes);
 app.use('/api/leads', leadsRoutes);
+app.use('/api/activities', activitiesRoutes);
+app.use('/api/follow-ups', followUpsRoutes);
+app.use('/api/meetings', meetingsRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({

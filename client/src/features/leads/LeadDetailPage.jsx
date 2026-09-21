@@ -6,6 +6,9 @@ import {
 } from 'react-router-dom';
 
 import { fetchLead } from './leads.api';
+import LeadActivitiesPanel from '../activities/LeadActivitiesPanel';
+import LeadFollowUpsPanel from '../follow-ups/LeadFollowUpsPanel';
+import LeadMeetingsPanel from '../meetings/LeadMeetingsPanel';
 
 const stageLabels = {
   NEW: 'New',
@@ -156,7 +159,7 @@ export default function LeadDetailPage() {
     );
   }
 
-  if (query.isError) {
+  if (query.isError && !query.data) {
     return (
       <div className="mx-auto max-w-7xl text-ink">
         {backLink}
@@ -376,6 +379,9 @@ export default function LeadDetailPage() {
             value={formatDate(lead.stage_entered_at)}
           />
         </DetailSection>
+        <LeadMeetingsPanel lead={lead} />
+        <LeadFollowUpsPanel lead={lead} />
+        <LeadActivitiesPanel lead={lead} />
       </div>
     </div>
   );

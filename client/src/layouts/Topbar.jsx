@@ -15,6 +15,8 @@ export default function Topbar({
     '/contacts': 'Contact Master',
     '/leads': 'Leads & Pipeline',
     '/leads/new': 'Create Lead',
+    '/activities': 'Activities',
+    '/follow-ups': 'Follow-ups',
   };
 
 const title =

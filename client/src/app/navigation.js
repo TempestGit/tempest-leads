@@ -50,6 +50,7 @@ export const navigation = [
         label: 'Activities',
         to: '/activities',
         icon: Activity,
+        enabled: true,
       },
       {
         label: 'Meetings',
@@ -60,6 +61,7 @@ export const navigation = [
         label: 'Follow-ups',
         to: '/follow-ups',
         icon: ListChecks,
+        enabled: true,
       },
     ],
   },

@@ -19,6 +19,8 @@ import ContactDetailPage from './features/contacts/ContactDetailPage';
 import LeadsPage from './features/leads/LeadsPage';
 import CreateLeadPage from './features/leads/CreateLeadPage';
 import LeadDetailPage from './features/leads/LeadDetailPage';
+import ActivitiesPage from './features/activities/ActivitiesPage';
+import FollowUpsPage from './features/follow-ups/FollowUpsPage';
 
 
 
@@ -67,6 +69,8 @@ export default function App() {
           <Route path="leads" element={<LeadsPage />} />
           <Route path="leads/new" element={<CreateLeadPage />} />
           <Route path="leads/:id" element={<LeadDetailPage />} />
+          <Route path="activities" element={<ActivitiesPage />} />
+          <Route path="follow-ups" element={<FollowUpsPage />} />
         </Route>
       </Route>
 
