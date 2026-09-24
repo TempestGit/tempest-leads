@@ -20,6 +20,8 @@ import errorMiddleware from "./middleware/error.middleware.js";
 
 const app = express();
 
+// Testing
+
 /*
 |--------------------------------------------------------------------------
 | Security
