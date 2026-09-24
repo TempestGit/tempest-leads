@@ -1,0 +1,8 @@
+ALTER TABLE meetings
+    ADD COLUMN IF NOT EXISTS contact_id BIGINT UNSIGNED NULL AFTER lead_id,
+    ADD COLUMN IF NOT EXISTS participants_json JSON NULL AFTER meeting_type,
+    ADD COLUMN IF NOT EXISTS agenda TEXT NULL AFTER location,
+    ADD COLUMN IF NOT EXISTS next_action VARCHAR(500) NULL AFTER outcome,
+    ADD COLUMN IF NOT EXISTS follow_up_at DATETIME NULL AFTER next_action,
+    ADD COLUMN IF NOT EXISTS completed_by BIGINT UNSIGNED NULL AFTER completed_at,
+    ADD COLUMN IF NOT EXISTS status_reason TEXT NULL AFTER completed_by;
