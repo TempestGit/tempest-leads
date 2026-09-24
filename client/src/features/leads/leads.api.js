@@ -20,6 +20,22 @@ export const getLeadsRequest =
 
     return response.data;
   };
+  
+/*
+|--------------------------------------------------------------------------
+| Lead Owners
+|--------------------------------------------------------------------------
+*/
+
+export const getLeadOwnersRequest =
+  async () => {
+    const response =
+      await apiClient.get(
+        "/leads/owners"
+      );
+
+    return response.data;
+  };
 
 /*
 |--------------------------------------------------------------------------

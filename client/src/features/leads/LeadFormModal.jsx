@@ -12,7 +12,7 @@ import useAuth from "../auth/useAuth.js";
 
 import {
   useCreateLeadMutation,
-  useLeadOptionsQuery,
+  useLeadOwnersQuery,
 } from "./leads.queries.js";
 
 import {
@@ -55,8 +55,10 @@ const LeadFormModal = ({
     user,
   } = useAuth();
 
-  const optionsQuery =
-    useLeadOptionsQuery();
+  const ownersQuery =
+    useLeadOwnersQuery(
+      open
+    );
 
   const createMutation =
     useCreateLeadMutation();
@@ -79,7 +81,7 @@ const LeadFormModal = ({
   ] = useState({});
 
   const owners =
-    optionsQuery
+    ownersQuery
       .data
       ?.data
       ?.owners || [];
@@ -1059,6 +1061,43 @@ const LeadFormModal = ({
                 Ownership
               </h3>
 
+              {ownersQuery.isError && (
+                <div className="error-box">
+                  {ownersQuery
+                    .error
+                    ?.response
+                    ?.data
+                    ?.message ||
+                    "Unable to load owners."}
+
+                  <div
+                    style={{
+                      marginTop:
+                        "8px",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="tl-link"
+                      onClick={() =>
+                        ownersQuery.refetch()
+                      }
+                    >
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!ownersQuery.isLoading &&
+                !ownersQuery.isError &&
+                owners.length === 0 && (
+                  <div className="error-box">
+                    No active owners are
+                    available.
+                  </div>
+                )}
+
               <div className="form-grid2">
                 <label>
                   Owner *
@@ -1073,14 +1112,17 @@ const LeadFormModal = ({
                       )
                     }
                     disabled={
-                      optionsQuery.isLoading
+                      ownersQuery.isLoading ||
+                      ownersQuery.isError
                     }
                     autoFocus
                   >
                     <option value="">
-                      {optionsQuery.isLoading
+                      {ownersQuery.isLoading
                         ? "Loading owners..."
-                        : "Select owner"}
+                        : owners.length === 0
+                          ? "No owners available"
+                          : "Select owner"}
                     </option>
 
                     {owners.map(
@@ -1095,9 +1137,13 @@ const LeadFormModal = ({
                             owner.id
                           }
                         >
-                          {
-                            owner.name
-                          }
+                          {owner.fullName ||
+                            owner.name ||
+                            `User ${owner.id}`}
+
+                          {owner.branchName
+                            ? ` · ${owner.branchName}`
+                            : ""}
                         </option>
                       )
                     )}

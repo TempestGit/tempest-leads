@@ -22,6 +22,7 @@ import {
   createLeadController,
   getLeadController,
   getLeadOptionsController,
+  getLeadOwnersController,
   listLeadsController,
   markLeadLostController,
   updateLeadController,
@@ -83,6 +84,26 @@ router.post(
 
   asyncHandler(
     createLeadController
+  )
+);
+
+/*
+|--------------------------------------------------------------------------
+| Owner Options
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+  "/owners",
+  asyncHandler(
+    getLeadOwnersController
+  )
+);
+
+router.get(
+  "/options",
+  asyncHandler(
+    getLeadOptionsController
   )
 );
 

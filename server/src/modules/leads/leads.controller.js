@@ -7,6 +7,7 @@ import {
   getLeadsService,
   markLeadLostService,
   updateLeadService,
+  getLeadOwnersService,
 } from "./leads.service.js";
 
 /*
@@ -309,5 +310,29 @@ export const markLeadLostController =
       data: {
         lead,
       },
+    });
+  };
+
+  /*
+|--------------------------------------------------------------------------
+| Owner Options
+|--------------------------------------------------------------------------
+*/
+
+export const getLeadOwnersController =
+  async (
+    req,
+    res
+  ) => {
+    const result =
+      await getLeadOwnersService(
+        req.user
+      );
+
+    res.status(200).json({
+      success: true,
+
+      data:
+        result,
     });
   };

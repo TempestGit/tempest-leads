@@ -3688,3 +3688,728 @@ a {
   background: var(--crm-success-soft);
   color: var(--crm-success);
 }
+
+/*
+|--------------------------------------------------------------------------
+| Brief
+|--------------------------------------------------------------------------
+*/
+
+.brief-modal {
+  width: min(
+    980px,
+    calc(100vw - 32px)
+  );
+
+  max-width: 980px;
+}
+
+.brief-modal-body {
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Brief Form Grid
+|--------------------------------------------------------------------------
+*/
+
+.brief-form-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap: 14px;
+}
+
+.brief-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.brief-form-grid
+  .brief-full {
+  grid-column: 1 / -1;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Progress
+|--------------------------------------------------------------------------
+*/
+
+.brief-progress-card {
+  display: grid;
+  gap: 8px;
+
+  margin-bottom: 18px;
+  padding: 13px 14px;
+
+  border: 1px solid
+    var(--crm-border);
+  border-radius: 8px;
+
+  background:
+    var(--crm-canvas);
+}
+
+.brief-progress-card
+  > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content:
+    space-between;
+  gap: 12px;
+}
+
+.brief-progress-card small {
+  color:
+    var(--crm-muted);
+
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.brief-progress-card b {
+  color:
+    var(--crm-heading);
+
+  font-size: 14px;
+}
+
+.brief-progress-track {
+  width: 100%;
+  height: 7px;
+
+  overflow: hidden;
+
+  border-radius: 999px;
+
+  background:
+    var(--crm-border);
+}
+
+.brief-progress-track span {
+  display: block;
+
+  height: 100%;
+
+  border-radius: inherit;
+
+  background:
+    var(--crm-success);
+
+  transition:
+    width 180ms ease;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Missing Fields
+|--------------------------------------------------------------------------
+*/
+
+.brief-missing {
+  display: grid;
+  gap: 5px;
+
+  margin-top: 16px;
+  padding: 12px 14px;
+
+  border: 1px solid
+    var(--crm-warning);
+  border-radius: 8px;
+
+  background:
+    var(--crm-warning-soft);
+}
+
+.brief-missing b {
+  color:
+    var(--crm-warning);
+
+  font-size: 11px;
+}
+
+.brief-missing p {
+  margin: 0;
+
+  color:
+    var(--crm-text-secondary);
+
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Route Preview
+|--------------------------------------------------------------------------
+*/
+
+.brief-route-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  margin-top: 12px;
+  padding: 12px 14px;
+
+  border: 1px solid
+    var(--crm-border);
+  border-radius: 8px;
+
+  background:
+    var(--crm-canvas);
+}
+
+.brief-route-preview b {
+  color:
+    var(--crm-heading);
+
+  font-size: 11px;
+}
+
+.brief-route-preview span {
+  color:
+    var(--crm-text-secondary);
+
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Brief Summary
+|--------------------------------------------------------------------------
+*/
+
+.brief-summary-grid {
+  margin-top: 16px;
+}
+
+.brief-panel-progress {
+  display: grid;
+  gap: 7px;
+
+  margin-top: 18px;
+}
+
+.brief-panel-progress small {
+  color:
+    var(--crm-muted);
+
+  font-size: 9.5px;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Clarification
+|--------------------------------------------------------------------------
+*/
+
+.brief-clarification {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  margin-top: 18px;
+  padding: 12px 14px;
+
+  border: 1px solid
+    var(--crm-warning);
+  border-radius: 8px;
+
+  background:
+    var(--crm-warning-soft);
+}
+
+.brief-clarification b {
+  color:
+    var(--crm-warning);
+
+  font-size: 11px;
+}
+
+.brief-clarification span {
+  color:
+    var(--crm-text-secondary);
+
+  font-size: 10px;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Route Card
+|--------------------------------------------------------------------------
+*/
+
+.brief-route-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  margin-top: 18px;
+  padding: 14px;
+
+  border: 1px solid
+    var(--crm-border);
+  border-radius: 8px;
+
+  background:
+    var(--crm-canvas);
+}
+
+.brief-route-card small {
+  color:
+    var(--crm-muted);
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.brief-route-card b {
+  color:
+    var(--crm-heading);
+
+  font-size: 12px;
+}
+
+.brief-route-card span {
+  color:
+    var(--crm-text-secondary);
+
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.brief-route-card p {
+  margin:
+    5px 0 0;
+
+  color:
+    var(--crm-text);
+
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.brief-empty-state {
+  margin-top: 18px;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Responsive
+|--------------------------------------------------------------------------
+*/
+
+@media (
+  max-width: 760px
+) {
+  .brief-modal {
+    width:
+      calc(
+        100vw - 20px
+      );
+  }
+
+  .brief-form-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+  .brief-form-grid
+    .brief-full {
+    grid-column:
+      auto;
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Team Assignment
+|--------------------------------------------------------------------------
+*/
+
+.team-assignment-summary {
+  margin-top: 16px;
+}
+
+.team-assignment-error {
+  margin-top: 16px;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Responsibility Coverage
+|--------------------------------------------------------------------------
+*/
+
+.team-responsibility-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      4,
+      minmax(0, 1fr)
+    );
+
+  gap: 10px;
+
+  margin-top: 18px;
+}
+
+.team-responsibility-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  min-height: 82px;
+
+  padding: 12px;
+
+  border:
+    1px solid
+    var(--crm-border);
+
+  border-radius:
+    8px;
+
+  background:
+    var(--crm-canvas);
+}
+
+.team-responsibility-card.assigned {
+  background:
+    var(--crm-surface);
+}
+
+.team-responsibility-card small {
+  color:
+    var(--crm-muted);
+
+  font-size: 9px;
+  font-weight: 700;
+
+  text-transform:
+    uppercase;
+
+  letter-spacing:
+    .04em;
+}
+
+.team-responsibility-card b {
+  color:
+    var(--crm-heading);
+
+  font-size:
+    11px;
+
+  line-height:
+    1.4;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Status
+|--------------------------------------------------------------------------
+*/
+
+.team-assignment-status {
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  width:
+    max-content;
+
+  min-height:
+    24px;
+
+  margin-top:
+    2px;
+
+  padding:
+    4px 8px;
+
+  border-radius:
+    6px;
+
+  background:
+    var(--crm-canvas);
+
+  color:
+    var(--crm-muted);
+
+  font-size:
+    9px;
+
+  font-weight:
+    700;
+}
+
+.team-assignment-status.pending {
+  background:
+    var(--crm-warning-soft);
+
+  color:
+    var(--crm-warning);
+}
+
+.team-assignment-status.in-progress {
+  background:
+    var(--crm-info-soft);
+
+  color:
+    var(--crm-info);
+}
+
+.team-assignment-status.completed {
+  background:
+    var(--crm-success-soft);
+
+  color:
+    var(--crm-success);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Table
+|--------------------------------------------------------------------------
+*/
+
+.team-assignment-table-wrap {
+  margin-top:
+    20px;
+}
+
+.team-status-select {
+  min-width:
+    118px;
+}
+
+.team-assignment-actions {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    10px;
+
+  white-space:
+    nowrap;
+}
+
+.team-remove-action {
+  color:
+    var(--crm-danger);
+}
+
+.team-assignment-empty {
+  margin-top:
+    20px;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Responsive
+|--------------------------------------------------------------------------
+*/
+
+@media (
+  max-width: 1050px
+) {
+  .team-responsibility-grid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+}
+
+@media (
+  max-width: 600px
+) {
+  .team-responsibility-grid {
+    grid-template-columns:
+      1fr;
+  }
+}
+
+.lead-lifecycle-stack {
+  display: grid;
+  gap: 18px;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Branch-aware Team Assignment
+|--------------------------------------------------------------------------
+*/
+
+.team-lead-branch-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  padding: 10px 12px;
+
+  border:
+    1px solid
+    var(--crm-border);
+
+  border-radius:
+    7px;
+
+  background:
+    var(--crm-canvas);
+}
+
+.team-lead-branch-field small {
+  color:
+    var(--crm-muted);
+
+  font-size:
+    9px;
+
+  font-weight:
+    700;
+}
+
+.team-lead-branch-field b {
+  color:
+    var(--crm-heading);
+
+  font-size:
+    11px;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Cross Branch Toggle
+|--------------------------------------------------------------------------
+*/
+
+.team-cross-branch-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-bottom: 14px;
+
+  color:
+    var(--crm-text);
+
+  font-size:
+    10px;
+
+  font-weight:
+    700;
+
+  cursor: pointer;
+}
+
+.team-cross-branch-toggle input {
+  width: 14px;
+  height: 14px;
+
+  margin: 0;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Cross Branch Notice
+|--------------------------------------------------------------------------
+*/
+
+.team-cross-branch-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  margin-top: 14px;
+
+  padding: 11px 13px;
+
+  border:
+    1px solid
+    var(--crm-info);
+
+  border-radius:
+    7px;
+
+  background:
+    var(--crm-info-soft);
+}
+
+.team-cross-branch-note b {
+  color:
+    var(--crm-info);
+
+  font-size:
+    10px;
+}
+
+.team-cross-branch-note span {
+  color:
+    var(--crm-text-secondary);
+
+  font-size:
+    9.5px;
+
+  line-height:
+    1.5;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Branch Details
+|--------------------------------------------------------------------------
+*/
+
+.team-member-branch {
+  color:
+    var(--crm-muted);
+
+  font-size:
+    9px;
+}
+
+.team-branch-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.team-cross-branch-badge {
+  display: inline-flex;
+
+  padding: 3px 6px;
+
+  border-radius: 5px;
+
+  background:
+    var(--crm-info-soft);
+
+  color:
+    var(--crm-info);
+
+  font-size:
+    8.5px;
+
+  font-weight:
+    700;
+}

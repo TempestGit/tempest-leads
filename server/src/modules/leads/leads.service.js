@@ -15,6 +15,10 @@ import {
 } from "../nurture/nurture.repository.js";
 
 import {
+  listAssignableLeadOwners,
+} from "./leads.repository.js";
+
+import {
   closeLeadState,
   createLeadFollowup,
   createLeadStageHistory,
@@ -1383,4 +1387,34 @@ export const markLeadLostService =
     } finally {
       connection.release();
     }
+  };
+
+  /*
+|--------------------------------------------------------------------------
+| Get Assignable Owners
+|--------------------------------------------------------------------------
+*/
+
+export const getLeadOwnersService =
+  async (
+    currentUser
+  ) => {
+    if (
+      currentUser.role !==
+      "SUPER_ADMIN"
+    ) {
+      throw new ApiError(
+        403,
+        "Only Super Admin can assign or reassign lead owners.",
+        [],
+        "FORBIDDEN"
+      );
+    }
+
+    const owners =
+      await listAssignableLeadOwners();
+
+    return {
+      owners,
+    };
   };

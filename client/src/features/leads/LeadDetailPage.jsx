@@ -22,17 +22,57 @@ import {
   useActivitiesQuery,
 } from "../activities/activities.queries.js";
 
+/*
+|--------------------------------------------------------------------------
+| Lead Actions
+|--------------------------------------------------------------------------
+*/
+
 import AssignOwnerModal from "./AssignOwnerModal.jsx";
 import ChangeStageModal from "./ChangeStageModal.jsx";
 import MarkLostModal from "./MarkLostModal.jsx";
 
+/*
+|--------------------------------------------------------------------------
+| Activities
+|--------------------------------------------------------------------------
+*/
+
 import ActivityTimeline from "../activities/ActivityTimeline.jsx";
 import AddActivityModal from "../activities/AddActivityModal.jsx";
+
+/*
+|--------------------------------------------------------------------------
+| Meetings
+|--------------------------------------------------------------------------
+*/
 
 import LeadMeetingsPanel from "../meetings/LeadMeetingsPanel.jsx";
 import ScheduleMeetingModal from "../meetings/ScheduleMeetingModal.jsx";
 
+/*
+|--------------------------------------------------------------------------
+| Follow-ups
+|--------------------------------------------------------------------------
+*/
+
 import LeadFollowupsPanel from "../followups/LeadFollowupsPanel.jsx";
+
+/*
+|--------------------------------------------------------------------------
+| Brief
+|--------------------------------------------------------------------------
+*/
+
+import LeadBriefPanel from "../briefs/LeadBriefPanel.jsx";
+
+import TeamAssignmentsPanel from "../teamAssignments/TeamAssignmentsPanel.jsx";
+
+/*
+|--------------------------------------------------------------------------
+| Nurture
+|--------------------------------------------------------------------------
+*/
 
 import LeadNurturePanel from "../nurture/LeadNurturePanel.jsx";
 
@@ -59,7 +99,7 @@ const TABS = [
 
 /*
 |--------------------------------------------------------------------------
-| Date
+| Format Date
 |--------------------------------------------------------------------------
 */
 
@@ -155,21 +195,37 @@ const statusClass = (
 const getWorkflow = (
   lead
 ) => {
+  /*
+  |--------------------------------------------------------------------------
+  | Known / Existing
+  |--------------------------------------------------------------------------
+  */
+
   if (
     lead.knownRelationship
   ) {
     return [
       "Brief",
+      "Scope Confirmation",
       "Commercials",
       "Contract / PO",
+      "Team Assignment",
+      "Pitch",
       "Onboarding",
       "Active Client",
-      "Pitch",
     ];
   }
 
+  /*
+  |--------------------------------------------------------------------------
+  | New / Unknown
+  |--------------------------------------------------------------------------
+  */
+
   return [
     "Brief",
+    "Understand Client + Industry",
+    "Team Assignment",
     "Pitch",
     "Commercials",
     "Contract / PO",
@@ -180,7 +236,7 @@ const getWorkflow = (
 
 /*
 |--------------------------------------------------------------------------
-| Placeholder
+| Lifecycle Placeholder
 |--------------------------------------------------------------------------
 */
 
@@ -224,7 +280,7 @@ const LeadDetailPage =
 
     /*
     |--------------------------------------------------------------------------
-    | UI State
+    | Tab
     |--------------------------------------------------------------------------
     */
 
@@ -234,6 +290,12 @@ const LeadDetailPage =
     ] = useState(
       "Overview"
     );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Modals
+    |--------------------------------------------------------------------------
+    */
 
     const [
       stageModalOpen,
@@ -270,6 +332,12 @@ const LeadDetailPage =
       false
     );
 
+    /*
+    |--------------------------------------------------------------------------
+    | Requested Stage
+    |--------------------------------------------------------------------------
+    */
+
     const [
       requestedStage,
       setRequestedStage,
@@ -296,7 +364,7 @@ const LeadDetailPage =
 
     /*
     |--------------------------------------------------------------------------
-    | Contacts
+    | Contacts Query Params
     |--------------------------------------------------------------------------
     */
 
@@ -321,6 +389,12 @@ const LeadDetailPage =
         ]
       );
 
+    /*
+    |--------------------------------------------------------------------------
+    | Contacts
+    |--------------------------------------------------------------------------
+    */
+
     const contactsQuery =
       useContactsQuery(
         contactParams
@@ -337,7 +411,7 @@ const LeadDetailPage =
 
     /*
     |--------------------------------------------------------------------------
-    | Activities
+    | Activity Query Params
     |--------------------------------------------------------------------------
     */
 
@@ -357,6 +431,12 @@ const LeadDetailPage =
           leadId,
         ]
       );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Activities
+    |--------------------------------------------------------------------------
+    */
 
     const activitiesQuery =
       useActivitiesQuery(
@@ -446,7 +526,7 @@ const LeadDetailPage =
 
     /*
     |--------------------------------------------------------------------------
-    | Quick Actions
+    | Call
     |--------------------------------------------------------------------------
     */
 
@@ -462,6 +542,12 @@ const LeadDetailPage =
           `tel:${lead.primaryContactPhone}`;
       };
 
+    /*
+    |--------------------------------------------------------------------------
+    | Email
+    |--------------------------------------------------------------------------
+    */
+
     const emailContact =
       () => {
         if (
@@ -473,6 +559,12 @@ const LeadDetailPage =
         window.location.href =
           `mailto:${lead.primaryContactEmail}`;
       };
+
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp
+    |--------------------------------------------------------------------------
+    */
 
     const whatsappContact =
       () => {
@@ -499,7 +591,7 @@ const LeadDetailPage =
 
     /*
     |--------------------------------------------------------------------------
-    | Stage Modal
+    | Open Stage Modal
     |--------------------------------------------------------------------------
     */
 
@@ -535,16 +627,16 @@ const LeadDetailPage =
 
     /*
     |--------------------------------------------------------------------------
-    | Render Overview
+    | Overview
     |--------------------------------------------------------------------------
     */
 
     const renderOverview =
       () => (
         <div className="detail-grid">
-          {/* ------------------------------------------------------------- */}
+          {/* --------------------------------------------------------------- */}
           {/* Opportunity */}
-          {/* ------------------------------------------------------------- */}
+          {/* --------------------------------------------------------------- */}
 
           <article className="tl-card">
             <div className="tl-card-head">
@@ -554,6 +646,8 @@ const LeadDetailPage =
             </div>
 
             <div className="info-grid">
+              {/* Lead ID */}
+
               <div className="info-field">
                 <small>
                   Lead ID
@@ -566,6 +660,8 @@ const LeadDetailPage =
                 </b>
               </div>
 
+              {/* Requirement */}
+
               <div className="info-field">
                 <small>
                   Potential
@@ -577,6 +673,8 @@ const LeadDetailPage =
                     "—"}
                 </b>
               </div>
+
+              {/* Opportunity Value */}
 
               <div className="info-field">
                 <small>
@@ -591,6 +689,8 @@ const LeadDetailPage =
                 </b>
               </div>
 
+              {/* Source */}
+
               <div className="info-field">
                 <small>
                   Lead source
@@ -601,6 +701,8 @@ const LeadDetailPage =
                     "—"}
                 </b>
               </div>
+
+              {/* Stage */}
 
               <div className="info-field">
                 <small>
@@ -614,6 +716,8 @@ const LeadDetailPage =
                 </b>
               </div>
 
+              {/* Next Action */}
+
               <div className="info-field">
                 <small>
                   Next action
@@ -624,6 +728,8 @@ const LeadDetailPage =
                     "—"}
                 </b>
               </div>
+
+              {/* Follow-up */}
 
               <div className="info-field">
                 <small>
@@ -637,6 +743,8 @@ const LeadDetailPage =
                 </b>
               </div>
 
+              {/* Last Touch */}
+
               <div className="info-field">
                 <small>
                   Last touch
@@ -649,6 +757,8 @@ const LeadDetailPage =
                 </b>
               </div>
 
+              {/* Route */}
+
               <div className="info-field">
                 <small>
                   Route
@@ -656,10 +766,12 @@ const LeadDetailPage =
 
                 <b>
                   {lead.knownRelationship
-                    ? "Known / existing: commercials first"
-                    : "New / unknown: pitch first"}
+                    ? "Known / Existing"
+                    : "New / Unknown"}
                 </b>
               </div>
+
+              {/* Stage Age */}
 
               <div className="info-field">
                 <small>
@@ -674,9 +786,9 @@ const LeadDetailPage =
               </div>
             </div>
 
-            {/* ----------------------------------------------------------- */}
+            {/* ------------------------------------------------------------- */}
             {/* Route Decision */}
-            {/* ----------------------------------------------------------- */}
+            {/* ------------------------------------------------------------- */}
 
             <div
               className="tl-card-head"
@@ -706,6 +818,10 @@ const LeadDetailPage =
                 </span>
               </div>
             )}
+
+            {/* ------------------------------------------------------------- */}
+            {/* Workflow */}
+            {/* ------------------------------------------------------------- */}
 
             <div className="workflow">
               {workflow.map(
@@ -761,9 +877,9 @@ const LeadDetailPage =
             </div>
           </article>
 
-          {/* ------------------------------------------------------------- */}
+          {/* --------------------------------------------------------------- */}
           {/* Recent Activity */}
-          {/* ------------------------------------------------------------- */}
+          {/* --------------------------------------------------------------- */}
 
           <aside className="tl-card">
             <div className="tl-card-head">
@@ -882,7 +998,7 @@ const LeadDetailPage =
 
     /*
     |--------------------------------------------------------------------------
-    | Contacts Tab
+    | Contacts
     |--------------------------------------------------------------------------
     */
 
@@ -1015,7 +1131,7 @@ const LeadDetailPage =
 
     /*
     |--------------------------------------------------------------------------
-    | Activity Tab
+    | Activity Timeline
     |--------------------------------------------------------------------------
     */
 
@@ -1085,68 +1201,30 @@ const LeadDetailPage =
 
     /*
     |--------------------------------------------------------------------------
-    | Brief
-    |--------------------------------------------------------------------------
-    */
-
-    const renderBrief =
-      () => (
-        <article className="tl-card">
-          <div className="tl-card-head">
-            <h2>
-              BRIEF
-            </h2>
-          </div>
-
-          <p className="muted">
-            Capture a structured
-            brief before the
-            opportunity moves
-            forward.
-          </p>
-
-          <div className="info-grid">
-            <div className="info-field">
-              <small>
-                Status
-              </small>
-
-              <b>
-                Awaiting
-                clarification
-              </b>
-            </div>
-
-            <div className="info-field">
-              <small>
-                Known client /
-                industry
-              </small>
-
-              <b>
-                {lead.knownRelationship
-                  ? "Known / Existing"
-                  : "New / Unknown"}
-              </b>
-            </div>
-          </div>
-        </article>
-      );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Render Tab
+    | Tab Content
     |--------------------------------------------------------------------------
     */
 
     const renderTab =
       () => {
+        /*
+        |--------------------------------------------------------------------------
+        | Overview
+        |--------------------------------------------------------------------------
+        */
+
         if (
           activeTab ===
           "Overview"
         ) {
           return renderOverview();
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Contacts
+        |--------------------------------------------------------------------------
+        */
 
         if (
           activeTab ===
@@ -1155,12 +1233,24 @@ const LeadDetailPage =
           return renderContacts();
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Activity
+        |--------------------------------------------------------------------------
+        */
+
         if (
           activeTab ===
           "Activity Timeline"
         ) {
           return renderActivities();
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Meetings
+        |--------------------------------------------------------------------------
+        */
 
         if (
           activeTab ===
@@ -1175,6 +1265,12 @@ const LeadDetailPage =
           );
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Follow-ups
+        |--------------------------------------------------------------------------
+        */
+
         if (
           activeTab ===
           "Follow-ups"
@@ -1188,12 +1284,48 @@ const LeadDetailPage =
           );
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Brief
+        |--------------------------------------------------------------------------
+        */
+
         if (
           activeTab ===
           "Brief"
         ) {
-          return renderBrief();
+          return (
+            <LeadBriefPanel
+              lead={
+                lead
+              }
+            />
+          );
         }
+
+        if (
+          activeTab ===
+          "Pitch"
+        ) {
+          return (
+            <div className="lead-lifecycle-stack">
+              <TeamAssignmentsPanel
+                lead={lead}
+              />
+
+              <LifecyclePlaceholder
+                title="Pitch"
+                description="Versioned pitch records track team assignment, reviews and client feedback."
+              />
+            </div>
+          );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Nurture
+        |--------------------------------------------------------------------------
+        */
 
         if (
           activeTab ===
@@ -1208,10 +1340,13 @@ const LeadDetailPage =
           );
         }
 
-        const descriptions = {
-          Pitch:
-            "Versioned pitch records track team assignment, reviews and client feedback.",
+        /*
+        |--------------------------------------------------------------------------
+        | Upcoming Modules
+        |--------------------------------------------------------------------------
+        */
 
+        const descriptions = {
           Commercials:
             "Commercial versions protect negotiation history instead of overwriting it.",
 
@@ -1273,6 +1408,8 @@ const LeadDetailPage =
         {/* --------------------------------------------------------------- */}
 
         <article className="detail-header">
+          {/* Meta */}
+
           <div className="detail-meta">
             {/* Stage */}
 
@@ -1328,7 +1465,7 @@ const LeadDetailPage =
             }
           </h1>
 
-          {/* Company Meta */}
+          {/* Details */}
 
           <p>
             {lead.industry ||
@@ -1395,7 +1532,7 @@ const LeadDetailPage =
               WhatsApp
             </button>
 
-            {/* Schedule Meeting */}
+            {/* Meeting */}
 
             <button
               type="button"
@@ -1409,7 +1546,7 @@ const LeadDetailPage =
               Schedule Meeting
             </button>
 
-            {/* Add Activity */}
+            {/* Activity */}
 
             <button
               type="button"
@@ -1454,7 +1591,7 @@ const LeadDetailPage =
               Change stage
             </button>
 
-            {/* Mark Lost */}
+            {/* Lost */}
 
             <button
               type="button"
@@ -1542,7 +1679,7 @@ const LeadDetailPage =
         />
 
         {/* --------------------------------------------------------------- */}
-        {/* Change Owner */}
+        {/* Assign Owner */}
         {/* --------------------------------------------------------------- */}
 
         <AssignOwnerModal

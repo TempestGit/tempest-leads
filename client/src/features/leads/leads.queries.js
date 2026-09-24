@@ -11,6 +11,7 @@ import {
   getLeadOptionsRequest,
   getLeadRequest,
   getLeadsRequest,
+  getLeadOwnersRequest,
   markLeadLostRequest,
   updateLeadRequest,
 } from "./leads.api.js";
@@ -291,3 +292,25 @@ export const useMarkLeadLostMutation =
         },
     });
   };
+
+  /*
+|--------------------------------------------------------------------------
+| Lead Owners
+|--------------------------------------------------------------------------
+*/
+
+export const useLeadOwnersQuery =
+  (
+    enabled = true
+  ) =>
+    useQuery({
+      queryKey: [
+        "leads",
+        "owners",
+      ],
+
+      queryFn:
+        getLeadOwnersRequest,
+
+      enabled,
+    });

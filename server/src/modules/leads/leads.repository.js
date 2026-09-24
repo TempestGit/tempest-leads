@@ -1496,3 +1496,91 @@ export const createLeadFollowup =
       result.insertId
     );
   };
+
+  /*
+|--------------------------------------------------------------------------
+| Assignable Lead Owners
+|--------------------------------------------------------------------------
+*/
+
+export const listAssignableLeadOwners =
+  async (
+    connection = pool
+  ) => {
+    const [
+      rows,
+    ] =
+      await connection.query(
+        `
+          SELECT
+            u.id,
+
+            u.full_name
+              AS fullName,
+
+            u.email,
+
+            u.role,
+
+            u.status,
+
+            u.branch_id
+              AS branchId,
+
+            b.name
+              AS branchName,
+
+            b.code
+              AS branchCode
+
+          FROM users u
+
+          LEFT JOIN branches b
+            ON b.id =
+              u.branch_id
+
+          WHERE
+            UPPER(u.status) =
+              'ACTIVE'
+
+          ORDER BY
+            u.full_name ASC
+        `
+      );
+
+    return rows.map(
+      (
+        row
+      ) => ({
+        id:
+          Number(
+            row.id
+          ),
+
+        fullName:
+          row.fullName,
+
+        email:
+          row.email,
+
+        role:
+          row.role,
+
+        status:
+          row.status,
+
+        branchId:
+          row.branchId
+            ? Number(
+                row.branchId
+              )
+            : null,
+
+        branchName:
+          row.branchName,
+
+        branchCode:
+          row.branchCode,
+      })
+    );
+  };
