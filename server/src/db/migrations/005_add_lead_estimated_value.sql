@@ -1,0 +1,5 @@
+ALTER TABLE leads
+ADD COLUMN IF NOT EXISTS estimated_value_rupees
+DECIMAL(15,2)
+NOT NULL
+DEFAULT 0;

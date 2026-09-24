@@ -2,88 +2,126 @@ import pool from "../../config/db.js";
 
 import ApiError from "../../utils/ApiError.js";
 
-import generateCompanyCode from "../../utils/companyCode.js";
-import generateContactCode from "../../utils/contactCode.js";
-import generateLeadCode from "../../utils/leadCode.js";
-import generatePublicId from "../../utils/publicId.js";
-
 import {
   createAuditLog,
 } from "../../services/audit.service.js";
 
 import {
-  findCompanyById,
-} from "../companies/companies.repository.js";
+  createActivity,
+} from "../activities/activities.repository.js";
 
 import {
-  changeLeadOwner,
-  changeLeadStage,
-  createLead,
-  createLeadActivity,
+  upsertNurtureProfile,
+} from "../nurture/nurture.repository.js";
+
+import {
+  closeLeadState,
   createLeadFollowup,
   createLeadStageHistory,
-  findActiveOwnerById,
   findContactForCompany,
   findLeadById,
-  listActiveLeadOwners,
+  findLeadCompany,
+  findLeadOwner,
+  insertLead,
+  listLeadOptions,
   listLeads,
-  reassignPendingFollowups,
-  updateLeadCode,
-  updateLeadDetails,
+  updateLead,
+  updateLeadOwner,
+  updateLeadStage,
 } from "./leads.repository.js";
 
 /*
 |--------------------------------------------------------------------------
-| Money Helper
+| Follow-up Code
 |--------------------------------------------------------------------------
 */
 
-const rupeesToPaise = (
-  rupees
-) => {
-  const amount =
-    Number(rupees || 0);
-
-  const paise =
-    Math.round(
-      amount * 100
-    );
-
-  if (
-    !Number.isSafeInteger(
-      paise
-    ) ||
-    paise < 0
-  ) {
-    throw new ApiError(
-      422,
-      "Opportunity value is invalid.",
-      [],
-      "INVALID_OPPORTUNITY_VALUE"
-    );
-  }
-
-  return paise;
-};
+const createFollowupCode =
+  () =>
+    `FUP-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 7)
+      .toUpperCase()}`;
 
 /*
 |--------------------------------------------------------------------------
-| Lead Form Options
+| Validate Company / Contact
 |--------------------------------------------------------------------------
 */
 
-export const getLeadOptionsService = async (
-  currentUser
-) => {
-  const owners =
-    await listActiveLeadOwners(
-      currentUser
-    );
+const validateLeadRelations =
+  async (
+    {
+      companyId,
+      primaryContactId,
+    },
+    connection
+  ) => {
+    const company =
+      await findLeadCompany(
+        companyId,
+        connection
+      );
 
-  return {
-    owners,
+    if (!company) {
+      throw new ApiError(
+        404,
+        "Company not found.",
+        [],
+        "COMPANY_NOT_FOUND"
+      );
+    }
+
+    const contact =
+      await findContactForCompany(
+        primaryContactId,
+        companyId,
+        connection
+      );
+
+    if (!contact) {
+      throw new ApiError(
+        422,
+        "Primary contact does not belong to the selected company.",
+        [],
+        "INVALID_PRIMARY_CONTACT"
+      );
+    }
+
+    return {
+      company,
+      contact,
+    };
   };
-};
+
+/*
+|--------------------------------------------------------------------------
+| Validate Owner
+|--------------------------------------------------------------------------
+*/
+
+const validateOwner =
+  async (
+    ownerId,
+    connection
+  ) => {
+    const owner =
+      await findLeadOwner(
+        ownerId,
+        connection
+      );
+
+    if (!owner) {
+      throw new ApiError(
+        404,
+        "Owner not found.",
+        [],
+        "OWNER_NOT_FOUND"
+      );
+    }
+
+    return owner;
+  };
 
 /*
 |--------------------------------------------------------------------------
@@ -97,16 +135,17 @@ export const getLeadsService =
     currentUser
   ) => {
     const {
-      rows,
+      leads,
       total,
     } =
       await listLeads({
         ...filters,
+
         currentUser,
       });
 
     return {
-      leads: rows,
+      leads,
 
       pagination: {
         page:
@@ -130,7 +169,27 @@ export const getLeadsService =
 
 /*
 |--------------------------------------------------------------------------
-| Get Lead
+| Lead Options
+|--------------------------------------------------------------------------
+*/
+
+export const getLeadOptionsService =
+  async (
+    currentUser
+  ) => {
+    const leads =
+      await listLeadOptions(
+        currentUser
+      );
+
+    return {
+      leads,
+    };
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Get One
 |--------------------------------------------------------------------------
 */
 
@@ -159,639 +218,206 @@ export const getLeadService =
 
 /*
 |--------------------------------------------------------------------------
-| Validate Relationships
-|--------------------------------------------------------------------------
-*/
-
-const validateLeadRelationships =
-  async ({
-    companyId,
-    primaryContactId,
-    ownerId,
-    currentUser,
-    connection,
-  }) => {
-    /*
-    |--------------------------------------------------------------------------
-    | Company
-    |--------------------------------------------------------------------------
-    */
-
-    const company =
-      await findCompanyById(
-        companyId,
-        connection
-      );
-
-    if (!company) {
-      throw new ApiError(
-        404,
-        "Selected company was not found.",
-        [],
-        "COMPANY_NOT_FOUND"
-      );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Contact
-    |--------------------------------------------------------------------------
-    */
-
-    const contact =
-      await findContactForCompany(
-        primaryContactId,
-        companyId,
-        connection
-      );
-
-    if (!contact) {
-      throw new ApiError(
-        422,
-        "The selected contact does not belong to the selected company.",
-        [],
-        "CONTACT_COMPANY_MISMATCH"
-      );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Owner
-    |--------------------------------------------------------------------------
-    */
-
-    const owner =
-      await findActiveOwnerById(
-        ownerId,
-        connection
-      );
-
-    if (!owner) {
-      throw new ApiError(
-        422,
-        "Selected owner is not active.",
-        [],
-        "OWNER_NOT_AVAILABLE"
-      );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | OWNER Users Can Assign Only To Themselves
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-      currentUser.role !==
-        "SUPER_ADMIN" &&
-      Number(ownerId) !==
-        Number(
-          currentUser.id
-        )
-    ) {
-      throw new ApiError(
-        403,
-        "You can only create leads assigned to yourself.",
-        [],
-        "LEAD_OWNER_FORBIDDEN"
-      );
-    }
-
-    return {
-      company,
-      contact,
-      owner,
-    };
-  };
-
-/*
-|--------------------------------------------------------------------------
 | Create Lead
 |--------------------------------------------------------------------------
 */
 
-export const createLeadService = async ({
-  data,
-  currentUser,
-  ipAddress,
-  userAgent,
-}) => {
-  const connection =
-    await pool.getConnection();
+export const createLeadService =
+  async ({
+    data,
+    currentUser,
+    ipAddress,
+    userAgent,
+  }) => {
+    const connection =
+      await pool.getConnection();
 
-  try {
-    await connection.beginTransaction();
+    try {
+      await connection.beginTransaction();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Owner
-    |--------------------------------------------------------------------------
-    */
+      /*
+      |--------------------------------------------------------------------------
+      | Validate Relations
+      |--------------------------------------------------------------------------
+      */
 
-    const owner =
-      await findActiveOwnerById(
+      await validateLeadRelations(
+        {
+          companyId:
+            data.companyId,
+
+          primaryContactId:
+            data.primaryContactId,
+        },
+        connection
+      );
+
+      await validateOwner(
         data.ownerId,
         connection
       );
 
-    if (!owner) {
-      throw new ApiError(
-        422,
-        "Selected owner is not active.",
-        [],
-        "OWNER_NOT_AVAILABLE"
-      );
-    }
-
-    if (
-      currentUser.role !==
-        "SUPER_ADMIN" &&
-      Number(data.ownerId) !==
-        Number(currentUser.id)
-    ) {
-      throw new ApiError(
-        403,
-        "You can only assign a lead to yourself.",
-        [],
-        "LEAD_OWNER_FORBIDDEN"
-      );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Find Existing Company By Name
-    |--------------------------------------------------------------------------
-    */
-
-    const [companyRows] =
-      await connection.query(
-        `
-          SELECT
-            id,
-            company_code AS companyCode,
-            name
-
-          FROM companies
-
-          WHERE
-            LOWER(TRIM(name)) =
-              LOWER(TRIM(?))
-            AND deleted_at IS NULL
-
-          LIMIT 1
-        `,
-        [
-          data.company.name,
-        ]
-      );
-
-    let companyId;
-    let companyCode;
-
-    /*
-    |--------------------------------------------------------------------------
-    | Existing Company
-    |--------------------------------------------------------------------------
-    */
-
-    if (companyRows.length) {
-      companyId =
-        Number(
-          companyRows[0].id
-        );
-
-      companyCode =
-        companyRows[0]
-          .companyCode;
-    } else {
       /*
       |--------------------------------------------------------------------------
-      | Create Company
+      | Create Lead
       |--------------------------------------------------------------------------
       */
 
-      const temporaryCode =
-        `TEMP-CMP-${Date.now()}`;
-
-      const [
-        companyResult,
-      ] =
-        await connection.query(
-          `
-            INSERT INTO companies (
-              company_code,
-              name,
-              industry,
-              city,
-              country,
-              website,
-              agency_relationship,
-              source,
-              status,
-              notes,
-              created_by,
-              updated_by
-            )
-            VALUES (
-              ?,
-              ?,
-              ?,
-              ?,
-              'India',
-              ?,
-              ?,
-              ?,
-              'ACTIVE',
-              ?,
-              ?,
-              ?
-            )
-          `,
-          [
-            temporaryCode,
-
-            data.company.name,
-
-            data.company
-              .industry,
-
-            data.company.city ||
-              null,
-
-            data.company.website ||
-              null,
-
-            data.company
-              .agencyRelationship ||
-              null,
-
-            data.source,
-
-            data.company
-              .marketingActivity ||
-              null,
-
-            currentUser.id,
-            currentUser.id,
-          ]
-        );
-
-      companyId =
-        Number(
-          companyResult.insertId
-        );
-
-      companyCode =
-        generateCompanyCode(
-          companyId
-        );
-
-      await connection.query(
-        `
-          UPDATE companies
-
-          SET company_code = ?
-
-          WHERE id = ?
-        `,
-        [
-          companyCode,
-          companyId,
-        ]
-      );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Primary Contact
-    |--------------------------------------------------------------------------
-    */
-
-    const temporaryContactCode =
-      `TEMP-CON-${Date.now()}`;
-
-    const [
-      contactResult,
-    ] =
-      await connection.query(
-        `
-          INSERT INTO contacts (
-            contact_code,
-            company_id,
-            full_name,
-            designation,
-            phone,
-            email,
-            is_decision_maker,
-            status,
-            created_by,
-            updated_by
-          )
-          VALUES (
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            'ACTIVE',
-            ?,
-            ?
-          )
-        `,
-        [
-          temporaryContactCode,
-
-          companyId,
-
-          data.contact.name,
-
-          data.contact
-            .designation ||
-            null,
-
-          data.contact.phone ||
-            null,
-
-          data.contact.email ||
-            null,
-
-          data.contact
-            .isDecisionMaker
-            ? 1
-            : 0,
-
+      const {
+        leadId,
+        leadCode,
+      } =
+        await insertLead(
+          data,
           currentUser.id,
-          currentUser.id,
-        ]
-      );
+          connection
+        );
 
-    const contactId =
-      Number(
-        contactResult.insertId
-      );
+      /*
+      |--------------------------------------------------------------------------
+      | Initial Stage History
+      |--------------------------------------------------------------------------
+      */
 
-    const contactCode =
-      generateContactCode(
-        contactId
-      );
-
-    await connection.query(
-      `
-        UPDATE contacts
-
-        SET contact_code = ?
-
-        WHERE id = ?
-      `,
-      [
-        contactCode,
-        contactId,
-      ]
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Opportunity Value
-    |--------------------------------------------------------------------------
-    */
-
-    const estimatedValuePaise =
-      rupeesToPaise(
-        data.estimatedValueRupees
-      );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Lead
-    |--------------------------------------------------------------------------
-    */
-
-    const leadId =
-      await createLead(
+      await createLeadStageHistory(
         {
-          companyId,
+          leadId,
 
-          primaryContactId:
-            contactId,
-
-          ownerId:
-            data.ownerId,
-
-          serviceRequired:
-            data.serviceRequired,
-
-          source:
-            data.source,
-
-          estimatedValuePaise,
-
-          priority:
-            data.priority,
-
-          description:
-            data.description ||
+          previousStage:
             null,
 
-          nextAction:
-            data.nextAction,
+          newStage:
+            "New",
 
-          followUpAt:
-            data.followUpAt,
-
-          knownRelationship:
-            data.knownRelationship,
+          reason:
+            "Lead created.",
 
           userId:
             currentUser.id,
         },
-
         connection
       );
 
-    /*
-    |--------------------------------------------------------------------------
-    | Lead Code
-    |--------------------------------------------------------------------------
-    */
+      /*
+      |--------------------------------------------------------------------------
+      | Initial Activity
+      |--------------------------------------------------------------------------
+      */
 
-    const leadCode =
-      generateLeadCode(
-        leadId
-      );
+      await createActivity(
+        {
+          leadId,
 
-    await updateLeadCode(
-      leadId,
-      leadCode,
-      connection
-    );
+          activityType:
+            "Lead created",
 
-    /*
-    |--------------------------------------------------------------------------
-    | Stage History
-    |--------------------------------------------------------------------------
-    */
+          outcome:
+            "New lead created",
 
-    await createLeadStageHistory(
-      {
-        leadId,
+          notes:
+            "Company and primary contact captured.",
 
-        fromStage: null,
-
-        toStage: "New",
-
-        changedBy:
-          currentUser.id,
-
-        reason:
-          "Lead created.",
-
-        metadata: {
-          initialStage:
-            true,
+          userId:
+            currentUser.id,
         },
-      },
-
-      connection
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Activity
-    |--------------------------------------------------------------------------
-    */
-
-    await createLeadActivity(
-      {
-        leadId,
-
-        activityType:
-          "Lead created",
-
-        outcome:
-          "New lead created",
-
-        notes:
-          "Company and primary contact captured.",
-
-        userId:
-          currentUser.id,
-      },
-
-      connection
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | First Follow-up
-    |--------------------------------------------------------------------------
-    */
-
-    const followupCode =
-      generatePublicId(
-        "FUP"
+        connection
       );
 
-    await createLeadFollowup(
-      {
-        followupCode,
+      /*
+      |--------------------------------------------------------------------------
+      | Initial Follow-up
+      |--------------------------------------------------------------------------
+      */
 
-        leadId,
+      await createLeadFollowup(
+        {
+          followupCode:
+            createFollowupCode(),
 
-        assignedTo:
-          data.ownerId,
+          leadId,
+
+          assignedTo:
+            data.ownerId,
+
+          action:
+            data.nextAction,
+
+          dueAt:
+            data.followUpAt,
+
+          priority:
+            data.priority,
+
+          userId:
+            currentUser.id,
+        },
+        connection
+      );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Reload
+      |--------------------------------------------------------------------------
+      */
+
+      const lead =
+        await findLeadById(
+          leadId,
+          currentUser,
+          connection
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Audit
+      |--------------------------------------------------------------------------
+      */
+
+      await createAuditLog({
+        actorUserId:
+          currentUser.id,
+
+        entityType:
+          "LEAD",
+
+        entityId:
+          leadId,
 
         action:
-          data.nextAction,
+          "LEAD_CREATED",
 
-        dueAt:
-          data.followUpAt,
+        previousValues:
+          null,
 
-        priority:
-          data.priority,
+        newValues:
+          lead,
 
-        userId:
-          currentUser.id,
-      },
+        metadata: {
+          leadCode,
+        },
 
-      connection
-    );
+        ipAddress,
+        userAgent,
+        connection,
+      });
 
-    /*
-    |--------------------------------------------------------------------------
-    | Reload Lead
-    |--------------------------------------------------------------------------
-    */
+      await connection.commit();
 
-    const lead =
-      await findLeadById(
-        leadId,
-        currentUser,
-        connection
-      );
+      return lead;
+    } catch (
+      error
+    ) {
+      try {
+        await connection.rollback();
+      } catch {
+        // Ignore rollback failure.
+      }
 
-    if (!lead) {
-      throw new ApiError(
-        500,
-        "Lead was created but could not be loaded.",
-        [],
-        "LEAD_CREATED_BUT_NOT_LOADED"
-      );
+      throw error;
+    } finally {
+      connection.release();
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Audit
-    |--------------------------------------------------------------------------
-    */
-
-    await createAuditLog({
-      actorUserId:
-        currentUser.id,
-
-      entityType:
-        "LEAD",
-
-      entityId:
-        leadId,
-
-      action:
-        "LEAD_CREATED",
-
-      previousValues:
-        null,
-
-      newValues:
-        lead,
-
-      metadata: {
-        leadCode,
-        companyCode,
-        contactCode,
-        followupCode,
-      },
-
-      ipAddress,
-      userAgent,
-      connection,
-    });
-
-    await connection.commit();
-
-    return lead;
-  } catch (error) {
-    try {
-      await connection.rollback();
-    } catch {
-      // Ignore rollback failure.
-    }
-
-    throw error;
-  } finally {
-    connection.release();
-  }
-};
+  };
 
 /*
 |--------------------------------------------------------------------------
@@ -813,12 +439,6 @@ export const updateLeadService =
     try {
       await connection.beginTransaction();
 
-      /*
-      |--------------------------------------------------------------------------
-      | Existing + Access
-      |--------------------------------------------------------------------------
-      */
-
       const existing =
         await findLeadById(
           leadId,
@@ -837,7 +457,7 @@ export const updateLeadService =
 
       /*
       |--------------------------------------------------------------------------
-      | Resolve Company / Contact
+      | Validate Company / Contact
       |--------------------------------------------------------------------------
       */
 
@@ -845,70 +465,19 @@ export const updateLeadService =
         data.companyId ??
         existing.companyId;
 
-      const primaryContactId =
+      const contactId =
         data.primaryContactId ??
         existing.primaryContactId;
 
-      if (
-        data.companyId !==
-          undefined ||
-        data.primaryContactId !==
-          undefined
-      ) {
-        const company =
-          await findCompanyById(
-            companyId,
-            connection
-          );
+      await validateLeadRelations(
+        {
+          companyId,
 
-        if (!company) {
-          throw new ApiError(
-            404,
-            "Selected company was not found.",
-            [],
-            "COMPANY_NOT_FOUND"
-          );
-        }
-
-        const contact =
-          await findContactForCompany(
-            primaryContactId,
-            companyId,
-            connection
-          );
-
-        if (!contact) {
-          throw new ApiError(
-            422,
-            "The selected contact does not belong to the selected company.",
-            [],
-            "CONTACT_COMPANY_MISMATCH"
-          );
-        }
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Transform Data
-      |--------------------------------------------------------------------------
-      */
-
-      const updateData = {
-        ...data,
-      };
-
-      if (
-        data.estimatedValueRupees !==
-        undefined
-      ) {
-        updateData.estimatedValuePaise =
-          rupeesToPaise(
-            data.estimatedValueRupees
-          );
-
-        delete updateData
-          .estimatedValueRupees;
-      }
+          primaryContactId:
+            contactId,
+        },
+        connection
+      );
 
       /*
       |--------------------------------------------------------------------------
@@ -916,9 +485,9 @@ export const updateLeadService =
       |--------------------------------------------------------------------------
       */
 
-      await updateLeadDetails(
+      await updateLead(
         leadId,
-        updateData,
+        data,
         currentUser.id,
         connection
       );
@@ -929,7 +498,7 @@ export const updateLeadService =
       |--------------------------------------------------------------------------
       */
 
-      await createLeadActivity(
+      await createActivity(
         {
           leadId,
 
@@ -940,21 +509,13 @@ export const updateLeadService =
             "Lead details updated",
 
           notes:
-            data.description ||
-            "Lead information updated.",
+            "Lead profile information was updated.",
 
           userId:
             currentUser.id,
         },
-
         connection
       );
-
-      /*
-      |--------------------------------------------------------------------------
-      | Reload
-      |--------------------------------------------------------------------------
-      */
 
       const updated =
         await findLeadById(
@@ -962,15 +523,6 @@ export const updateLeadService =
           currentUser,
           connection
         );
-
-      if (!updated) {
-        throw new ApiError(
-          500,
-          "Lead was updated but could not be loaded.",
-          [],
-          "LEAD_UPDATED_BUT_NOT_LOADED"
-        );
-      }
 
       /*
       |--------------------------------------------------------------------------
@@ -997,28 +549,24 @@ export const updateLeadService =
         newValues:
           updated,
 
-        metadata: {
-          changedFields:
-            Object.keys(
-              data
-            ),
-        },
+        metadata:
+          null,
 
         ipAddress,
-
         userAgent,
-
         connection,
       });
 
       await connection.commit();
 
       return updated;
-    } catch (error) {
+    } catch (
+      error
+    ) {
       try {
         await connection.rollback();
       } catch {
-        // Ignore rollback error.
+        // Ignore.
       }
 
       throw error;
@@ -1063,6 +611,30 @@ export const changeLeadStageService =
         );
       }
 
+      /*
+      |--------------------------------------------------------------------------
+      | Lost Must Use Dedicated Flow
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        data.stage ===
+        "Lost"
+      ) {
+        throw new ApiError(
+          422,
+          "Use the Mark Lost action to close a lead.",
+          [],
+          "USE_MARK_LOST_FLOW"
+        );
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Same Stage
+      |--------------------------------------------------------------------------
+      */
+
       if (
         existing.stage ===
         data.stage
@@ -1081,60 +653,59 @@ export const changeLeadStageService =
       |--------------------------------------------------------------------------
       */
 
-      let newStatus =
+      let status =
         existing.status;
 
       if (
         data.stage ===
         "Nurture"
       ) {
-        newStatus =
-          "Later";
-      } else if (
-        data.stage ===
-        "Lost"
-      ) {
-        newStatus =
-          "Not interested";
-      } else if (
-        existing.stage ===
-          "Nurture" ||
-        existing.stage ===
-          "Lost"
-      ) {
-        newStatus =
+        status =
           "Open";
+      }
+
+      if (
+        data.stage ===
+        "Active Client"
+      ) {
+        status =
+          "Active Client";
       }
 
       /*
       |--------------------------------------------------------------------------
-      | Update
+      | Update Stage
       |--------------------------------------------------------------------------
       */
 
-      await changeLeadStage(
-        {
-          leadId,
+      const changed =
+        await updateLeadStage(
+          {
+            leadId,
 
-          stage:
-            data.stage,
+            stage:
+              data.stage,
 
-          status:
-            newStatus,
+            status,
 
-          reason:
-            data.reason,
+            userId:
+              currentUser.id,
+          },
+          connection
+        );
 
-          userId:
-            currentUser.id,
-        },
-
-        connection
-      );
+      if (!changed) {
+        throw new ApiError(
+          409,
+          "Lead stage could not be changed.",
+          [],
+          "LEAD_STAGE_CHANGE_FAILED"
+        );
+      }
 
       /*
       |--------------------------------------------------------------------------
-      | History
+      | Stage History
       |--------------------------------------------------------------------------
       */
 
@@ -1142,19 +713,18 @@ export const changeLeadStageService =
         {
           leadId,
 
-          fromStage:
+          previousStage:
             existing.stage,
 
-          toStage:
+          newStage:
             data.stage,
-
-          changedBy:
-            currentUser.id,
 
           reason:
             data.reason,
-        },
 
+          userId:
+            currentUser.id,
+        },
         connection
       );
 
@@ -1164,7 +734,7 @@ export const changeLeadStageService =
       |--------------------------------------------------------------------------
       */
 
-      await createLeadActivity(
+      await createActivity(
         {
           leadId,
 
@@ -1180,9 +750,51 @@ export const changeLeadStageService =
           userId:
             currentUser.id,
         },
-
         connection
       );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Automatically Create Nurture Profile
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        data.stage ===
+        "Nurture"
+      ) {
+        await upsertNurtureProfile(
+          {
+            leadId,
+
+            category:
+              "LATER",
+
+            reason:
+              data.reason,
+
+            buyingStage:
+              null,
+
+            communicationStatus:
+              "NOT_CONTACTED",
+
+            reconnectAt:
+              existing.followUpAt ||
+              null,
+
+            userId:
+              currentUser.id,
+          },
+          connection
+        );
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Reload
+      |--------------------------------------------------------------------------
+      */
 
       const updated =
         await findLeadById(
@@ -1232,16 +844,16 @@ export const changeLeadStageService =
         },
 
         ipAddress,
-
         userAgent,
-
         connection,
       });
 
       await connection.commit();
 
       return updated;
-    } catch (error) {
+    } catch (
+      error
+    ) {
       try {
         await connection.rollback();
       } catch {
@@ -1258,9 +870,6 @@ export const changeLeadStageService =
 |--------------------------------------------------------------------------
 | Change Owner
 |--------------------------------------------------------------------------
-|
-| Super Admin only route.
-|
 */
 
 export const changeLeadOwnerService =
@@ -1271,6 +880,18 @@ export const changeLeadOwnerService =
     ipAddress,
     userAgent,
   }) => {
+    if (
+      currentUser.role !==
+      "SUPER_ADMIN"
+    ) {
+      throw new ApiError(
+        403,
+        "Only Super Admin can reassign lead ownership.",
+        [],
+        "FORBIDDEN"
+      );
+    }
+
     const connection =
       await pool.getConnection();
 
@@ -1293,20 +914,11 @@ export const changeLeadOwnerService =
         );
       }
 
-      const newOwner =
-        await findActiveOwnerById(
+      const owner =
+        await validateOwner(
           data.ownerId,
           connection
         );
-
-      if (!newOwner) {
-        throw new ApiError(
-          422,
-          "Selected owner is not active.",
-          [],
-          "OWNER_NOT_AVAILABLE"
-        );
-      }
 
       if (
         Number(
@@ -1324,30 +936,43 @@ export const changeLeadOwnerService =
         );
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Owner
-      |--------------------------------------------------------------------------
-      */
+      await updateLeadOwner(
+        {
+          leadId,
 
-      await changeLeadOwner(
-        leadId,
-        data.ownerId,
-        currentUser.id,
+          ownerId:
+            data.ownerId,
+
+          userId:
+            currentUser.id,
+        },
         connection
       );
 
       /*
       |--------------------------------------------------------------------------
-      | Move Pending Follow-ups To New Owner
+      | Move Open Follow-ups To New Owner
       |--------------------------------------------------------------------------
       */
 
-      await reassignPendingFollowups(
-        leadId,
-        data.ownerId,
-        currentUser.id,
-        connection
+      await connection.query(
+        `
+          UPDATE followups
+
+          SET
+            assigned_to = ?,
+            updated_by = ?
+
+          WHERE
+            lead_id = ?
+            AND status =
+              'PENDING'
+        `,
+        [
+          data.ownerId,
+          currentUser.id,
+          leadId,
+        ]
       );
 
       /*
@@ -1356,7 +981,7 @@ export const changeLeadOwnerService =
       |--------------------------------------------------------------------------
       */
 
-      await createLeadActivity(
+      await createActivity(
         {
           leadId,
 
@@ -1364,7 +989,7 @@ export const changeLeadOwnerService =
             "Owner changed",
 
           outcome:
-            `Assigned to ${newOwner.fullName}`,
+            `Assigned to ${owner.fullName}`,
 
           notes:
             data.reason ||
@@ -1373,7 +998,6 @@ export const changeLeadOwnerService =
           userId:
             currentUser.id,
         },
-
         connection
       );
 
@@ -1426,20 +1050,333 @@ export const changeLeadOwnerService =
         },
 
         ipAddress,
-
         userAgent,
-
         connection,
       });
 
       await connection.commit();
 
       return updated;
-    } catch (error) {
+    } catch (
+      error
+    ) {
       try {
         await connection.rollback();
       } catch {
-        // Ignore rollback error.
+        // Ignore.
+      }
+
+      throw error;
+    } finally {
+      connection.release();
+    }
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Mark Lead Lost
+|--------------------------------------------------------------------------
+*/
+
+export const markLeadLostService =
+  async ({
+    leadId,
+    data,
+    currentUser,
+    ipAddress,
+    userAgent,
+  }) => {
+    const connection =
+      await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      /*
+      |--------------------------------------------------------------------------
+      | Existing
+      |--------------------------------------------------------------------------
+      */
+
+      const existing =
+        await findLeadById(
+          leadId,
+          currentUser,
+          connection
+        );
+
+      if (!existing) {
+        throw new ApiError(
+          404,
+          "Lead not found.",
+          [],
+          "LEAD_NOT_FOUND"
+        );
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Already Lost
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        existing.stage ===
+          "Lost" &&
+        !data.moveToNurture
+      ) {
+        throw new ApiError(
+          409,
+          "Lead is already marked as lost.",
+          [],
+          "LEAD_ALREADY_LOST"
+        );
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Destination
+      |--------------------------------------------------------------------------
+      */
+
+      const nextStage =
+        data.moveToNurture
+          ? "Nurture"
+          : "Lost";
+
+      /*
+      |--------------------------------------------------------------------------
+      | Reconnect
+      |--------------------------------------------------------------------------
+      |
+      | Preserve current follow-up when moving to nurture.
+      |
+      */
+
+      const reconnectAt =
+        data.moveToNurture
+          ? existing.followUpAt ||
+            null
+          : null;
+
+      /*
+      |--------------------------------------------------------------------------
+      | Lead
+      |--------------------------------------------------------------------------
+      */
+
+      const changed =
+        await closeLeadState(
+          {
+            leadId,
+
+            stage:
+              nextStage,
+
+            status:
+              "Not interested",
+
+            nextAction:
+              data.moveToNurture
+                ? "Reconnect when relevant"
+                : null,
+
+            followUpAt:
+              reconnectAt,
+
+            userId:
+              currentUser.id,
+          },
+          connection
+        );
+
+      if (!changed) {
+        throw new ApiError(
+          409,
+          "Lead could not be closed.",
+          [],
+          "LEAD_CLOSE_FAILED"
+        );
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Stage History
+      |--------------------------------------------------------------------------
+      */
+
+      await createLeadStageHistory(
+        {
+          leadId,
+
+          previousStage:
+            existing.stage,
+
+          newStage:
+            nextStage,
+
+          reason:
+            `${data.reason}: ${data.comment}`,
+
+          userId:
+            currentUser.id,
+        },
+        connection
+      );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Nurture Profile
+      |--------------------------------------------------------------------------
+      |
+      | Lost records are still preserved in the Nurture database so they can
+      | later be segmented and reconnected.
+      |
+      */
+
+      await upsertNurtureProfile(
+        {
+          leadId,
+
+          category:
+            "LOST_NOT_INTERESTED",
+
+          reason:
+            data.reason,
+
+          buyingStage:
+            null,
+
+          communicationStatus:
+            data.reason ===
+            "No response"
+              ? "NO_RESPONSE"
+              : "NOT_CONTACTED",
+
+          reconnectAt,
+
+          userId:
+            currentUser.id,
+        },
+        connection
+      );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Activity
+      |--------------------------------------------------------------------------
+      */
+
+      await createActivity(
+        {
+          leadId,
+
+          activityType:
+            "Stage change",
+
+          outcome:
+            data.moveToNurture
+              ? "Lead closed and moved to nurture"
+              : "Lead marked lost / not interested",
+
+          notes:
+            `${data.reason}: ${data.comment}`,
+
+          userId:
+            currentUser.id,
+        },
+        connection
+      );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Reload
+      |--------------------------------------------------------------------------
+      */
+
+      const updated =
+        await findLeadById(
+          leadId,
+          currentUser,
+          connection
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Audit
+      |--------------------------------------------------------------------------
+      */
+
+      await createAuditLog({
+        actorUserId:
+          currentUser.id,
+
+        entityType:
+          "LEAD",
+
+        entityId:
+          leadId,
+
+        action:
+          "LEAD_MARKED_LOST",
+
+        previousValues: {
+          stage:
+            existing.stage,
+
+          status:
+            existing.status,
+
+          nextAction:
+            existing.nextAction,
+
+          followUpAt:
+            existing.followUpAt,
+        },
+
+        newValues: {
+          stage:
+            updated.stage,
+
+          status:
+            updated.status,
+
+          nextAction:
+            updated.nextAction,
+
+          followUpAt:
+            updated.followUpAt,
+        },
+
+        metadata: {
+          reason:
+            data.reason,
+
+          comment:
+            data.comment,
+
+          moveToNurture:
+            data.moveToNurture,
+
+          nurtureCategory:
+            "LOST_NOT_INTERESTED",
+        },
+
+        ipAddress,
+        userAgent,
+        connection,
+      });
+
+      await connection.commit();
+
+      return updated;
+    } catch (
+      error
+    ) {
+      try {
+        await connection.rollback();
+      } catch {
+        // Ignore rollback failure.
       }
 
       throw error;

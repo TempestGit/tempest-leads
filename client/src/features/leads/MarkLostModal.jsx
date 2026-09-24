@@ -8,59 +8,59 @@ import {
 } from "lucide-react";
 
 import {
-  useChangeLeadStageMutation,
+  useMarkLeadLostMutation,
 } from "./leads.queries.js";
 
 /*
 |--------------------------------------------------------------------------
-| Generic Stage Options
+| Reasons
 |--------------------------------------------------------------------------
-|
-| Lost is intentionally excluded.
-| Mark Lost has its own mandatory close workflow.
-|
 */
 
-const STAGES = [
-  "New",
-  "Contact Research",
-  "Connected",
-  "Meeting",
-  "Brief",
-  "Pitch",
-  "Commercials",
-  "Contract / PO",
-  "Onboarding",
-  "Active Client",
-  "Nurture",
+const LOST_REASONS = [
+  "Budget",
+  "Timing",
+  "No requirement",
+  "Creative / pitch",
+  "Competitor",
+  "Existing agency",
+  "Internal decision",
+  "No response",
+  "Other",
 ];
 
 /*
 |--------------------------------------------------------------------------
-| Change Stage Modal
+| Mark Lost
 |--------------------------------------------------------------------------
 */
 
-const ChangeStageModal = ({
+const MarkLostModal = ({
   open,
-  leadIds = [],
-  initialStage = "New",
+  lead,
   onClose,
 }) => {
   const mutation =
-    useChangeLeadStageMutation();
-
-  const [
-    stage,
-    setStage,
-  ] = useState(
-    "New"
-  );
+    useMarkLeadLostMutation();
 
   const [
     reason,
     setReason,
+  ] = useState(
+    "Budget"
+  );
+
+  const [
+    comment,
+    setComment,
   ] = useState("");
+
+  const [
+    moveToNurture,
+    setMoveToNurture,
+  ] = useState(
+    true
+  );
 
   const [
     error,
@@ -78,26 +78,66 @@ const ChangeStageModal = ({
       return;
     }
 
-    const safeStage =
-      STAGES.includes(
-        initialStage
-      )
-        ? initialStage
-        : "New";
-
-    setStage(
-      safeStage
+    setReason(
+      "Budget"
     );
 
-    setReason("");
+    setComment("");
+
+    setMoveToNurture(
+      true
+    );
 
     setError("");
   }, [
     open,
-    initialStage,
+    lead,
   ]);
 
-  if (!open) {
+  /*
+  |--------------------------------------------------------------------------
+  | Escape
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handleKeyDown =
+      (
+        event
+      ) => {
+        if (
+          event.key ===
+            "Escape" &&
+          !mutation.isPending
+        ) {
+          onClose();
+        }
+      };
+
+    window.addEventListener(
+      "keydown",
+      handleKeyDown
+    );
+
+    return () =>
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown
+      );
+  }, [
+    open,
+    onClose,
+    mutation.isPending,
+  ]);
+
+  if (
+    !open ||
+    !lead
+  ) {
     return null;
   }
 
@@ -111,45 +151,40 @@ const ChangeStageModal = ({
     async () => {
       setError("");
 
-      if (
-        !leadIds.length
-      ) {
+      if (!reason) {
         setError(
-          "No lead selected."
+          "Reason is required."
         );
 
         return;
       }
 
       if (
-        !reason.trim()
+        !comment.trim()
       ) {
         setError(
-          "Reason or comment is required."
+          "Close comment is required."
         );
 
         return;
       }
 
       try {
-        for (
-          const leadId
-          of leadIds
-        ) {
-          await mutation.mutateAsync({
-            leadId:
-              Number(
-                leadId
-              ),
+        await mutation.mutateAsync({
+          leadId:
+            Number(
+              lead.id
+            ),
 
-            data: {
-              stage,
+          data: {
+            reason,
 
-              reason:
-                reason.trim(),
-            },
-          });
-        }
+            comment:
+              comment.trim(),
+
+            moveToNurture,
+          },
+        });
 
         onClose();
       } catch (
@@ -160,38 +195,50 @@ const ChangeStageModal = ({
             ?.response
             ?.data
             ?.message ||
-            "Unable to change stage."
+            "Unable to close lead."
         );
       }
     };
 
   return (
     <div className="modal-backdrop">
-      <section className="tl-modal">
+      <section
+        className="tl-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="lost-title"
+      >
         <header className="modal-head">
           <div>
-            <h2>
-              Change stage
+            <h2 id="lost-title">
+              Mark as lost /
+              not interested
             </h2>
 
             <p>
-              Every change
-              creates a history
-              and audit entry.
+              This preserves the
+              record and allows
+              the prospect to
+              enter Nurture.
+              Close details are
+              mandatory.
             </p>
           </div>
 
           <button
             type="button"
             className="icon-control"
-            onClick={
-              onClose
-            }
             disabled={
               mutation.isPending
             }
+            onClick={
+              onClose
+            }
+            aria-label="Close"
           >
-            <X size={15} />
+            <X
+              size={15}
+            />
           </button>
         </header>
 
@@ -205,22 +252,22 @@ const ChangeStageModal = ({
           <div className="form-section">
             <div className="form-grid2">
               <label>
-                New stage
+                Reason *
 
                 <select
                   value={
-                    stage
+                    reason
                   }
                   onChange={(
                     event
                   ) =>
-                    setStage(
+                    setReason(
                       event.target
                         .value
                     )
                   }
                 >
-                  {STAGES.map(
+                  {LOST_REASONS.map(
                     (
                       item
                     ) => (
@@ -239,22 +286,52 @@ const ChangeStageModal = ({
                 </select>
               </label>
 
-              <label className="full">
-                Reason / comment *
+              <label>
+                Move to nurture?
 
-                <textarea
-                  rows="4"
+                <select
                   value={
-                    reason
+                    moveToNurture
+                      ? "Yes"
+                      : "No"
                   }
                   onChange={(
                     event
                   ) =>
-                    setReason(
+                    setMoveToNurture(
+                      event.target
+                        .value ===
+                        "Yes"
+                    )
+                  }
+                >
+                  <option value="Yes">
+                    Yes
+                  </option>
+
+                  <option value="No">
+                    No
+                  </option>
+                </select>
+              </label>
+
+              <label className="full">
+                Close comment *
+
+                <textarea
+                  rows="4"
+                  value={
+                    comment
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setComment(
                       event.target
                         .value
                     )
                   }
+                  autoFocus
                 />
               </label>
             </div>
@@ -265,11 +342,11 @@ const ChangeStageModal = ({
           <button
             type="button"
             className="tl-secondary"
-            onClick={
-              onClose
-            }
             disabled={
               mutation.isPending
+            }
+            onClick={
+              onClose
             }
           >
             Cancel
@@ -277,17 +354,17 @@ const ChangeStageModal = ({
 
           <button
             type="button"
-            className="tl-primary"
-            onClick={
-              submit
-            }
+            className="tl-danger"
             disabled={
               mutation.isPending
             }
+            onClick={
+              submit
+            }
           >
             {mutation.isPending
-              ? "Changing..."
-              : "Change stage"}
+              ? "Closing..."
+              : "Close lead"}
           </button>
         </footer>
       </section>
@@ -295,4 +372,4 @@ const ChangeStageModal = ({
   );
 };
 
-export default ChangeStageModal;
+export default MarkLostModal;

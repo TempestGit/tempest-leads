@@ -14,6 +14,7 @@ import leadsRoutes from "./modules/leads/leads.routes.js";
 import activitiesRoutes from "./modules/activities/activities.routes.js";
 import meetingsRoutes from "./modules/meetings/meetings.routes.js";
 import followupsRoutes from "./modules/followups/followups.routes.js";
+import nurtureRoutes from "./modules/nurture/nurture.routes.js";
 
 import notFoundMiddleware from "./middleware/notFound.middleware.js";
 import errorMiddleware from "./middleware/error.middleware.js";
@@ -85,6 +86,7 @@ app.use("/api/leads", leadsRoutes);
 app.use("/api/activities", activitiesRoutes);
 app.use("/api/meetings", meetingsRoutes);
 app.use("/api/followups", followupsRoutes);
+app.use("/api/nurture", nurtureRoutes);
 
 /*
 |--------------------------------------------------------------------------

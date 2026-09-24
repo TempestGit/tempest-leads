@@ -3580,3 +3580,111 @@ a {
   background: var(--crm-info-soft);
   color: var(--crm-info);
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Nurture
+|--------------------------------------------------------------------------
+*/
+
+.nurture-row {
+  cursor: pointer;
+}
+
+.nurture-row:hover td {
+  background: var(--crm-surface-hover);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Company
+|--------------------------------------------------------------------------
+*/
+
+.nurture-company-link {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+
+  padding: 0;
+  border: 0;
+  background: transparent;
+
+  color: var(--crm-text);
+  text-align: left;
+
+  cursor: pointer;
+}
+
+.nurture-company-link:hover b {
+  color: var(--crm-primary);
+}
+
+.nurture-company-link small {
+  color: var(--crm-muted);
+  font-size: 9px;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Contact
+|--------------------------------------------------------------------------
+*/
+
+.nurture-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nurture-contact small {
+  color: var(--crm-muted);
+  font-size: 9px;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Category
+|--------------------------------------------------------------------------
+*/
+
+.nurture-category {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 25px;
+
+  padding: 4px 8px;
+
+  border-radius: 6px;
+
+  background: var(--crm-canvas);
+  color: var(--crm-text-secondary);
+
+  font-size: 9.5px;
+  font-weight: 700;
+
+  white-space: nowrap;
+}
+
+.nurture-category.later {
+  background: var(--crm-warning-soft);
+  color: var(--crm-warning);
+}
+
+.nurture-category.no-response {
+  background: var(--crm-info-soft);
+  color: var(--crm-info);
+}
+
+.nurture-category.lost-not-interested {
+  background: var(--crm-danger-soft);
+  color: var(--crm-danger);
+}
+
+.nurture-category.future-opportunity {
+  background: var(--crm-success-soft);
+  color: var(--crm-success);
+}
