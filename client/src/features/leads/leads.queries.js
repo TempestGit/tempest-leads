@@ -11,12 +11,13 @@ import {
   getLeadOptionsRequest,
   getLeadRequest,
   getLeadsRequest,
+  markLeadLostRequest,
   updateLeadRequest,
 } from "./leads.api.js";
 
 /*
 |--------------------------------------------------------------------------
-| Query Keys
+| Keys
 |--------------------------------------------------------------------------
 */
 
@@ -30,14 +31,11 @@ export const leadKeys = {
     "list",
   ],
 
-  list: (params) => [
+  list: (
+    params
+  ) => [
     ...leadKeys.lists(),
     params,
-  ],
-
-  options: () => [
-    ...leadKeys.all,
-    "options",
   ],
 
   details: () => [
@@ -45,34 +43,48 @@ export const leadKeys = {
     "detail",
   ],
 
-  detail: (id) => [
+  detail: (
+    leadId
+  ) => [
     ...leadKeys.details(),
-    id,
+    Number(
+      leadId
+    ),
+  ],
+
+  options: () => [
+    ...leadKeys.all,
+    "options",
   ],
 };
 
 /*
 |--------------------------------------------------------------------------
-| Leads
+| List
 |--------------------------------------------------------------------------
 */
 
-export const useLeadsQuery = (
-  params
-) =>
-  useQuery({
-    queryKey:
-      leadKeys.list(params),
+export const useLeadsQuery =
+  (
+    params = {}
+  ) =>
+    useQuery({
+      queryKey:
+        leadKeys.list(
+          params
+        ),
 
-    queryFn: () =>
-      getLeadsRequest(
-        params
-      ),
+      queryFn: () =>
+        getLeadsRequest(
+          params
+        ),
 
-    placeholderData:
-      (previousData) =>
-        previousData,
-  });
+      placeholderData:
+        (
+          previousData
+        ) =>
+          previousData,
+    });
 
 /*
 |--------------------------------------------------------------------------
@@ -88,34 +100,77 @@ export const useLeadOptionsQuery =
 
       queryFn:
         getLeadOptionsRequest,
-
-      staleTime:
-        60 * 1000,
     });
 
 /*
 |--------------------------------------------------------------------------
-| Lead
+| Detail
 |--------------------------------------------------------------------------
 */
 
-export const useLeadQuery = (
-  leadId
-) =>
-  useQuery({
-    queryKey:
-      leadKeys.detail(
-        leadId
-      ),
+export const useLeadQuery =
+  (
+    leadId
+  ) =>
+    useQuery({
+      queryKey:
+        leadKeys.detail(
+          leadId
+        ),
 
-    queryFn: () =>
-      getLeadRequest(
-        leadId
-      ),
+      queryFn: () =>
+        getLeadRequest(
+          leadId
+        ),
 
-    enabled:
-      Boolean(leadId),
-  });
+      enabled:
+        Boolean(
+          leadId
+        ),
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Related Invalidation
+|--------------------------------------------------------------------------
+*/
+
+const invalidateLeadData =
+  async (
+    queryClient
+  ) => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: [
+          "leads",
+        ],
+      }),
+
+      queryClient.invalidateQueries({
+        queryKey: [
+          "activities",
+        ],
+      }),
+
+      queryClient.invalidateQueries({
+        queryKey: [
+          "followups",
+        ],
+      }),
+
+      queryClient.invalidateQueries({
+        queryKey: [
+          "meetings",
+        ],
+      }),
+
+      queryClient.invalidateQueries({
+        queryKey: [
+          "nurture",
+        ],
+      }),
+    ]);
+  };
 
 /*
 |--------------------------------------------------------------------------
@@ -132,26 +187,12 @@ export const useCreateLeadMutation =
       mutationFn:
         createLeadRequest,
 
-      onSuccess: async () => {
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey:
-              leadKeys.lists(),
-          }),
-
-          queryClient.invalidateQueries({
-            queryKey: [
-              "companies",
-            ],
-          }),
-
-          queryClient.invalidateQueries({
-            queryKey: [
-              "contacts",
-            ],
-          }),
-        ]);
-      },
+      onSuccess:
+        async () => {
+          await invalidateLeadData(
+            queryClient
+          );
+        },
     });
   };
 
@@ -170,26 +211,12 @@ export const useUpdateLeadMutation =
       mutationFn:
         updateLeadRequest,
 
-      onSuccess: async (
-        response,
-        variables
-      ) => {
-        await queryClient.invalidateQueries({
-          queryKey:
-            leadKeys.lists(),
-        });
-
-        if (
-          variables?.leadId
-        ) {
-          queryClient.setQueryData(
-            leadKeys.detail(
-              variables.leadId
-            ),
-            response
+      onSuccess:
+        async () => {
+          await invalidateLeadData(
+            queryClient
           );
-        }
-      },
+        },
     });
   };
 
@@ -208,12 +235,12 @@ export const useChangeLeadStageMutation =
       mutationFn:
         changeLeadStageRequest,
 
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({
-          queryKey:
-            leadKeys.all,
-        });
-      },
+      onSuccess:
+        async () => {
+          await invalidateLeadData(
+            queryClient
+          );
+        },
     });
   };
 
@@ -232,11 +259,35 @@ export const useChangeLeadOwnerMutation =
       mutationFn:
         changeLeadOwnerRequest,
 
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({
-          queryKey:
-            leadKeys.all,
-        });
-      },
+      onSuccess:
+        async () => {
+          await invalidateLeadData(
+            queryClient
+          );
+        },
+    });
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Mark Lost
+|--------------------------------------------------------------------------
+*/
+
+export const useMarkLeadLostMutation =
+  () => {
+    const queryClient =
+      useQueryClient();
+
+    return useMutation({
+      mutationFn:
+        markLeadLostRequest,
+
+      onSuccess:
+        async () => {
+          await invalidateLeadData(
+            queryClient
+          );
+        },
     });
   };

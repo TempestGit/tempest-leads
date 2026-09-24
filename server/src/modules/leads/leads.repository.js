@@ -1,69 +1,129 @@
-import crypto from "node:crypto";
-
 import pool from "../../config/db.js";
 
 /*
 |--------------------------------------------------------------------------
-| Lead Mapper
+| Map Lead
 |--------------------------------------------------------------------------
 */
 
-const mapLead = (
-  row
-) => {
-  if (!row) {
-    return null;
-  }
+export const mapLead =
+  (row) => {
+    if (!row) {
+      return null;
+    }
 
-  const estimatedValuePaise =
-    Number(
-      row.estimatedValuePaise ||
-        0
-    );
+    return {
+      id:
+        Number(
+          row.id
+        ),
 
-  return {
-    ...row,
+      leadCode:
+        row.leadCode,
 
-    id:
-      Number(row.id),
-
-    companyId:
-      Number(
+      companyId:
         row.companyId
-      ),
+          ? Number(
+              row.companyId
+            )
+          : null,
 
-    primaryContactId:
-      Number(
+      companyName:
+        row.companyName,
+
+      industry:
+        row.industry,
+
+      city:
+        row.city,
+
+      website:
+        row.website,
+
+      primaryContactId:
         row.primaryContactId
-      ),
+          ? Number(
+              row.primaryContactId
+            )
+          : null,
 
-    ownerId:
-      Number(
+      primaryContactName:
+        row.primaryContactName,
+
+      primaryContactDesignation:
+        row.primaryContactDesignation,
+
+      primaryContactPhone:
+        row.primaryContactPhone,
+
+      primaryContactEmail:
+        row.primaryContactEmail,
+
+      ownerId:
         row.ownerId
-      ),
+          ? Number(
+              row.ownerId
+            )
+          : null,
 
-    estimatedValuePaise,
+      ownerName:
+        row.ownerName,
 
-    estimatedValueRupees:
-      estimatedValuePaise /
-      100,
+      stage:
+        row.stage,
 
-    knownRelationship:
-      Boolean(
-        row.knownRelationship
-      ),
+      status:
+        row.status,
 
-    stageAgeDays:
-      Number(
-        row.stageAgeDays ||
-          0
-      ),
+      priority:
+        row.priority,
+
+      source:
+        row.source,
+
+      serviceRequired:
+        row.serviceRequired,
+
+      estimatedValueRupees:
+        Number(
+          row.estimatedValueRupees ||
+            0
+        ),
+
+      knownRelationship:
+        Boolean(
+          Number(
+            row.knownRelationship ||
+              0
+          )
+        ),
+
+      lastTouchAt:
+        row.lastTouchAt,
+
+      nextAction:
+        row.nextAction,
+
+      followUpAt:
+        row.followUpAt,
+
+      stageAgeDays:
+        Number(
+          row.stageAgeDays ||
+            0
+        ),
+
+      createdAt:
+        row.createdAt,
+
+      updatedAt:
+        row.updatedAt,
+    };
   };
-};
 
 /*
 |--------------------------------------------------------------------------
-| Lead SELECT
+| Common Lead Select
 |--------------------------------------------------------------------------
 */
 
@@ -77,9 +137,6 @@ const LEAD_SELECT = `
     l.company_id
       AS companyId,
 
-    c.company_code
-      AS companyCode,
-
     c.name
       AS companyName,
 
@@ -91,9 +148,6 @@ const LEAD_SELECT = `
 
     l.primary_contact_id
       AS primaryContactId,
-
-    ct.contact_code
-      AS primaryContactCode,
 
     ct.full_name
       AS primaryContactName,
@@ -110,14 +164,8 @@ const LEAD_SELECT = `
     l.owner_id
       AS ownerId,
 
-    u.user_code
-      AS ownerCode,
-
-    u.full_name
+    owner.full_name
       AS ownerName,
-
-    u.role
-      AS ownerRole,
 
     l.stage,
 
@@ -130,8 +178,14 @@ const LEAD_SELECT = `
     l.service_required
       AS serviceRequired,
 
-    l.estimated_value_paise
-      AS estimatedValuePaise,
+    l.estimated_value_rupees
+      AS estimatedValueRupees,
+
+    l.known_relationship
+      AS knownRelationship,
+
+    l.last_touch_at
+      AS lastTouchAt,
 
     l.next_action
       AS nextAction,
@@ -139,67 +193,341 @@ const LEAD_SELECT = `
     l.follow_up_at
       AS followUpAt,
 
-    l.last_touch_at
-      AS lastTouchAt,
-
-    l.known_relationship
-      AS knownRelationship,
-
-    l.lifecycle_reason
-      AS lifecycleReason,
-
-    l.notes
-      AS description,
-
-    l.created_by
-      AS createdBy,
-
-    l.updated_by
-      AS updatedBy,
-
-    l.created_at
-      AS createdAt,
-
-    l.updated_at
-      AS updatedAt,
-
     TIMESTAMPDIFF(
       DAY,
 
       COALESCE(
         (
           SELECT
-            MAX(lsh.created_at)
+            MAX(
+              lsh.created_at
+            )
 
           FROM lead_stage_history lsh
 
-          WHERE lsh.lead_id = l.id
+          WHERE
+            lsh.lead_id =
+              l.id
         ),
 
         l.created_at
       ),
 
       UTC_TIMESTAMP()
-    ) AS stageAgeDays
+    )
+      AS stageAgeDays,
+
+    l.created_at
+      AS createdAt,
+
+    l.updated_at
+      AS updatedAt
 
   FROM leads l
 
   INNER JOIN companies c
-    ON c.id = l.company_id
-    AND c.deleted_at IS NULL
+    ON c.id =
+      l.company_id
+
+    AND c.deleted_at
+      IS NULL
 
   LEFT JOIN contacts ct
-    ON ct.id = l.primary_contact_id
-    AND ct.deleted_at IS NULL
+    ON ct.id =
+      l.primary_contact_id
 
-  LEFT JOIN users u
-    ON u.id = l.owner_id
-    AND u.deleted_at IS NULL
+    AND ct.deleted_at
+      IS NULL
+
+  LEFT JOIN users owner
+    ON owner.id =
+      l.owner_id
 `;
 
 /*
 |--------------------------------------------------------------------------
-| Find Lead
+| List Leads
+|--------------------------------------------------------------------------
+*/
+
+export const listLeads =
+  async ({
+    search,
+    ownerId,
+    stage,
+    status,
+    priority,
+    source,
+    companyId,
+    page,
+    limit,
+    sort,
+    direction,
+    currentUser,
+  }) => {
+    const conditions = [
+      "l.deleted_at IS NULL",
+    ];
+
+    const values = [];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Role Scope
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      currentUser.role !==
+      "SUPER_ADMIN"
+    ) {
+      conditions.push(
+        "l.owner_id = ?"
+      );
+
+      values.push(
+        currentUser.id
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Filters
+    |--------------------------------------------------------------------------
+    */
+
+    if (ownerId) {
+      conditions.push(
+        "l.owner_id = ?"
+      );
+
+      values.push(
+        ownerId
+      );
+    }
+
+    if (stage) {
+      conditions.push(
+        "l.stage = ?"
+      );
+
+      values.push(
+        stage
+      );
+    }
+
+    if (status) {
+      conditions.push(
+        "l.status = ?"
+      );
+
+      values.push(
+        status
+      );
+    }
+
+    if (priority) {
+      conditions.push(
+        "l.priority = ?"
+      );
+
+      values.push(
+        priority
+      );
+    }
+
+    if (source) {
+      conditions.push(
+        "l.source = ?"
+      );
+
+      values.push(
+        source
+      );
+    }
+
+    if (companyId) {
+      conditions.push(
+        "l.company_id = ?"
+      );
+
+      values.push(
+        companyId
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Search
+    |--------------------------------------------------------------------------
+    */
+
+    if (search) {
+      const like =
+        `%${search}%`;
+
+      conditions.push(`
+        (
+          l.lead_code LIKE ?
+
+          OR c.name LIKE ?
+
+          OR c.website LIKE ?
+
+          OR ct.full_name LIKE ?
+
+          OR ct.phone LIKE ?
+
+          OR ct.email LIKE ?
+        )
+      `);
+
+      values.push(
+        like,
+        like,
+        like,
+        like,
+        like,
+        like
+      );
+    }
+
+    const whereSql =
+      `
+        WHERE
+          ${conditions.join(
+            " AND "
+          )}
+      `;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sorting
+    |--------------------------------------------------------------------------
+    */
+
+    const sortMap = {
+      createdAt:
+        "l.created_at",
+
+      updatedAt:
+        "l.updated_at",
+
+      followUpAt:
+        "l.follow_up_at",
+
+      lastTouchAt:
+        "l.last_touch_at",
+
+      companyName:
+        "c.name",
+    };
+
+    const sortColumn =
+      sortMap[sort] ||
+      "l.created_at";
+
+    const sortDirection =
+      String(
+        direction
+      ).toLowerCase() ===
+      "asc"
+        ? "ASC"
+        : "DESC";
+
+    /*
+    |--------------------------------------------------------------------------
+    | Count
+    |--------------------------------------------------------------------------
+    */
+
+    const [
+      countRows,
+    ] =
+      await pool.query(
+        `
+          SELECT
+            COUNT(*) AS total
+
+          FROM leads l
+
+          INNER JOIN companies c
+            ON c.id =
+              l.company_id
+
+            AND c.deleted_at
+              IS NULL
+
+          LEFT JOIN contacts ct
+            ON ct.id =
+              l.primary_contact_id
+
+            AND ct.deleted_at
+              IS NULL
+
+          ${whereSql}
+        `,
+        values
+      );
+
+    const total =
+      Number(
+        countRows[0]
+          ?.total ||
+          0
+      );
+
+    const offset =
+      (
+        Number(page) -
+        1
+      ) *
+      Number(limit);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Records
+    |--------------------------------------------------------------------------
+    */
+
+    const [
+      rows,
+    ] =
+      await pool.query(
+        `
+          ${LEAD_SELECT}
+
+          ${whereSql}
+
+          ORDER BY
+            ${sortColumn}
+            ${sortDirection}
+
+          LIMIT ?
+          OFFSET ?
+        `,
+        [
+          ...values,
+
+          Number(limit),
+
+          Number(offset),
+        ]
+      );
+
+    return {
+      leads:
+        rows.map(
+          mapLead
+        ),
+
+      total,
+    };
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Find Lead By ID
 |--------------------------------------------------------------------------
 */
 
@@ -218,6 +546,12 @@ export const findLeadById =
       leadId,
     ];
 
+    /*
+    |--------------------------------------------------------------------------
+    | Owner Scope
+    |--------------------------------------------------------------------------
+    */
+
     if (
       currentUser.role !==
       "SUPER_ADMIN"
@@ -231,7 +565,9 @@ export const findLeadById =
       );
     }
 
-    const [rows] =
+    const [
+      rows,
+    ] =
       await connection.query(
         `
           ${LEAD_SELECT}
@@ -247,46 +583,27 @@ export const findLeadById =
       );
 
     return mapLead(
-      rows[0] || null
+      rows[0] ||
+        null
     );
   };
 
 /*
 |--------------------------------------------------------------------------
-| List Leads
+| Lead Options
 |--------------------------------------------------------------------------
 */
 
-export const listLeads =
-  async ({
-    search = "",
-    ownerId,
-    companyId,
-    primaryContactId,
-    stage,
-    status,
-    industry,
-    source,
-    priority,
-    page = 1,
-    limit = 20,
-    sort = "createdAt",
-    direction = "desc",
-
+export const listLeadOptions =
+  async (
     currentUser,
-  }) => {
+    connection = pool
+  ) => {
     const conditions = [
       "l.deleted_at IS NULL",
-      "c.deleted_at IS NULL",
     ];
 
     const values = [];
-
-    /*
-    |--------------------------------------------------------------------------
-    | Access Scope
-    |--------------------------------------------------------------------------
-    */
 
     if (
       currentUser.role !==
@@ -299,246 +616,150 @@ export const listLeads =
       values.push(
         currentUser.id
       );
-    } else if (ownerId) {
-      conditions.push(
-        "l.owner_id = ?"
-      );
-
-      values.push(
-        ownerId
-      );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Search
-    |--------------------------------------------------------------------------
-    */
-
-    if (search) {
-      const term =
-        `%${search}%`;
-
-      conditions.push(`
-        (
-          l.lead_code LIKE ?
-
-          OR c.company_code LIKE ?
-
-          OR c.name LIKE ?
-
-          OR c.website LIKE ?
-
-          OR ct.contact_code LIKE ?
-
-          OR ct.full_name LIKE ?
-
-          OR ct.phone LIKE ?
-
-          OR ct.email LIKE ?
-        )
-      `);
-
-      values.push(
-        term,
-        term,
-        term,
-        term,
-        term,
-        term,
-        term,
-        term
-      );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Filters
-    |--------------------------------------------------------------------------
-    */
-
-    if (companyId) {
-      conditions.push(
-        "l.company_id = ?"
-      );
-
-      values.push(
-        companyId
-      );
-    }
-
-    if (primaryContactId) {
-      conditions.push(
-        "l.primary_contact_id = ?"
-      );
-
-      values.push(
-        primaryContactId
-      );
-    }
-
-    if (stage) {
-      conditions.push(
-        "l.stage = ?"
-      );
-
-      values.push(stage);
-    }
-
-    if (status) {
-      conditions.push(
-        "l.status = ?"
-      );
-
-      values.push(status);
-    }
-
-    if (industry) {
-      conditions.push(
-        "c.industry = ?"
-      );
-
-      values.push(industry);
-    }
-
-    if (source) {
-      conditions.push(
-        "l.source = ?"
-      );
-
-      values.push(source);
-    }
-
-    if (priority) {
-      conditions.push(
-        "l.priority = ?"
-      );
-
-      values.push(
-        priority
-      );
-    }
-
-    const whereClause =
-      conditions.join(
-        " AND "
-      );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Count
-    |--------------------------------------------------------------------------
-    */
-
-    const [countRows] =
-      await pool.query(
+    const [
+      rows,
+    ] =
+      await connection.query(
         `
           SELECT
-            COUNT(*) AS total
+            l.id,
+
+            l.lead_code
+              AS leadCode,
+
+            c.name
+              AS companyName,
+
+            l.owner_id
+              AS ownerId,
+
+            l.primary_contact_id
+              AS primaryContactId,
+
+            l.stage,
+
+            l.status,
+
+            l.priority,
+
+            l.next_action
+              AS nextAction,
+
+            l.follow_up_at
+              AS followUpAt
 
           FROM leads l
 
           INNER JOIN companies c
-            ON c.id = l.company_id
-            AND c.deleted_at IS NULL
+            ON c.id =
+              l.company_id
 
-          LEFT JOIN contacts ct
-            ON ct.id = l.primary_contact_id
-            AND ct.deleted_at IS NULL
+            AND c.deleted_at
+              IS NULL
 
           WHERE
-            ${whereClause}
+            ${conditions.join(
+              " AND "
+            )}
+
+          ORDER BY
+            c.name ASC,
+            l.id DESC
         `,
         values
       );
 
-    const total =
-      Number(
-        countRows[0]
-          ?.total || 0
-      );
+    return rows.map(
+      (row) => ({
+        id:
+          Number(
+            row.id
+          ),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Sort
-    |--------------------------------------------------------------------------
-    */
+        leadCode:
+          row.leadCode,
 
-    const sortColumns = {
-      createdAt:
-        "l.created_at",
+        companyName:
+          row.companyName,
 
-      updatedAt:
-        "l.updated_at",
+        ownerId:
+          row.ownerId
+            ? Number(
+                row.ownerId
+              )
+            : null,
 
-      followUpAt:
-        "l.follow_up_at",
+        primaryContactId:
+          row.primaryContactId
+            ? Number(
+                row.primaryContactId
+              )
+            : null,
 
-      lastTouchAt:
-        "l.last_touch_at",
+        stage:
+          row.stage,
 
-      companyName:
-        "c.name",
+        status:
+          row.status,
 
-      stage:
-        "l.stage",
-    };
+        priority:
+          row.priority,
 
-    const orderColumn =
-      sortColumns[sort] ||
-      "l.created_at";
+        nextAction:
+          row.nextAction,
 
-    const orderDirection =
-      direction === "asc"
-        ? "ASC"
-        : "DESC";
-
-    /*
-    |--------------------------------------------------------------------------
-    | Pagination
-    |--------------------------------------------------------------------------
-    */
-
-    const offset =
-      (Number(page) - 1) *
-      Number(limit);
-
-    const [rows] =
-      await pool.query(
-        `
-          ${LEAD_SELECT}
-
-          WHERE
-            ${whereClause}
-
-          ORDER BY
-            ${orderColumn}
-            ${orderDirection},
-            l.id DESC
-
-          LIMIT ?
-          OFFSET ?
-        `,
-        [
-          ...values,
-          Number(limit),
-          Number(offset),
-        ]
-      );
-
-    return {
-      rows:
-        rows.map(
-          mapLead
-        ),
-
-      total,
-    };
+        followUpAt:
+          row.followUpAt,
+      })
+    );
   };
 
 /*
 |--------------------------------------------------------------------------
-| Verify Contact Belongs To Company
+| Company
+|--------------------------------------------------------------------------
+*/
+
+export const findLeadCompany =
+  async (
+    companyId,
+    connection = pool
+  ) => {
+    const [
+      rows,
+    ] =
+      await connection.query(
+        `
+          SELECT
+            id,
+            name
+
+          FROM companies
+
+          WHERE
+            id = ?
+
+            AND deleted_at
+              IS NULL
+
+          LIMIT 1
+        `,
+        [
+          companyId,
+        ]
+      );
+
+    return (
+      rows[0] ||
+      null
+    );
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Contact
 |--------------------------------------------------------------------------
 */
 
@@ -548,22 +769,29 @@ export const findContactForCompany =
     companyId,
     connection = pool
   ) => {
-    const [rows] =
+    const [
+      rows,
+    ] =
       await connection.query(
         `
           SELECT
             id,
-            company_id AS companyId,
-            contact_code AS contactCode,
-            full_name AS name,
-            status
+
+            company_id
+              AS companyId,
+
+            full_name
+              AS fullName
 
           FROM contacts
 
-          WHERE id = ?
+          WHERE
+            id = ?
+
             AND company_id = ?
-            AND status = 'ACTIVE'
-            AND deleted_at IS NULL
+
+            AND deleted_at
+              IS NULL
 
           LIMIT 1
         `,
@@ -573,118 +801,133 @@ export const findContactForCompany =
         ]
       );
 
-    return rows[0] || null;
+    return (
+      rows[0] ||
+      null
+    );
   };
 
 /*
 |--------------------------------------------------------------------------
-| Find Active Owner
+| Owner
 |--------------------------------------------------------------------------
 */
 
-export const findActiveOwnerById =
+export const findLeadOwner =
   async (
     ownerId,
     connection = pool
   ) => {
-    const [rows] =
+    const [
+      rows,
+    ] =
       await connection.query(
         `
           SELECT
             id,
 
-            user_code
-              AS userCode,
-
             full_name
               AS fullName,
 
-            email,
-
-            role,
-
-            status
+            role
 
           FROM users
 
-          WHERE id = ?
-            AND status = 'ACTIVE'
-            AND deleted_at IS NULL
+          WHERE
+            id = ?
 
           LIMIT 1
         `,
-        [ownerId]
+        [
+          ownerId,
+        ]
       );
 
-    return rows[0] || null;
+    return (
+      rows[0] ||
+      null
+    );
   };
 
 /*
 |--------------------------------------------------------------------------
-| Insert Lead
+| Create Lead
 |--------------------------------------------------------------------------
 */
 
-export const createLead =
+export const insertLead =
   async (
-    {
-      companyId,
-      primaryContactId,
-      ownerId,
-      serviceRequired,
-      source,
-      estimatedValuePaise,
-      priority,
-      description,
-      nextAction,
-      followUpAt,
-      knownRelationship,
-      userId,
-    },
+    data,
+    userId,
     connection = pool
   ) => {
-    const temporaryCode =
-      `TEMP-${crypto.randomUUID()}`;
+    /*
+    |--------------------------------------------------------------------------
+    | Temporary Public ID
+    |--------------------------------------------------------------------------
+    */
 
-    const [result] =
+    const temporaryCode =
+      `LED-TEMP-${Date.now()}`;
+
+    const [
+      result,
+    ] =
       await connection.query(
         `
           INSERT INTO leads (
             lead_code,
+
             company_id,
+
             primary_contact_id,
+
             owner_id,
+
             stage,
+
             status,
+
             priority,
+
             source,
+
             service_required,
-            estimated_value_paise,
-            next_action,
-            follow_up_at,
-            last_touch_at,
+
+            estimated_value_rupees,
+
             known_relationship,
-            lifecycle_reason,
-            notes,
+
+            last_touch_at,
+
+            next_action,
+
+            follow_up_at,
+
             created_by,
+
             updated_by
           )
+
           VALUES (
             ?,
             ?,
             ?,
             ?,
+
             'New',
+
             'Open',
+
             ?,
             ?,
             ?,
             ?,
             ?,
-            ?,
+
             UTC_TIMESTAMP(),
+
             ?,
-            NULL,
             ?,
             ?,
             ?
@@ -692,150 +935,202 @@ export const createLead =
         `,
         [
           temporaryCode,
-          companyId,
-          primaryContactId,
-          ownerId,
-          priority,
-          source,
-          serviceRequired,
-          estimatedValuePaise,
-          nextAction,
-          followUpAt,
-          knownRelationship
+
+          data.companyId,
+
+          data.primaryContactId,
+
+          data.ownerId,
+
+          data.priority,
+
+          data.source,
+
+          data.serviceRequired,
+
+          data.estimatedValueRupees ??
+            0,
+
+          data.knownRelationship
             ? 1
             : 0,
-          description,
+
+          data.nextAction,
+
+          data.followUpAt,
+
           userId,
+
           userId,
         ]
       );
 
-    return result.insertId;
-  };
-
-/*
-|--------------------------------------------------------------------------
-| Update Lead Code
-|--------------------------------------------------------------------------
-*/
-
-export const updateLeadCode =
-  async (
-    leadId,
-    leadCode,
-    connection = pool
-  ) => {
-    const [result] =
-      await connection.query(
-        `
-          UPDATE leads
-
-          SET
-            lead_code = ?
-
-          WHERE id = ?
-            AND deleted_at IS NULL
-        `,
-        [
-          leadCode,
-          leadId,
-        ]
+    const leadId =
+      Number(
+        result.insertId
       );
 
-    return (
-      result.affectedRows >
-      0
+    /*
+    |--------------------------------------------------------------------------
+    | Public Lead Code
+    |--------------------------------------------------------------------------
+    */
+
+    const leadCode =
+      `LED-${3000 + leadId}`;
+
+    await connection.query(
+      `
+        UPDATE leads
+
+        SET
+          lead_code = ?
+
+        WHERE id = ?
+      `,
+      [
+        leadCode,
+        leadId,
+      ]
     );
+
+    return {
+      leadId,
+      leadCode,
+    };
   };
 
 /*
 |--------------------------------------------------------------------------
-| Update Lead Details
+| Update Lead
 |--------------------------------------------------------------------------
 */
 
-export const updateLeadDetails =
+export const updateLead =
   async (
     leadId,
     data,
     userId,
     connection = pool
   ) => {
-    const columnMap = {
-      companyId:
-        "company_id",
+    const updates = [];
 
-      primaryContactId:
-        "primary_contact_id",
-
-      serviceRequired:
-        "service_required",
-
-      source:
-        "source",
-
-      estimatedValuePaise:
-        "estimated_value_paise",
-
-      priority:
-        "priority",
-
-      description:
-        "notes",
-
-      nextAction:
-        "next_action",
-
-      followUpAt:
-        "follow_up_at",
-
-      knownRelationship:
-        "known_relationship",
-    };
-
-    const assignments = [];
     const values = [];
 
-    for (
-      const [
-        key,
-        value,
-      ] of Object.entries(
-        data
-      )
+    const add =
+      (
+        column,
+        value
+      ) => {
+        updates.push(
+          `${column} = ?`
+        );
+
+        values.push(
+          value
+        );
+      };
+
+    if (
+      data.companyId !==
+      undefined
     ) {
-      const column =
-        columnMap[key];
-
-      if (!column) {
-        continue;
-      }
-
-      assignments.push(
-        `${column} = ?`
+      add(
+        "company_id",
+        data.companyId
       );
-
-      if (
-        key ===
-        "knownRelationship"
-      ) {
-        values.push(
-          value
-            ? 1
-            : 0
-        );
-      } else {
-        values.push(
-          value
-        );
-      }
     }
 
-    assignments.push(
-      "last_touch_at = UTC_TIMESTAMP()"
-    );
+    if (
+      data.primaryContactId !==
+      undefined
+    ) {
+      add(
+        "primary_contact_id",
+        data.primaryContactId
+      );
+    }
 
-    assignments.push(
+    if (
+      data.serviceRequired !==
+      undefined
+    ) {
+      add(
+        "service_required",
+        data.serviceRequired
+      );
+    }
+
+    if (
+      data.source !==
+      undefined
+    ) {
+      add(
+        "source",
+        data.source
+      );
+    }
+
+    if (
+      data.estimatedValueRupees !==
+      undefined
+    ) {
+      add(
+        "estimated_value_rupees",
+        data.estimatedValueRupees
+      );
+    }
+
+    if (
+      data.priority !==
+      undefined
+    ) {
+      add(
+        "priority",
+        data.priority
+      );
+    }
+
+    if (
+      data.nextAction !==
+      undefined
+    ) {
+      add(
+        "next_action",
+        data.nextAction
+      );
+    }
+
+    if (
+      data.followUpAt !==
+      undefined
+    ) {
+      add(
+        "follow_up_at",
+        data.followUpAt
+      );
+    }
+
+    if (
+      data.knownRelationship !==
+      undefined
+    ) {
+      add(
+        "known_relationship",
+        data.knownRelationship
+          ? 1
+          : 0
+      );
+    }
+
+    if (
+      updates.length ===
+      0
+    ) {
+      return false;
+    }
+
+    updates.push(
       "updated_by = ?"
     );
 
@@ -847,18 +1142,23 @@ export const updateLeadDetails =
       leadId
     );
 
-    const [result] =
+    const [
+      result,
+    ] =
       await connection.query(
         `
           UPDATE leads
 
           SET
-            ${assignments.join(
+            ${updates.join(
               ", "
             )}
 
-          WHERE id = ?
-            AND deleted_at IS NULL
+          WHERE
+            id = ?
+
+            AND deleted_at
+              IS NULL
         `,
         values
       );
@@ -875,38 +1175,47 @@ export const updateLeadDetails =
 |--------------------------------------------------------------------------
 */
 
-export const changeLeadStage =
+export const updateLeadStage =
   async (
     {
       leadId,
       stage,
-      status,
-      reason,
+      status = null,
       userId,
     },
     connection = pool
   ) => {
-    const [result] =
+    const [
+      result,
+    ] =
       await connection.query(
         `
           UPDATE leads
 
           SET
             stage = ?,
-            status = ?,
-            lifecycle_reason = ?,
-            last_touch_at =
-              UTC_TIMESTAMP(),
+
+            status =
+              COALESCE(
+                ?,
+                status
+              ),
+
             updated_by = ?
 
-          WHERE id = ?
-            AND deleted_at IS NULL
+          WHERE
+            id = ?
+
+            AND deleted_at
+              IS NULL
         `,
         [
           stage,
+
           status,
-          reason,
+
           userId,
+
           leadId,
         ]
       );
@@ -923,30 +1232,38 @@ export const changeLeadStage =
 |--------------------------------------------------------------------------
 */
 
-export const changeLeadOwner =
+export const updateLeadOwner =
   async (
-    leadId,
-    ownerId,
-    userId,
+    {
+      leadId,
+      ownerId,
+      userId,
+    },
     connection = pool
   ) => {
-    const [result] =
+    const [
+      result,
+    ] =
       await connection.query(
         `
           UPDATE leads
 
           SET
             owner_id = ?,
-            last_touch_at =
-              UTC_TIMESTAMP(),
+
             updated_by = ?
 
-          WHERE id = ?
-            AND deleted_at IS NULL
+          WHERE
+            id = ?
+
+            AND deleted_at
+              IS NULL
         `,
         [
           ownerId,
+
           userId,
+
           leadId,
         ]
       );
@@ -959,111 +1276,148 @@ export const changeLeadOwner =
 
 /*
 |--------------------------------------------------------------------------
-| Stage History
+| Close Lead
 |--------------------------------------------------------------------------
+*/
+
+export const closeLeadState =
+  async (
+    {
+      leadId,
+      stage,
+      status,
+      nextAction,
+      followUpAt,
+      userId,
+    },
+    connection = pool
+  ) => {
+    const [
+      result,
+    ] =
+      await connection.query(
+        `
+          UPDATE leads
+
+          SET
+            stage = ?,
+
+            status = ?,
+
+            next_action = ?,
+
+            follow_up_at = ?,
+
+            updated_by = ?
+
+          WHERE
+            id = ?
+
+            AND deleted_at
+              IS NULL
+        `,
+        [
+          stage,
+
+          status,
+
+          nextAction ??
+            null,
+
+          followUpAt ??
+            null,
+
+          userId,
+
+          leadId,
+        ]
+      );
+
+    return (
+      result.affectedRows >
+      0
+    );
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Lead Stage History
+|--------------------------------------------------------------------------
+|
+| This is the important corrected section.
+|
+| Timestamp column:
+|
+| created_at
+|
+| NOT:
+|
+| changed_at
+|
 */
 
 export const createLeadStageHistory =
   async (
     {
       leadId,
-      fromStage,
-      toStage,
-      changedBy,
+      previousStage,
+      newStage,
       reason,
-      metadata = null,
-    },
-    connection = pool
-  ) => {
-    const [result] =
-      await connection.query(
-        `
-          INSERT INTO lead_stage_history (
-            lead_id,
-            from_stage,
-            to_stage,
-            changed_by,
-            reason,
-            metadata
-          )
-          VALUES (
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?
-          )
-        `,
-        [
-          leadId,
-          fromStage,
-          toStage,
-          changedBy,
-          reason,
-          metadata
-            ? JSON.stringify(
-                metadata
-              )
-            : null,
-        ]
-      );
-
-    return result.insertId;
-  };
-
-/*
-|--------------------------------------------------------------------------
-| Activity
-|--------------------------------------------------------------------------
-*/
-
-export const createLeadActivity =
-  async (
-    {
-      leadId,
-      activityType,
-      outcome,
-      notes,
       userId,
     },
     connection = pool
   ) => {
-    const [result] =
+    const [
+      result,
+    ] =
       await connection.query(
         `
-          INSERT INTO activities (
+          INSERT INTO lead_stage_history (
             lead_id,
-            activity_type,
-            outcome,
-            notes,
-            occurred_at,
-            created_by
+
+            previous_stage,
+
+            new_stage,
+
+            reason,
+
+            changed_by,
+
+            created_at
           )
+
           VALUES (
             ?,
             ?,
             ?,
             ?,
-            UTC_TIMESTAMP(),
-            ?
+            ?,
+            UTC_TIMESTAMP()
           )
         `,
         [
           leadId,
-          activityType,
-          outcome,
-          notes,
+
+          previousStage ??
+            null,
+
+          newStage,
+
+          reason ||
+            null,
+
           userId,
         ]
       );
 
-    return result.insertId;
+    return Number(
+      result.insertId
+    );
   };
 
 /*
 |--------------------------------------------------------------------------
-| Create Follow-up
+| Create Lead Follow-up
 |--------------------------------------------------------------------------
 */
 
@@ -1080,22 +1434,31 @@ export const createLeadFollowup =
     },
     connection = pool
   ) => {
-    const [result] =
+    const [
+      result,
+    ] =
       await connection.query(
         `
           INSERT INTO followups (
             followup_code,
+
             lead_id,
+
             assigned_to,
+
             action,
+
             due_at,
+
             priority,
+
             status,
-            notes,
-            completed_at,
+
             created_by,
+
             updated_by
           )
+
           VALUES (
             ?,
             ?,
@@ -1103,111 +1466,33 @@ export const createLeadFollowup =
             ?,
             ?,
             ?,
+
             'PENDING',
-            NULL,
-            NULL,
+
             ?,
             ?
           )
         `,
         [
           followupCode,
+
           leadId,
+
           assignedTo,
+
           action,
+
           dueAt,
-          priority.toUpperCase(),
+
+          priority,
+
           userId,
+
           userId,
         ]
       );
 
-    return result.insertId;
-  };
-
-/*
-|--------------------------------------------------------------------------
-| Reassign Pending Follow-ups
-|--------------------------------------------------------------------------
-*/
-
-export const reassignPendingFollowups =
-  async (
-    leadId,
-    ownerId,
-    userId,
-    connection = pool
-  ) => {
-    const [result] =
-      await connection.query(
-        `
-          UPDATE followups
-
-          SET
-            assigned_to = ?,
-            updated_by = ?
-
-          WHERE lead_id = ?
-            AND status = 'PENDING'
-        `,
-        [
-          ownerId,
-          userId,
-          leadId,
-        ]
-      );
-
-    return result.affectedRows;
-  };
-
-  /*
-|--------------------------------------------------------------------------
-| List Active Lead Owners
-|--------------------------------------------------------------------------
-*/
-
-export const listActiveLeadOwners = async (
-  currentUser,
-  connection = pool
-) => {
-  const values = [];
-
-  let condition = `
-    status = 'ACTIVE'
-    AND deleted_at IS NULL
-  `;
-
-  if (
-    currentUser.role !==
-    "SUPER_ADMIN"
-  ) {
-    condition += `
-      AND id = ?
-    `;
-
-    values.push(
-      currentUser.id
+    return Number(
+      result.insertId
     );
-  }
-
-  const [rows] =
-    await connection.query(
-      `
-        SELECT
-          id,
-          user_code AS userCode,
-          full_name AS name,
-          email,
-          role
-
-        FROM users
-
-        WHERE ${condition}
-
-        ORDER BY full_name ASC
-      `,
-      values
-    );
-
-  return rows;
-};
+  };

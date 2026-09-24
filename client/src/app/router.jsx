@@ -17,6 +17,7 @@ import LeadDetailPage from "../features/leads/LeadDetailPage.jsx";
 import ActivitiesPage from "../features/activities/ActivitiesPage.jsx";
 import MeetingsPage from "../features/meetings/MeetingsPage.jsx";
 import FollowupsPage from "../features/followups/FollowupsPage.jsx";
+import NurturePage from "../features/nurture/NurturePage.jsx";
 
 import NotFoundPage from "../pages/NotFoundPage";
 
@@ -105,14 +106,10 @@ export const router =
               element: <FollowupsPage />,
             },
 
-            {
+           {
               path: "nurture",
-
-              element: page(
-                "Nurture",
-                "Manage long-term opportunities and reconnect plans."
-              ),
-            },
+              element: <NurturePage />,
+           },
 
             {
               path: "pitch",

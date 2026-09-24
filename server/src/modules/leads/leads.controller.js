@@ -5,6 +5,7 @@ import {
   getLeadOptionsService,
   getLeadService,
   getLeadsService,
+  markLeadLostService,
   updateLeadService,
 } from "./leads.service.js";
 
@@ -14,44 +15,32 @@ import {
 |--------------------------------------------------------------------------
 */
 
-const metadata =
-  (req) => ({
+const getMetadata =
+  (
+    req
+  ) => ({
     ipAddress:
-      req.ip || null,
+      req.ip ||
+      null,
 
     userAgent:
       req.get(
         "user-agent"
-      ) || null,
+      ) ||
+      null,
   });
 
 /*
 |--------------------------------------------------------------------------
-| GET /api/leads/options
-|--------------------------------------------------------------------------
-*/
-
-export const getLeadOptionsController =
-  async (req, res) => {
-    const result =
-      await getLeadOptionsService(
-        req.user
-      );
-
-    res.status(200).json({
-      success: true,
-      data: result,
-    });
-  };
-
-/*
-|--------------------------------------------------------------------------
-| GET /api/leads
+| List
 |--------------------------------------------------------------------------
 */
 
 export const listLeadsController =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     const result =
       await getLeadsService(
         req.validated.query,
@@ -60,18 +49,47 @@ export const listLeadsController =
 
     res.status(200).json({
       success: true,
-      data: result,
+
+      data:
+        result,
     });
   };
 
 /*
 |--------------------------------------------------------------------------
-| GET /api/leads/:leadId
+| Options
+|--------------------------------------------------------------------------
+*/
+
+export const getLeadOptionsController =
+  async (
+    req,
+    res
+  ) => {
+    const result =
+      await getLeadOptionsService(
+        req.user
+      );
+
+    res.status(200).json({
+      success: true,
+
+      data:
+        result,
+    });
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Detail
 |--------------------------------------------------------------------------
 */
 
 export const getLeadController =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     const lead =
       await getLeadService(
         req.validated
@@ -92,12 +110,15 @@ export const getLeadController =
 
 /*
 |--------------------------------------------------------------------------
-| POST /api/leads
+| Create
 |--------------------------------------------------------------------------
 */
 
 export const createLeadController =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     const lead =
       await createLeadService({
         data:
@@ -106,14 +127,16 @@ export const createLeadController =
         currentUser:
           req.user,
 
-        ...metadata(req),
+        ...getMetadata(
+          req
+        ),
       });
 
     res.status(201).json({
       success: true,
 
       message:
-        "Lead created with first follow-up.",
+        "Lead created.",
 
       data: {
         lead,
@@ -123,12 +146,15 @@ export const createLeadController =
 
 /*
 |--------------------------------------------------------------------------
-| PATCH /api/leads/:leadId
+| Update
 |--------------------------------------------------------------------------
 */
 
 export const updateLeadController =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     const lead =
       await updateLeadService({
         leadId:
@@ -142,7 +168,9 @@ export const updateLeadController =
         currentUser:
           req.user,
 
-        ...metadata(req),
+        ...getMetadata(
+          req
+        ),
       });
 
     res.status(200).json({
@@ -164,7 +192,10 @@ export const updateLeadController =
 */
 
 export const changeLeadStageController =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     const lead =
       await changeLeadStageService({
         leadId:
@@ -178,7 +209,9 @@ export const changeLeadStageController =
         currentUser:
           req.user,
 
-        ...metadata(req),
+        ...getMetadata(
+          req
+        ),
       });
 
     res.status(200).json({
@@ -200,7 +233,10 @@ export const changeLeadStageController =
 */
 
 export const changeLeadOwnerController =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     const lead =
       await changeLeadOwnerService({
         leadId:
@@ -214,7 +250,9 @@ export const changeLeadOwnerController =
         currentUser:
           req.user,
 
-        ...metadata(req),
+        ...getMetadata(
+          req
+        ),
       });
 
     res.status(200).json({
@@ -222,6 +260,51 @@ export const changeLeadOwnerController =
 
       message:
         "Lead owner updated.",
+
+      data: {
+        lead,
+      },
+    });
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Lost
+|--------------------------------------------------------------------------
+*/
+
+export const markLeadLostController =
+  async (
+    req,
+    res
+  ) => {
+    const lead =
+      await markLeadLostService({
+        leadId:
+          req.validated
+            .params
+            .leadId,
+
+        data:
+          req.validated.body,
+
+        currentUser:
+          req.user,
+
+        ...getMetadata(
+          req
+        ),
+      });
+
+    res.status(200).json({
+      success: true,
+
+      message:
+        req.validated
+          .body
+          .moveToNurture
+          ? "Lead closed and moved to nurture."
+          : "Lead marked as lost.",
 
       data: {
         lead,
