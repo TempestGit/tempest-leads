@@ -375,7 +375,9 @@ export const createCompany = async (
   connection = pool
 ) => {
   const temporaryCode =
-    `TEMP-${crypto.randomUUID()}`;
+  `TEMP-${crypto
+    .randomBytes(12)
+    .toString("hex")}`;
 
   const [result] =
     await connection.query(
