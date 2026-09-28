@@ -17,6 +17,7 @@ import followupsRoutes from "./modules/followups/followups.routes.js";
 import nurtureRoutes from "./modules/nurture/nurture.routes.js";
 import briefRoutes from "./modules/briefs/briefs.routes.js";
 import teamAssignmentRoutes from "./modules/teamAssignments/teamAssignments.routes.js";
+import usersRoutes from "./modules/users/users.routes.js";
 
 import notFoundMiddleware from "./middleware/notFound.middleware.js";
 import errorMiddleware from "./middleware/error.middleware.js";
@@ -91,6 +92,7 @@ app.use("/api/followups", followupsRoutes);
 app.use("/api/nurture", nurtureRoutes);
 app.use("/api/briefs", briefRoutes);
 app.use("/api/team-assignments", teamAssignmentRoutes);
+app.use("/api/users", usersRoutes);
 
 /*
 |--------------------------------------------------------------------------

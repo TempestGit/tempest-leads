@@ -18,6 +18,7 @@ import ActivitiesPage from "../features/activities/ActivitiesPage.jsx";
 import MeetingsPage from "../features/meetings/MeetingsPage.jsx";
 import FollowupsPage from "../features/followups/FollowupsPage.jsx";
 import NurturePage from "../features/nurture/NurturePage.jsx";
+import UsersPage from "../features/users/UsersPage.jsx";
 
 import NotFoundPage from "../pages/NotFoundPage";
 
@@ -179,10 +180,7 @@ export const router =
                   path:
                     "admin/users",
 
-                  element: page(
-                    "Users / Owners",
-                    "Manage CRM users, roles and access."
-                  ),
+                   element: <UsersPage />,
                 },
 
                 {
