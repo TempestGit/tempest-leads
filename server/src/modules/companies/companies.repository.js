@@ -364,6 +364,7 @@ export const createCompany = async (
     city,
     website,
     agencyRelationship,
+    notes = null,
 
     country = "India",
     source = "Other",
@@ -405,7 +406,7 @@ export const createCompany = async (
           ?,
           ?,
           ?,
-          NULL,
+          ?,
           ?,
           ?
         )
@@ -420,6 +421,7 @@ export const createCompany = async (
         agencyRelationship,
         source,
         status,
+        notes,
         userId,
         userId,
       ]

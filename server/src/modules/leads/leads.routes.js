@@ -56,9 +56,21 @@ router.get(
 
 /*
 |--------------------------------------------------------------------------
-| Options
+| Static Options Routes
 |--------------------------------------------------------------------------
+|
+| Keep these ABOVE /:leadId so Express never treats "owners" or "options"
+| as a lead ID.
+|
 */
+
+router.get(
+  "/owners",
+
+  asyncHandler(
+    getLeadOwnersController
+  )
+);
 
 router.get(
   "/options",
@@ -84,26 +96,6 @@ router.post(
 
   asyncHandler(
     createLeadController
-  )
-);
-
-/*
-|--------------------------------------------------------------------------
-| Owner Options
-|--------------------------------------------------------------------------
-*/
-
-router.get(
-  "/owners",
-  asyncHandler(
-    getLeadOwnersController
-  )
-);
-
-router.get(
-  "/options",
-  asyncHandler(
-    getLeadOptionsController
   )
 );
 

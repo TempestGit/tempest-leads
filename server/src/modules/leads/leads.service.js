@@ -15,6 +15,18 @@ import {
 } from "../nurture/nurture.repository.js";
 
 import {
+  createCompany,
+  findCompanyByName,
+  updateCompanyCode,
+} from "../companies/companies.repository.js";
+
+import {
+  createContact,
+  findMatchingContact,
+  updateContactCode,
+} from "../contacts/contacts.repository.js";
+
+import {
   listAssignableLeadOwners,
 } from "./leads.repository.js";
 
@@ -241,38 +253,235 @@ export const createLeadService =
 
       /*
       |--------------------------------------------------------------------------
-      | Validate Relations
+      | Validate Owner
       |--------------------------------------------------------------------------
       */
 
-      await validateLeadRelations(
-        {
-          companyId:
-            data.companyId,
+      const owner =
+        await validateOwner(
+          data.ownerId,
+          connection
+        );
 
-          primaryContactId:
-            data.primaryContactId,
-        },
-        connection
-      );
+      /*
+      |--------------------------------------------------------------------------
+      | Resolve Company
+      |--------------------------------------------------------------------------
+      |
+      | Add Lead captures company data directly. Reuse an existing active
+      | company when the same name already exists; otherwise create it inside
+      | this transaction.
+      |
+      */
 
-      await validateOwner(
-        data.ownerId,
-        connection
-      );
+      let company =
+        await findCompanyByName(
+          data.company.name,
+          null,
+          connection
+        );
+
+      let companyReused =
+        Boolean(
+          company
+        );
+
+      let companyId;
+
+      if (
+        company
+      ) {
+        companyId =
+          Number(
+            company.id
+          );
+      } else {
+        companyId =
+          Number(
+            await createCompany(
+              {
+                name:
+                  data.company.name,
+
+                industry:
+                  data.company.industry,
+
+                city:
+                  data.company.city,
+
+                website:
+                  data.company.website,
+
+                agencyRelationship:
+                  data.company
+                    .agencyRelationship,
+
+                notes:
+                  data.company
+                    .marketingActivity,
+
+                source:
+                  data.source,
+
+                status:
+                  "ACTIVE",
+
+                userId:
+                  currentUser.id,
+              },
+              connection
+            )
+          );
+
+        await updateCompanyCode(
+          companyId,
+          `CMP-${1000 + companyId}`,
+          connection
+        );
+
+        companyReused =
+          false;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Resolve Contact
+      |--------------------------------------------------------------------------
+      |
+      | Reuse an existing contact under the selected company when email or
+      | phone matches. Otherwise create a new Contact Master record.
+      |
+      */
+
+      let contact =
+        await findMatchingContact(
+          {
+            companyId,
+
+            email:
+              data.contact.email,
+
+            phone:
+              data.contact.phone,
+          },
+          connection
+        );
+
+      let contactReused =
+        Boolean(
+          contact
+        );
+
+      let primaryContactId;
+
+      if (
+        contact
+      ) {
+        primaryContactId =
+          Number(
+            contact.id
+          );
+      } else {
+        primaryContactId =
+          Number(
+            await createContact(
+              {
+                companyId,
+
+                name:
+                  data.contact.name,
+
+                designation:
+                  data.contact
+                    .designation,
+
+                phone:
+                  data.contact.phone,
+
+                email:
+                  data.contact.email,
+
+                isDecisionMaker:
+                  data.contact
+                    .isDecisionMaker,
+
+                userId:
+                  currentUser.id,
+              },
+              connection
+            )
+          );
+
+        await updateContactCode(
+          primaryContactId,
+          `CON-${2000 + primaryContactId}`,
+          connection
+        );
+
+        contactReused =
+          false;
+      }
 
       /*
       |--------------------------------------------------------------------------
       | Create Lead
       |--------------------------------------------------------------------------
+      |
+      | Lead branch defaults to the selected owner's home branch. This keeps
+      | Team Assignment branch filtering usable for newly created leads.
+      |
       */
+
+      const leadData = {
+        ownerId:
+          data.ownerId,
+
+        companyId,
+
+        primaryContactId,
+
+        branchId:
+          owner.branchId
+            ? Number(
+                owner.branchId
+              )
+            : null,
+
+        serviceRequired:
+          data.serviceRequired,
+
+        source:
+          data.source,
+
+        estimatedValueRupees:
+          data.estimatedValueRupees ??
+          0,
+
+        priority:
+          data.priority,
+
+        description:
+          data.description ??
+          null,
+
+        nextAction:
+          data.nextAction,
+
+        followUpAt:
+          data.followUpAt,
+
+        knownRelationship:
+          Boolean(
+            data.knownRelationship
+          ),
+      };
 
       const {
         leadId,
         leadCode,
       } =
         await insertLead(
-          data,
+          leadData,
           currentUser.id,
           connection
         );
@@ -319,7 +528,10 @@ export const createLeadService =
             "New lead created",
 
           notes:
-            "Company and primary contact captured.",
+            companyReused ||
+            contactReused
+              ? "Lead created using existing CRM master data where a match was found."
+              : "Company and primary contact captured.",
 
           userId:
             currentUser.id,
@@ -371,6 +583,17 @@ export const createLeadService =
           connection
         );
 
+      if (
+        !lead
+      ) {
+        throw new ApiError(
+          500,
+          "Lead was created but could not be loaded.",
+          [],
+          "LEAD_CREATED_BUT_NOT_LOADED"
+        );
+      }
+
       /*
       |--------------------------------------------------------------------------
       | Audit
@@ -398,6 +621,17 @@ export const createLeadService =
 
         metadata: {
           leadCode,
+
+          companyId,
+
+          primaryContactId,
+
+          companyReused,
+
+          contactReused,
+
+          branchId:
+            leadData.branchId,
         },
 
         ipAddress,
@@ -1399,22 +1633,38 @@ export const getLeadOwnersService =
   async (
     currentUser
   ) => {
-    if (
-      currentUser.role !==
-      "SUPER_ADMIN"
-    ) {
-      throw new ApiError(
-        403,
-        "Only Super Admin can assign or reassign lead owners.",
-        [],
-        "FORBIDDEN"
-      );
-    }
-
     const owners =
       await listAssignableLeadOwners();
 
+    if (
+      currentUser.role ===
+      "SUPER_ADMIN"
+    ) {
+      return {
+        owners,
+      };
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Normal User / Owner
+    |--------------------------------------------------------------------------
+    |
+    | Normal users can add leads, but they must not assign a new lead to
+    | another owner. Return only the signed-in active user.
+    |
+    */
+
     return {
-      owners,
+      owners:
+        owners.filter(
+          (owner) =>
+            Number(
+              owner.id
+            ) ===
+            Number(
+              currentUser.id
+            )
+        ),
     };
   };

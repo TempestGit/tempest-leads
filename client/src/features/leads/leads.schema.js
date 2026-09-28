@@ -59,8 +59,11 @@ export const LEAD_SOURCES = [
   "Industry event",
   "Tender/RFP",
   "Funding news",
+  "New launch/rebrand",
   "Newspaper",
   "Magazine",
+  "Outdoor",
+  "TV/radio",
   "Digital/social",
   "Trade publication",
   "Other",
@@ -161,7 +164,7 @@ export const contactStepSchema =
         "Contact name is required."
       )
       .max(
-        190,
+        150,
         "Contact name is too long."
       ),
 
@@ -229,7 +232,7 @@ export const opportunityStepSchema =
         "Potential requirement is required."
       )
       .max(
-        500,
+        255,
         "Potential requirement is too long."
       ),
 

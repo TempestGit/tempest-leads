@@ -69,6 +69,16 @@ export const mapLead =
       ownerName:
         row.ownerName,
 
+      branchId:
+        row.branchId
+          ? Number(
+              row.branchId
+            )
+          : null,
+
+      branchName:
+        row.branchName,
+
       stage:
         row.stage,
 
@@ -83,6 +93,9 @@ export const mapLead =
 
       serviceRequired:
         row.serviceRequired,
+
+      description:
+        row.description,
 
       estimatedValueRupees:
         Number(
@@ -167,6 +180,12 @@ const LEAD_SELECT = `
     owner.full_name
       AS ownerName,
 
+    l.branch_id
+      AS branchId,
+
+    branch.name
+      AS branchName,
+
     l.stage,
 
     l.status,
@@ -177,6 +196,9 @@ const LEAD_SELECT = `
 
     l.service_required
       AS serviceRequired,
+
+    l.notes
+      AS description,
 
     l.estimated_value_rupees
       AS estimatedValueRupees,
@@ -242,6 +264,10 @@ const LEAD_SELECT = `
   LEFT JOIN users owner
     ON owner.id =
       l.owner_id
+
+  LEFT JOIN branches branch
+    ON branch.id =
+      l.branch_id
 `;
 
 /*
@@ -829,12 +855,20 @@ export const findLeadOwner =
             full_name
               AS fullName,
 
-            role
+            role,
+
+            status,
+
+            branch_id
+              AS branchId
 
           FROM users
 
           WHERE
             id = ?
+
+            AND UPPER(status) =
+              'ACTIVE'
 
           LIMIT 1
         `,
@@ -868,7 +902,10 @@ export const insertLead =
     */
 
     const temporaryCode =
-      `LED-TEMP-${Date.now()}`;
+      `LED-TEMP-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 7)
+        .toUpperCase()}`;
 
     const [
       result,
@@ -883,6 +920,8 @@ export const insertLead =
             primary_contact_id,
 
             owner_id,
+
+            branch_id,
 
             stage,
 
@@ -904,12 +943,15 @@ export const insertLead =
 
             follow_up_at,
 
+            notes,
+
             created_by,
 
             updated_by
           )
 
           VALUES (
+            ?,
             ?,
             ?,
             ?,
@@ -930,6 +972,7 @@ export const insertLead =
             ?,
             ?,
             ?,
+            ?,
             ?
           )
         `,
@@ -941,6 +984,9 @@ export const insertLead =
           data.primaryContactId,
 
           data.ownerId,
+
+          data.branchId ??
+            null,
 
           data.priority,
 
@@ -958,6 +1004,9 @@ export const insertLead =
           data.nextAction,
 
           data.followUpAt,
+
+          data.description ??
+            null,
 
           userId,
 
@@ -1078,6 +1127,16 @@ export const updateLead =
       add(
         "estimated_value_rupees",
         data.estimatedValueRupees
+      );
+    }
+
+    if (
+      data.description !==
+      undefined
+    ) {
+      add(
+        "notes",
+        data.description
       );
     }
 
