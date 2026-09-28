@@ -1,34 +1,50 @@
+import fs from "node:fs";
 import mysql from "mysql2/promise";
-import { env } from "./env.js";
 
-const pool = mysql.createPool({
-  host: env.DB_HOST,
-  port: env.DB_PORT,
-  user: env.DB_USER,
-  password: env.DB_PASSWORD,
-  database: env.DB_NAME,
+const ssl =
+  process.env.DB_SSL_CA_PATH
+    ? {
+        ca:
+          fs.readFileSync(
+            process.env.DB_SSL_CA_PATH,
+            "utf8"
+          ),
 
-  waitForConnections: true,
-  connectionLimit: 10,
-  maxIdle: 10,
-  idleTimeout: 60000,
-  queueLimit: 0,
+        rejectUnauthorized:
+          true,
+      }
+    : undefined;
 
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 0,
+const pool =
+  mysql.createPool({
+    host:
+      process.env.DB_HOST,
 
-  charset: "utf8mb4",
-  timezone: "Z",
-});
+    port:
+      Number(
+        process.env.DB_PORT ||
+          3306
+      ),
 
-export const testDatabaseConnection = async () => {
-  const connection = await pool.getConnection();
+    user:
+      process.env.DB_USER,
 
-  try {
-    await connection.query("SELECT 1");
-  } finally {
-    connection.release();
-  }
-};
+    password:
+      process.env.DB_PASSWORD,
+
+    database:
+      process.env.DB_NAME,
+
+    ssl,
+
+    waitForConnections:
+      true,
+
+    connectionLimit:
+      10,
+
+    queueLimit:
+      0,
+  });
 
 export default pool;

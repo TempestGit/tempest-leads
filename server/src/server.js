@@ -1,24 +1,19 @@
 import app from "./app.js";
-import { env } from "./config/env.js";
-import { testDatabaseConnection } from "./config/db.js";
 
-const startServer = async () => {
-  try {
-    await testDatabaseConnection();
+const PORT =
+  Number(
+    process.env.PORT
+  ) || 5000;
 
-    console.log("MySQL database connected.");
+const HOST =
+  "0.0.0.0";
 
-    app.listen(env.PORT, () => {
-      console.log(
-        `TEMPEST LEADS API running at http://localhost:${env.PORT}`
-      );
-    });
-  } catch (error) {
-    console.error("Failed to start server:");
-    console.error(error);
-
-    process.exit(1);
+app.listen(
+  PORT,
+  HOST,
+  () => {
+    console.log(
+      `TEMPEST LEADS API running on port ${PORT}`
+    );
   }
-};
-
-startServer();
+);
