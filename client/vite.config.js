@@ -9,27 +9,20 @@ export default defineConfig({
   ],
 
   server: {
-      host: true,
+    host: true,
+    port: 5173,
 
-      port: 5173,
-
-      proxy: {
-        "/api": {
-          target:
-            "http://localhost:5000",
-
-          changeOrigin:
-            true,
-
-          secure:
-            false,
-        },
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        secure: false,
       },
     },
+  },
 
-    preview: {
-      host: true,
-
-      port: 4173,
-    },
+  preview: {
+    host: true,
+    port: 4173,
+  },
 });
