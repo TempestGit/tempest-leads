@@ -17,8 +17,8 @@ export const LEAD_STAGES = [
   "Contract / PO",
   "Onboarding",
   "Active Client",
-  "Lost",
   "Nurture",
+  "Lost",
 ];
 
 /*
@@ -29,43 +29,8 @@ export const LEAD_STAGES = [
 
 export const LEAD_STATUSES = [
   "Open",
-  "Later",
   "Not interested",
-  "No response",
-];
-
-/*
-|--------------------------------------------------------------------------
-| Lead Priorities
-|--------------------------------------------------------------------------
-*/
-
-export const LEAD_PRIORITIES = [
-  "High",
-  "Medium",
-  "Low",
-];
-
-/*
-|--------------------------------------------------------------------------
-| Lead Sources
-|--------------------------------------------------------------------------
-*/
-
-export const LEAD_SOURCES = [
-  "LinkedIn",
-  "Google",
-  "Competitor research",
-  "Referral",
-  "Employee referral",
-  "Industry event",
-  "Tender/RFP",
-  "Funding news",
-  "Newspaper",
-  "Magazine",
-  "Digital/social",
-  "Trade publication",
-  "Other",
+  "Active Client",
 ];
 
 /*
@@ -88,6 +53,61 @@ export const LEAD_INDUSTRIES = [
   "Pharma",
   "Manufacturing",
   "D2C / E-commerce",
+  "Other",
+];
+
+/*
+|--------------------------------------------------------------------------
+| Priorities
+|--------------------------------------------------------------------------
+*/
+
+export const LEAD_PRIORITIES = [
+  "High",
+  "Medium",
+  "Low",
+];
+
+/*
+|--------------------------------------------------------------------------
+| Sources
+|--------------------------------------------------------------------------
+*/
+
+export const LEAD_SOURCES = [
+  "LinkedIn",
+  "Google",
+  "Competitor research",
+  "Referral",
+  "Employee referral",
+  "Industry event",
+  "Tender/RFP",
+  "Funding news",
+  "New launch/rebrand",
+  "Newspaper",
+  "Magazine",
+  "Outdoor",
+  "TV/radio",
+  "Digital/social",
+  "Trade publication",
+  "Other",
+];
+
+/*
+|--------------------------------------------------------------------------
+| Lost Reasons
+|--------------------------------------------------------------------------
+*/
+
+export const LOST_REASONS = [
+  "Budget",
+  "Timing",
+  "No requirement",
+  "Creative / pitch",
+  "Competitor",
+  "Existing agency",
+  "Internal decision",
+  "No response",
   "Other",
 ];
 
@@ -140,12 +160,6 @@ const optionalNullableText = (
       .optional()
   );
 
-/*
-|--------------------------------------------------------------------------
-| Nullable Email
-|--------------------------------------------------------------------------
-*/
-
 const nullableEmail =
   z.preprocess(
     (value) => {
@@ -171,116 +185,145 @@ const nullableEmail =
 
 /*
 |--------------------------------------------------------------------------
-| Create Lead Schema
+| ID
+|--------------------------------------------------------------------------
+*/
+
+export const leadIdSchema =
+  z.object({
+    leadId:
+      z.coerce
+        .number()
+        .int()
+        .positive(),
+  });
+
+/*
+|--------------------------------------------------------------------------
+| List
+|--------------------------------------------------------------------------
+*/
+
+export const leadListSchema =
+  z.object({
+    search:
+      z
+        .string()
+        .trim()
+        .max(200)
+        .optional(),
+
+    ownerId:
+      z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
+
+    stage:
+      z
+        .enum(
+          LEAD_STAGES
+        )
+        .optional(),
+
+    status:
+      z
+        .enum(
+          LEAD_STATUSES
+        )
+        .optional(),
+
+    priority:
+      z
+        .enum(
+          LEAD_PRIORITIES
+        )
+        .optional(),
+
+    source:
+      z
+        .string()
+        .trim()
+        .max(120)
+        .optional(),
+
+    companyId:
+      z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
+
+    page:
+      z.coerce
+        .number()
+        .int()
+        .min(1)
+        .default(1),
+
+    limit:
+      z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .default(25),
+
+    sort:
+      z
+        .enum([
+          "createdAt",
+          "updatedAt",
+          "followUpAt",
+          "lastTouchAt",
+          "companyName",
+        ])
+        .default(
+          "createdAt"
+        ),
+
+    direction:
+      z
+        .enum([
+          "asc",
+          "desc",
+        ])
+        .default(
+          "desc"
+        ),
+  });
+
+/*
+|--------------------------------------------------------------------------
+| Existing Record Fields
 |--------------------------------------------------------------------------
 |
-| Exact 5-step Add Lead workflow:
-|
-| 1. Company
-| 2. Contact
-| 3. Opportunity
-| 4. Ownership
-| 5. Next action
+| Used by PATCH /api/leads/:leadId.
 |
 */
 
-export const createLeadSchema =
-  z.object({
-    /*
-    |--------------------------------------------------------------------------
-    | STEP 1 — Company
-    |--------------------------------------------------------------------------
-    */
+const leadFormFields = {
+  companyId:
+    z.coerce
+      .number()
+      .int()
+      .positive(),
 
-    company: z.object({
-      name: z
-        .string()
-        .trim()
-        .min(
-          2,
-          "Company name is required."
-        )
-        .max(
-          190,
-          "Company name cannot exceed 190 characters."
-        ),
+  primaryContactId:
+    z.coerce
+      .number()
+      .int()
+      .positive(),
 
-      industry: z.enum(
-        LEAD_INDUSTRIES,
-        {
-          message:
-            "Industry is required.",
-        }
-      ),
+  ownerId:
+    z.coerce
+      .number()
+      .int()
+      .positive(),
 
-      city:
-        nullableText(
-          120
-        ),
-
-      website:
-        nullableText(
-          500
-        ),
-
-      agencyRelationship:
-        nullableText(
-          255
-        ),
-
-      marketingActivity:
-        nullableText(
-          5000
-        ),
-    }),
-
-    /*
-    |--------------------------------------------------------------------------
-    | STEP 2 — Primary Contact
-    |--------------------------------------------------------------------------
-    */
-
-    contact: z.object({
-      name: z
-        .string()
-        .trim()
-        .min(
-          2,
-          "Contact name is required."
-        )
-        .max(
-          190,
-          "Contact name cannot exceed 190 characters."
-        ),
-
-      designation:
-        nullableText(
-          150
-        ),
-
-      phone:
-        nullableText(
-          30
-        ),
-
-      email:
-        nullableEmail,
-
-      isDecisionMaker:
-        z
-          .boolean()
-          .default(
-            false
-          ),
-    }),
-
-    /*
-    |--------------------------------------------------------------------------
-    | STEP 3 — Opportunity
-    |--------------------------------------------------------------------------
-    */
-
-    serviceRequired: z
+  serviceRequired:
+    z
       .string()
       .trim()
       .min(
@@ -288,35 +331,32 @@ export const createLeadSchema =
         "Potential requirement is required."
       )
       .max(
-        500,
-        "Potential requirement cannot exceed 500 characters."
+        255,
+        "Potential requirement cannot exceed 255 characters."
       ),
 
-    source: z.enum(
-      LEAD_SOURCES,
-      {
-        message:
-          "Lead source is required.",
-      }
-    ),
-
-    estimatedValueRupees:
-      z.coerce
-        .number({
+  source:
+    z
+      .enum(
+        LEAD_SOURCES,
+        {
           message:
-            "Opportunity value must be a number.",
-        })
-        .min(
-          0,
-          "Opportunity value cannot be negative."
-        )
-        .max(
-          1000000000000,
-          "Opportunity value is too large."
-        )
-        .default(0),
+            "Please select a valid lead source.",
+        }
+      ),
 
-    priority: z
+  estimatedValueRupees:
+    z.coerce
+      .number()
+      .finite()
+      .min(
+        0,
+        "Opportunity value cannot be negative."
+      )
+      .default(0),
+
+  priority:
+    z
       .enum(
         LEAD_PRIORITIES
       )
@@ -324,36 +364,13 @@ export const createLeadSchema =
         "Medium"
       ),
 
-    description:
-      nullableText(
-        5000
-      ),
+  description:
+    optionalNullableText(
+      5000
+    ),
 
-    /*
-    |--------------------------------------------------------------------------
-    | STEP 4 — Ownership
-    |--------------------------------------------------------------------------
-    */
-
-    ownerId: z.coerce
-      .number({
-        message:
-          "Owner is required.",
-      })
-      .int(
-        "Owner ID must be an integer."
-      )
-      .positive(
-        "Owner is required."
-      ),
-
-    /*
-    |--------------------------------------------------------------------------
-    | STEP 5 — Next Action
-    |--------------------------------------------------------------------------
-    */
-
-    nextAction: z
+  nextAction:
+    z
       .string()
       .trim()
       .min(
@@ -365,88 +382,205 @@ export const createLeadSchema =
         "Next action cannot exceed 500 characters."
       ),
 
-    followUpAt:
-      z.coerce.date({
-        message:
-          "A valid follow-up date and time is required.",
+  followUpAt:
+    z.coerce
+      .date({
+        error:
+          "Enter a valid follow-up date and time.",
       }),
 
-    knownRelationship:
+  knownRelationship:
+    z
+      .boolean()
+      .default(false),
+};
+
+/*
+|--------------------------------------------------------------------------
+| Create Company Payload
+|--------------------------------------------------------------------------
+*/
+
+const createLeadCompanySchema =
+  z.object({
+    name:
       z
-        .boolean()
-        .default(
-          false
+        .string()
+        .trim()
+        .min(
+          2,
+          "Company name is required."
+        )
+        .max(
+          190,
+          "Company name cannot exceed 190 characters."
         ),
+
+    industry:
+      z.enum(
+        LEAD_INDUSTRIES,
+        {
+          message:
+            "Please select a valid industry.",
+        }
+      ),
+
+    city:
+      nullableText(
+        120
+      ),
+
+    website:
+      nullableText(
+        500
+      ),
+
+    agencyRelationship:
+      nullableText(
+        255
+      ),
+
+    marketingActivity:
+      nullableText(
+        5000
+      ),
   });
 
 /*
 |--------------------------------------------------------------------------
-| Update Lead Schema
+| Create Contact Payload
+|--------------------------------------------------------------------------
+*/
+
+const createLeadContactSchema =
+  z.object({
+    name:
+      z
+        .string()
+        .trim()
+        .min(
+          2,
+          "Contact name is required."
+        )
+        .max(
+          150,
+          "Contact name cannot exceed 150 characters."
+        ),
+
+    designation:
+      nullableText(
+        150
+      ),
+
+    phone:
+      nullableText(
+        30
+      ),
+
+    email:
+      nullableEmail,
+
+    isDecisionMaker:
+      z
+        .boolean()
+        .default(false),
+  });
+
+/*
+|--------------------------------------------------------------------------
+| Create
 |--------------------------------------------------------------------------
 |
-| Important:
+| Add Lead creates/reuses Company + Contact inside one transaction.
+| Therefore POST /api/leads accepts nested company/contact objects rather than
+| requiring companyId and primaryContactId from the browser.
 |
-| Stage and owner are NOT updated through this schema.
-|
-| They have dedicated endpoints:
-|
-| PATCH /api/leads/:leadId/stage
-| PATCH /api/leads/:leadId/owner
-|
+*/
+
+export const createLeadSchema =
+  z.object({
+    company:
+      createLeadCompanySchema,
+
+    contact:
+      createLeadContactSchema,
+
+    ownerId:
+      leadFormFields
+        .ownerId,
+
+    serviceRequired:
+      leadFormFields
+        .serviceRequired,
+
+    source:
+      leadFormFields
+        .source,
+
+    estimatedValueRupees:
+      leadFormFields
+        .estimatedValueRupees,
+
+    priority:
+      leadFormFields
+        .priority,
+
+    description:
+      optionalNullableText(
+        5000
+      ),
+
+    nextAction:
+      leadFormFields
+        .nextAction,
+
+    followUpAt:
+      leadFormFields
+        .followUpAt,
+
+    knownRelationship:
+      z
+        .boolean()
+        .default(false),
+  });
+
+/*
+|--------------------------------------------------------------------------
+| Update
+|--------------------------------------------------------------------------
 */
 
 export const updateLeadSchema =
   z
     .object({
       companyId:
-        z.coerce
-          .number()
-          .int()
-          .positive()
+        leadFormFields
+          .companyId
           .optional(),
 
       primaryContactId:
-        z.coerce
-          .number()
-          .int()
-          .positive()
+        leadFormFields
+          .primaryContactId
           .optional(),
 
       serviceRequired:
-        z
-          .string()
-          .trim()
-          .min(
-            2,
-            "Potential requirement is required."
-          )
-          .max(500)
+        leadFormFields
+          .serviceRequired
           .optional(),
 
       source:
-        z
-          .enum(
-            LEAD_SOURCES
-          )
+        leadFormFields
+          .source
           .optional(),
 
       estimatedValueRupees:
-        z.coerce
-          .number()
-          .min(
-            0,
-            "Opportunity value cannot be negative."
-          )
-          .max(
-            1000000000000
-          )
+        leadFormFields
+          .estimatedValueRupees
           .optional(),
 
       priority:
-        z
-          .enum(
-            LEAD_PRIORITIES
-          )
+        leadFormFields
+          .priority
           .optional(),
 
       description:
@@ -455,19 +589,13 @@ export const updateLeadSchema =
         ),
 
       nextAction:
-        z
-          .string()
-          .trim()
-          .min(
-            2,
-            "Next action is required."
-          )
-          .max(500)
+        leadFormFields
+          .nextAction
           .optional(),
 
       followUpAt:
-        z.coerce
-          .date()
+        leadFormFields
+          .followUpAt
           .optional(),
 
       knownRelationship:
@@ -488,260 +616,76 @@ export const updateLeadSchema =
 
 /*
 |--------------------------------------------------------------------------
-| Change Lead Stage Schema
+| Change Stage
 |--------------------------------------------------------------------------
-|
-| Stage movement cannot happen silently.
-| Reason/comment is required.
-|
 */
 
 export const changeLeadStageSchema =
   z.object({
-    stage: z.enum(
-      LEAD_STAGES,
-      {
-        message:
-          "Select a valid lead stage.",
-      }
-    ),
-
-    reason: z
-      .string()
-      .trim()
-      .min(
-        2,
-        "A reason or comment is required."
-      )
-      .max(
-        500,
-        "Reason cannot exceed 500 characters."
+    stage:
+      z.enum(
+        LEAD_STAGES
       ),
+
+    reason:
+      z
+        .string()
+        .trim()
+        .min(
+          2,
+          "Reason or comment is required."
+        )
+        .max(2000),
   });
 
 /*
 |--------------------------------------------------------------------------
-| Change Lead Owner Schema
+| Change Owner
 |--------------------------------------------------------------------------
 */
 
 export const changeLeadOwnerSchema =
   z.object({
-    ownerId: z.coerce
-      .number({
-        message:
-          "Owner is required.",
-      })
-      .int(
-        "Owner ID must be an integer."
-      )
-      .positive(
-        "Owner is required."
-      ),
-
-    reason:
-      optionalNullableText(
-        500
-      ),
-  });
-
-/*
-|--------------------------------------------------------------------------
-| Lead ID Params Schema
-|--------------------------------------------------------------------------
-*/
-
-export const leadIdSchema =
-  z.object({
-    leadId: z.coerce
-      .number({
-        message:
-          "Lead ID must be a number.",
-      })
-      .int(
-        "Lead ID must be an integer."
-      )
-      .positive(
-        "Lead ID must be greater than zero."
-      ),
-  });
-
-/*
-|--------------------------------------------------------------------------
-| Lead List Schema
-|--------------------------------------------------------------------------
-*/
-
-export const leadListSchema =
-  z.object({
-    /*
-    |--------------------------------------------------------------------------
-    | Search
-    |--------------------------------------------------------------------------
-    */
-
-    search: z
-      .string()
-      .trim()
-      .max(
-        190,
-        "Search query is too long."
-      )
-      .optional()
-      .default(""),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Owner
-    |--------------------------------------------------------------------------
-    */
-
     ownerId:
       z.coerce
         .number()
         .int()
-        .positive()
-        .optional(),
+        .positive(),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Company
-    |--------------------------------------------------------------------------
-    */
-
-    companyId:
-      z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional(),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Contact
-    |--------------------------------------------------------------------------
-    */
-
-    primaryContactId:
-      z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional(),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Stage
-    |--------------------------------------------------------------------------
-    */
-
-    stage:
-      z
-        .enum(
-          LEAD_STAGES
-        )
-        .optional(),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Status
-    |--------------------------------------------------------------------------
-    */
-
-    status:
-      z
-        .enum(
-          LEAD_STATUSES
-        )
-        .optional(),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Industry
-    |--------------------------------------------------------------------------
-    */
-
-    industry:
+    reason:
       z
         .string()
         .trim()
-        .max(120)
+        .max(2000)
+        .nullable()
         .optional(),
+  });
 
-    /*
-    |--------------------------------------------------------------------------
-    | Source
-    |--------------------------------------------------------------------------
-    */
+/*
+|--------------------------------------------------------------------------
+| Mark Lost
+|--------------------------------------------------------------------------
+*/
 
-    source:
+export const markLeadLostSchema =
+  z.object({
+    reason:
+      z.enum(
+        LOST_REASONS
+      ),
+
+    comment:
       z
-        .enum(
-          LEAD_SOURCES
+        .string()
+        .trim()
+        .min(
+          2,
+          "Close comment is required."
         )
-        .optional(),
+        .max(5000),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Priority
-    |--------------------------------------------------------------------------
-    */
-
-    priority:
+    moveToNurture:
       z
-        .enum(
-          LEAD_PRIORITIES
-        )
-        .optional(),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Pagination
-    |--------------------------------------------------------------------------
-    */
-
-    page:
-      z.coerce
-        .number()
-        .int()
-        .min(1)
-        .default(1),
-
-    limit:
-      z.coerce
-        .number()
-        .int()
-        .min(1)
-        .max(100)
-        .default(20),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Sorting
-    |--------------------------------------------------------------------------
-    */
-
-    sort:
-      z
-        .enum([
-          "createdAt",
-          "updatedAt",
-          "followUpAt",
-          "lastTouchAt",
-          "companyName",
-          "stage",
-        ])
-        .default(
-          "createdAt"
-        ),
-
-    direction:
-      z
-        .enum([
-          "asc",
-          "desc",
-        ])
-        .default(
-          "desc"
-        ),
-});
+        .boolean()
+        .default(true),
+  });

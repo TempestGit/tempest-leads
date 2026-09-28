@@ -2,27 +2,44 @@ import apiClient from "../../lib/apiClient.js";
 
 /*
 |--------------------------------------------------------------------------
-| List Leads
+| List
 |--------------------------------------------------------------------------
 */
 
-export const getLeadsRequest = async (
-  params = {}
-) => {
-  const response =
-    await apiClient.get(
-      "/leads",
-      {
-        params,
-      }
-    );
+export const getLeadsRequest =
+  async (
+    params = {}
+  ) => {
+    const response =
+      await apiClient.get(
+        "/leads",
+        {
+          params,
+        }
+      );
 
-  return response.data;
-};
+    return response.data;
+  };
+  
+/*
+|--------------------------------------------------------------------------
+| Lead Owners
+|--------------------------------------------------------------------------
+*/
+
+export const getLeadOwnersRequest =
+  async () => {
+    const response =
+      await apiClient.get(
+        "/leads/owners"
+      );
+
+    return response.data;
+  };
 
 /*
 |--------------------------------------------------------------------------
-| Lead Options
+| Options
 |--------------------------------------------------------------------------
 */
 
@@ -38,29 +55,32 @@ export const getLeadOptionsRequest =
 
 /*
 |--------------------------------------------------------------------------
-| Get Lead
+| Detail
 |--------------------------------------------------------------------------
 */
 
-export const getLeadRequest = async (
-  leadId
-) => {
-  const response =
-    await apiClient.get(
-      `/leads/${leadId}`
-    );
+export const getLeadRequest =
+  async (
+    leadId
+  ) => {
+    const response =
+      await apiClient.get(
+        `/leads/${leadId}`
+      );
 
-  return response.data;
-};
+    return response.data;
+  };
 
 /*
 |--------------------------------------------------------------------------
-| Create Lead
+| Create
 |--------------------------------------------------------------------------
 */
 
 export const createLeadRequest =
-  async (data) => {
+  async (
+    data
+  ) => {
     const response =
       await apiClient.post(
         "/leads",
@@ -72,7 +92,7 @@ export const createLeadRequest =
 
 /*
 |--------------------------------------------------------------------------
-| Update Lead
+| Update
 |--------------------------------------------------------------------------
 */
 
@@ -124,6 +144,26 @@ export const changeLeadOwnerRequest =
     const response =
       await apiClient.patch(
         `/leads/${leadId}/owner`,
+        data
+      );
+
+    return response.data;
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Mark Lost
+|--------------------------------------------------------------------------
+*/
+
+export const markLeadLostRequest =
+  async ({
+    leadId,
+    data,
+  }) => {
+    const response =
+      await apiClient.patch(
+        `/leads/${leadId}/lost`,
         data
       );
 

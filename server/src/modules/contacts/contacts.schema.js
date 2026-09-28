@@ -126,7 +126,7 @@ export const createContactSchema =
         "Contact name is required."
       )
       .max(
-        190,
+        150,
         "Contact name is too long."
       ),
 
@@ -166,7 +166,7 @@ export const updateContactSchema =
           2,
           "Contact name is required."
         )
-        .max(190)
+        .max(150)
         .optional(),
 
       designation:

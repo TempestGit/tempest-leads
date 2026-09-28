@@ -12,7 +12,7 @@ import useAuth from "../auth/useAuth.js";
 
 import {
   useCreateLeadMutation,
-  useLeadOptionsQuery,
+  useLeadOwnersQuery,
 } from "./leads.queries.js";
 
 import {
@@ -55,8 +55,10 @@ const LeadFormModal = ({
     user,
   } = useAuth();
 
-  const optionsQuery =
-    useLeadOptionsQuery();
+  const ownersQuery =
+    useLeadOwnersQuery(
+      open
+    );
 
   const createMutation =
     useCreateLeadMutation();
@@ -79,7 +81,7 @@ const LeadFormModal = ({
   ] = useState({});
 
   const owners =
-    optionsQuery
+    ownersQuery
       .data
       ?.data
       ?.owners || [];
@@ -520,13 +522,186 @@ const LeadFormModal = ({
 
         onClose();
       } catch (error) {
-        setErrors({
-          root:
-            error?.response
-              ?.data
-              ?.message ||
-            "Unable to create lead.",
-        });
+        const response =
+          error?.response
+            ?.data;
+
+        const apiErrors =
+          Array.isArray(
+            response?.errors
+          )
+            ? response.errors
+            : [];
+
+        const fieldMap = {
+          "company.name":
+            "companyName",
+
+          "company.industry":
+            "industry",
+
+          "company.city":
+            "city",
+
+          "company.website":
+            "website",
+
+          "company.agencyRelationship":
+            "agencyRelationship",
+
+          "company.marketingActivity":
+            "marketingActivity",
+
+          "contact.name":
+            "contactName",
+
+          "contact.designation":
+            "designation",
+
+          "contact.phone":
+            "phone",
+
+          "contact.email":
+            "email",
+
+          "contact.isDecisionMaker":
+            "decisionMaker",
+
+          serviceRequired:
+            "serviceRequired",
+
+          source:
+            "source",
+
+          estimatedValueRupees:
+            "estimatedValueRupees",
+
+          priority:
+            "priority",
+
+          description:
+            "description",
+
+          ownerId:
+            "ownerId",
+
+          nextAction:
+            "nextAction",
+
+          followUpAt:
+            "followUpDate",
+
+          knownRelationship:
+            "knownRelationship",
+        };
+
+        const stepMap = {
+          companyName: 1,
+          industry: 1,
+          city: 1,
+          website: 1,
+          agencyRelationship: 1,
+          marketingActivity: 1,
+
+          contactName: 2,
+          designation: 2,
+          phone: 2,
+          email: 2,
+          decisionMaker: 2,
+
+          serviceRequired: 3,
+          source: 3,
+          estimatedValueRupees: 3,
+          priority: 3,
+          description: 3,
+
+          ownerId: 4,
+
+          nextAction: 5,
+          followUpDate: 5,
+          followUpTime: 5,
+          knownRelationship: 5,
+        };
+
+        const nextErrors = {};
+
+        let firstErrorStep =
+          null;
+
+        for (
+          const item of
+          apiErrors
+        ) {
+          const rawField =
+            String(
+              item?.field ||
+              ""
+            ).replace(
+              /^body\./,
+              ""
+            );
+
+          const localField =
+            fieldMap[
+              rawField
+            ] ||
+            rawField;
+
+          if (
+            localField &&
+            !nextErrors[
+              localField
+            ]
+          ) {
+            nextErrors[
+              localField
+            ] =
+              item?.message ||
+              "Invalid value.";
+
+            const errorStep =
+              stepMap[
+                localField
+              ];
+
+            if (
+              errorStep &&
+              (
+                firstErrorStep ===
+                  null ||
+                errorStep <
+                  firstErrorStep
+              )
+            ) {
+              firstErrorStep =
+                errorStep;
+            }
+          }
+        }
+
+        nextErrors.root =
+          apiErrors.length
+            ? "Please correct the highlighted fields."
+            : response?.message ||
+              "Unable to create lead.";
+
+        setErrors(
+          nextErrors
+        );
+
+        if (
+          firstErrorStep
+        ) {
+          setStep(
+            firstErrorStep
+          );
+        }
+
+        console.error(
+          "Create lead failed:",
+          response ||
+            error
+        );
       }
     };
 
@@ -1059,6 +1234,43 @@ const LeadFormModal = ({
                 Ownership
               </h3>
 
+              {ownersQuery.isError && (
+                <div className="error-box">
+                  {ownersQuery
+                    .error
+                    ?.response
+                    ?.data
+                    ?.message ||
+                    "Unable to load owners."}
+
+                  <div
+                    style={{
+                      marginTop:
+                        "8px",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="tl-link"
+                      onClick={() =>
+                        ownersQuery.refetch()
+                      }
+                    >
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!ownersQuery.isLoading &&
+                !ownersQuery.isError &&
+                owners.length === 0 && (
+                  <div className="error-box">
+                    No active owners are
+                    available.
+                  </div>
+                )}
+
               <div className="form-grid2">
                 <label>
                   Owner *
@@ -1073,14 +1285,17 @@ const LeadFormModal = ({
                       )
                     }
                     disabled={
-                      optionsQuery.isLoading
+                      ownersQuery.isLoading ||
+                      ownersQuery.isError
                     }
                     autoFocus
                   >
                     <option value="">
-                      {optionsQuery.isLoading
+                      {ownersQuery.isLoading
                         ? "Loading owners..."
-                        : "Select owner"}
+                        : owners.length === 0
+                          ? "No owners available"
+                          : "Select owner"}
                     </option>
 
                     {owners.map(
@@ -1095,9 +1310,13 @@ const LeadFormModal = ({
                             owner.id
                           }
                         >
-                          {
-                            owner.name
-                          }
+                          {owner.fullName ||
+                            owner.name ||
+                            `User ${owner.id}`}
+
+                          {owner.branchName
+                            ? ` · ${owner.branchName}`
+                            : ""}
                         </option>
                       )
                     )}

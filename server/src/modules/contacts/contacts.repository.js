@@ -113,6 +113,99 @@ export const findContactById =
 
 /*
 |--------------------------------------------------------------------------
+| Find Matching Contact For Company
+|--------------------------------------------------------------------------
+|
+| Reuse a contact when the same email or phone already exists under the same
+| company. This prevents duplicate contacts when Add Lead is submitted twice.
+|
+*/
+
+export const findMatchingContact =
+  async (
+    {
+      companyId,
+      email,
+      phone,
+    },
+    connection = pool
+  ) => {
+    if (
+      email
+    ) {
+      const [
+        rows,
+      ] =
+        await connection.query(
+          `
+            ${CONTACT_SELECT}
+
+            WHERE
+              ct.company_id = ?
+
+              AND LOWER(ct.email) =
+                LOWER(?)
+
+              AND ct.deleted_at
+                IS NULL
+
+            LIMIT 1
+          `,
+          [
+            companyId,
+            email,
+          ]
+        );
+
+      if (
+        rows[0]
+      ) {
+        return mapContact(
+          rows[0]
+        );
+      }
+    }
+
+    if (
+      phone
+    ) {
+      const [
+        rows,
+      ] =
+        await connection.query(
+          `
+            ${CONTACT_SELECT}
+
+            WHERE
+              ct.company_id = ?
+
+              AND ct.phone = ?
+
+              AND ct.deleted_at
+                IS NULL
+
+            LIMIT 1
+          `,
+          [
+            companyId,
+            phone,
+          ]
+        );
+
+      if (
+        rows[0]
+      ) {
+        return mapContact(
+          rows[0]
+        );
+      }
+    }
+
+    return null;
+  };
+
+/*
+|--------------------------------------------------------------------------
 | List Contacts
 |--------------------------------------------------------------------------
 */

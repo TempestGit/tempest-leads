@@ -1,12 +1,10 @@
 import express from "express";
 
-import asyncHandler from "../../utils/asyncHandler.js";
-
 import authMiddleware from "../../middleware/auth.middleware.js";
 
-import allowRoles from "../../middleware/role.middleware.js";
-
 import validateMiddleware from "../../middleware/validate.middleware.js";
+
+import asyncHandler from "../../utils/asyncHandler.js";
 
 import {
   changeLeadOwnerSchema,
@@ -14,6 +12,7 @@ import {
   createLeadSchema,
   leadIdSchema,
   leadListSchema,
+  markLeadLostSchema,
   updateLeadSchema,
 } from "./leads.schema.js";
 
@@ -23,7 +22,9 @@ import {
   createLeadController,
   getLeadController,
   getLeadOptionsController,
+  getLeadOwnersController,
   listLeadsController,
+  markLeadLostController,
   updateLeadController,
 } from "./leads.controller.js";
 
@@ -36,24 +37,7 @@ router.use(
 
 /*
 |--------------------------------------------------------------------------
-| GET /api/leads/options
-|--------------------------------------------------------------------------
-|
-| Must be before /:leadId.
-|
-*/
-
-router.get(
-  "/options",
-
-  asyncHandler(
-    getLeadOptionsController
-  )
-);
-
-/*
-|--------------------------------------------------------------------------
-| GET /api/leads
+| List
 |--------------------------------------------------------------------------
 */
 
@@ -72,7 +56,33 @@ router.get(
 
 /*
 |--------------------------------------------------------------------------
-| POST /api/leads
+| Static Options Routes
+|--------------------------------------------------------------------------
+|
+| Keep these ABOVE /:leadId so Express never treats "owners" or "options"
+| as a lead ID.
+|
+*/
+
+router.get(
+  "/owners",
+
+  asyncHandler(
+    getLeadOwnersController
+  )
+);
+
+router.get(
+  "/options",
+
+  asyncHandler(
+    getLeadOptionsController
+  )
+);
+
+/*
+|--------------------------------------------------------------------------
+| Create
 |--------------------------------------------------------------------------
 */
 
@@ -91,7 +101,7 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| GET /api/leads/:leadId
+| Detail
 |--------------------------------------------------------------------------
 */
 
@@ -110,7 +120,7 @@ router.get(
 
 /*
 |--------------------------------------------------------------------------
-| PATCH /api/leads/:leadId
+| Update
 |--------------------------------------------------------------------------
 */
 
@@ -132,7 +142,7 @@ router.patch(
 
 /*
 |--------------------------------------------------------------------------
-| PATCH /api/leads/:leadId/stage
+| Change Stage
 |--------------------------------------------------------------------------
 */
 
@@ -154,16 +164,12 @@ router.patch(
 
 /*
 |--------------------------------------------------------------------------
-| PATCH /api/leads/:leadId/owner
+| Change Owner
 |--------------------------------------------------------------------------
 */
 
 router.patch(
   "/:leadId/owner",
-
-  allowRoles(
-    "SUPER_ADMIN"
-  ),
 
   validateMiddleware({
     params:
@@ -175,6 +181,28 @@ router.patch(
 
   asyncHandler(
     changeLeadOwnerController
+  )
+);
+
+/*
+|--------------------------------------------------------------------------
+| Mark Lost
+|--------------------------------------------------------------------------
+*/
+
+router.patch(
+  "/:leadId/lost",
+
+  validateMiddleware({
+    params:
+      leadIdSchema,
+
+    body:
+      markLeadLostSchema,
+  }),
+
+  asyncHandler(
+    markLeadLostController
   )
 );
 
