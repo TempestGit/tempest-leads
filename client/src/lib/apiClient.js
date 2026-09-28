@@ -8,59 +8,133 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| Main API Client
+| API Base URL
+|--------------------------------------------------------------------------
+|
+| Development:
+|
+| VITE_API_URL=/api
+|
+| Vite proxies:
+|
+| /api
+|   ↓
+| http://localhost:5000/api
+|
+|
+| Production:
+|
+| VITE_API_URL=/api
+|
+| Netlify proxies:
+|
+| /api
+|   ↓
+| https://tempest-leads-api.onrender.com/api
+|
+|
+| The React application therefore never needs to hardcode the Render URL.
+|
+*/
+
+const rawApiUrl =
+  String(
+    import.meta.env
+      .VITE_API_URL ??
+      "/api"
+  ).trim();
+
+export const API_BASE_URL =
+  rawApiUrl === "/"
+    ? "/"
+    : rawApiUrl.replace(
+        /\/+$/,
+        ""
+      );
+
+/*
+|--------------------------------------------------------------------------
+| Axios Defaults
 |--------------------------------------------------------------------------
 */
 
-const apiClient = axios.create({
-  baseURL: "/api",
+const axiosDefaults = {
+  baseURL:
+    API_BASE_URL,
 
-  withCredentials: true,
+  withCredentials:
+    true,
 
   headers: {
-    Accept: "application/json",
-    "Content-Type": "application/json",
+    Accept:
+      "application/json",
+
+    "Content-Type":
+      "application/json",
   },
 
-  timeout: 15000,
-});
+  timeout:
+    20000,
+};
+
+/*
+|--------------------------------------------------------------------------
+| Main API Client
+|--------------------------------------------------------------------------
+|
+| Used by:
+|
+| /leads
+| /companies
+| /contacts
+| /meetings
+| /followups
+| etc.
+|
+*/
+
+const apiClient =
+  axios.create({
+    ...axiosDefaults,
+  });
 
 /*
 |--------------------------------------------------------------------------
 | Refresh-only Client
 |--------------------------------------------------------------------------
 |
-| This client does NOT use the normal response interceptor.
+| IMPORTANT:
 |
-| That prevents:
+| This client deliberately does NOT use the main response interceptor.
+|
+| Otherwise:
 |
 | /auth/refresh
-|    ↓
+|      ↓
 | 401
-|    ↓
-| try /auth/refresh again
+|      ↓
+| interceptor
+|      ↓
+| /auth/refresh
 |
-| loops.
+| would create a refresh loop.
 |
 */
 
-const refreshClient = axios.create({
-  baseURL: "/api",
-
-  withCredentials: true,
-
-  headers: {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-  },
-
-  timeout: 15000,
-});
+const refreshClient =
+  axios.create({
+    ...axiosDefaults,
+  });
 
 /*
 |--------------------------------------------------------------------------
 | Attach Access Token
 |--------------------------------------------------------------------------
+|
+| Access token stays in memory.
+|
+| Refresh token stays in the HTTP-only cookie.
+|
 */
 
 apiClient.interceptors.request.use(
@@ -68,84 +142,119 @@ apiClient.interceptors.request.use(
     const token =
       getAccessToken();
 
-    if (token) {
-      config.headers =
-        config.headers || {};
-
-      config.headers.Authorization =
-        `Bearer ${token}`;
+    if (!token) {
+      return config;
     }
+
+    config.headers =
+      config.headers ||
+      {};
+
+    config.headers.Authorization =
+      `Bearer ${token}`;
 
     return config;
   },
 
-  (error) =>
-    Promise.reject(error)
+  (error) => {
+    return Promise.reject(
+      error
+    );
+  }
 );
 
 /*
 |--------------------------------------------------------------------------
-| Global Refresh Lock
+| Refresh Lock
 |--------------------------------------------------------------------------
 |
-| Every part of the application MUST use this function.
+| Example:
 |
-| If 5 requests simultaneously discover an expired access token:
+| 5 API requests receive 401 simultaneously.
 |
-| request 1 → actually calls /auth/refresh
-| request 2 → waits
-| request 3 → waits
-| request 4 → waits
-| request 5 → waits
+| Without lock:
 |
-| Only one refresh-token rotation happens.
+| 5 refresh requests
+| → refresh-token rotation conflicts
+| → REFRESH_TOKEN_REUSED
+|
+| With lock:
+|
+| Request 1 → refreshes
+| Request 2 → waits
+| Request 3 → waits
+| Request 4 → waits
+| Request 5 → waits
+|
+| Only one refresh request is executed.
 |
 */
 
-let refreshPromise = null;
+let refreshPromise =
+  null;
 
 export const refreshSession =
   async () => {
-    if (!refreshPromise) {
-      refreshPromise =
-        refreshClient
-          .post(
-            "/auth/refresh"
-          )
-          .then(
-            (response) => {
-              const data =
-                response.data
-                  ?.data;
+    if (
+      refreshPromise
+    ) {
+      return refreshPromise;
+    }
 
-              const token =
-                data?.accessToken;
+    refreshPromise =
+      refreshClient
+        .post(
+          "/auth/refresh"
+        )
+        .then(
+          (
+            response
+          ) => {
+            const data =
+              response
+                ?.data
+                ?.data;
 
-              if (!token) {
-                throw new Error(
-                  "Refresh response did not contain an access token."
-                );
-              }
+            const accessToken =
+              data
+                ?.accessToken;
 
-              setAccessToken(
-                token
+            if (
+              !accessToken
+            ) {
+              throw new Error(
+                "Refresh response did not contain an access token."
               );
-
-              return data;
             }
-          )
-          .catch(
-            (error) => {
-              clearAccessToken();
 
-              throw error;
-            }
-          )
-          .finally(() => {
+            /*
+            |--------------------------------------------------------------------------
+            | Update In-memory Access Token
+            |--------------------------------------------------------------------------
+            */
+
+            setAccessToken(
+              accessToken
+            );
+
+            return data;
+          }
+        )
+        .catch(
+          (
+            error
+          ) => {
+            clearAccessToken();
+
+            throw error;
+          }
+        )
+        .finally(
+          () => {
             refreshPromise =
               null;
-          });
-    }
+          }
+        );
 
     return refreshPromise;
   };
@@ -154,18 +263,38 @@ export const refreshSession =
 |--------------------------------------------------------------------------
 | Response Interceptor
 |--------------------------------------------------------------------------
+|
+| If a normal API request receives 401:
+|
+| 1. Refresh the access token.
+| 2. Replace Authorization header.
+| 3. Retry the original request once.
+|
 */
 
 apiClient.interceptors.response.use(
-  (response) =>
-    response,
+  (
+    response
+  ) => {
+    return response;
+  },
 
-  async (error) => {
+  async (
+    error
+  ) => {
     const originalRequest =
-      error.config;
+      error?.config;
 
     const status =
-      error.response?.status;
+      error
+        ?.response
+        ?.status;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Non-authentication Error
+    |--------------------------------------------------------------------------
+    */
 
     if (
       status !== 401 ||
@@ -177,13 +306,26 @@ apiClient.interceptors.response.use(
     }
 
     const url =
-      originalRequest.url ||
-      "";
+      String(
+        originalRequest
+          ?.url ||
+          ""
+      );
 
     /*
     |--------------------------------------------------------------------------
-    | Never auto-refresh these endpoints
+    | Never Refresh Authentication Endpoints
     |--------------------------------------------------------------------------
+    |
+    | Login:
+    | Invalid credentials should remain a normal 401.
+    |
+    | Refresh:
+    | Prevent refresh recursion.
+    |
+    | Logout:
+    | Do not try to create another session during logout.
+    |
     */
 
     if (
@@ -204,31 +346,66 @@ apiClient.interceptors.response.use(
 
     /*
     |--------------------------------------------------------------------------
-    | Prevent request retry loops
+    | Prevent Retry Loop
     |--------------------------------------------------------------------------
     */
 
     if (
-      originalRequest._retry
+      originalRequest
+        ._retry
     ) {
       return Promise.reject(
         error
       );
     }
 
-    originalRequest._retry =
+    originalRequest
+      ._retry =
       true;
 
     try {
+      /*
+      |--------------------------------------------------------------------------
+      | Refresh Session
+      |--------------------------------------------------------------------------
+      */
+
       const session =
         await refreshSession();
 
+      const accessToken =
+        session
+          ?.accessToken;
+
+      if (
+        !accessToken
+      ) {
+        throw new Error(
+          "Unable to restore authenticated session."
+        );
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Replace Access Token
+      |--------------------------------------------------------------------------
+      */
+
       originalRequest.headers =
-        originalRequest.headers ||
+        originalRequest
+          .headers ||
         {};
 
-      originalRequest.headers.Authorization =
-        `Bearer ${session.accessToken}`;
+      originalRequest
+        .headers
+        .Authorization =
+        `Bearer ${accessToken}`;
+
+      /*
+      |--------------------------------------------------------------------------
+      | Retry Original Request
+      |--------------------------------------------------------------------------
+      */
 
       return apiClient(
         originalRequest
@@ -236,13 +413,38 @@ apiClient.interceptors.response.use(
     } catch (
       refreshError
     ) {
+      /*
+      |--------------------------------------------------------------------------
+      | Refresh Failed
+      |--------------------------------------------------------------------------
+      */
+
       clearAccessToken();
 
-      window.dispatchEvent(
-        new Event(
-          "auth:expired"
-        )
-      );
+      /*
+      |--------------------------------------------------------------------------
+      | Inform Auth Provider
+      |--------------------------------------------------------------------------
+      |
+      | AuthProvider / ProtectedRoute can listen for:
+      |
+      | window.addEventListener(
+      |   "auth:expired",
+      |   ...
+      | );
+      |
+      */
+
+      if (
+        typeof window !==
+        "undefined"
+      ) {
+        window.dispatchEvent(
+          new Event(
+            "auth:expired"
+          )
+        );
+      }
 
       return Promise.reject(
         refreshError
@@ -250,6 +452,12 @@ apiClient.interceptors.response.use(
     }
   }
 );
+
+/*
+|--------------------------------------------------------------------------
+| Exports
+|--------------------------------------------------------------------------
+*/
 
 export {
   refreshClient,
