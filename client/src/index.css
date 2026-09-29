@@ -4840,3 +4840,176 @@ a {
     min-width: 140px;
   }
 }
+
+
+/* =========================================================
+   TEAM ASSIGNMENT TABLE — STATUS + ACTION POLISH
+   ========================================================= */
+
+/* Status dropdown */
+
+.team-status-select {
+  min-width: 122px;
+  height: 30px;
+
+  padding: 0 28px 0 10px;
+
+  border: 1px solid var(--crm-border);
+  border-radius: 6px;
+
+  background: var(--crm-surface);
+
+  color: var(--crm-text);
+  font-size: 10px;
+  font-weight: 700;
+
+  outline: none;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.team-status-select:hover {
+  border-color: var(--crm-border-strong);
+  background: #f8fafb;
+}
+
+.team-status-select:focus {
+  border-color: var(--crm-info);
+
+  box-shadow:
+    0 0 0 3px
+    var(--crm-info-soft);
+}
+
+.team-status-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+
+/* Status color by selected value */
+
+.team-status-select:has(
+  option[value="PENDING"]:checked
+) {
+  border-color: #efd9ab;
+  background: var(--crm-warning-soft);
+  color: var(--crm-warning);
+}
+
+.team-status-select:has(
+  option[value="IN_PROGRESS"]:checked
+) {
+  border-color: #c9ddf7;
+  background: var(--crm-info-soft);
+  color: var(--crm-info);
+}
+
+.team-status-select:has(
+  option[value="COMPLETED"]:checked
+) {
+  border-color: #c8e8dc;
+  background: var(--crm-success-soft);
+  color: var(--crm-success);
+}
+
+
+/* Action container */
+
+.team-assignment-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  white-space: nowrap;
+}
+
+
+/* Edit + Remove buttons */
+
+.team-assignment-actions .tl-link {
+  min-height: 28px;
+
+  padding: 5px 9px;
+
+  border: 1px solid var(--crm-border);
+  border-radius: 5px;
+
+  background: var(--crm-surface);
+
+  color: var(--crm-info);
+
+  font-size: 10px;
+  font-weight: 700;
+
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+
+/* Edit hover */
+
+.team-assignment-actions
+  .tl-link:not(.team-remove-action):hover {
+  border-color: #bfd6ef;
+
+  background: var(--crm-info-soft);
+
+  color: var(--crm-info);
+}
+
+
+/* Remove */
+
+.team-assignment-actions
+  .team-remove-action {
+  border-color: #f0ced1;
+
+  background: var(--crm-danger-soft);
+
+  color: var(--crm-danger);
+}
+
+.team-assignment-actions
+  .team-remove-action:hover {
+  border-color: #e4aeb3;
+
+  background: #ffe4e7;
+
+  color: #b8323e;
+}
+
+
+/* Disabled action */
+
+.team-assignment-actions
+  .tl-link:disabled {
+  cursor: not-allowed;
+
+  opacity: 0.45;
+}
+
+
+/* Slight table alignment improvement */
+
+.team-assignment-table-wrap
+  .tl-table td:nth-last-child(2),
+.team-assignment-table-wrap
+  .tl-table th:nth-last-child(2) {
+  min-width: 145px;
+}
+
+.team-assignment-table-wrap
+  .tl-table td:last-child,
+.team-assignment-table-wrap
+  .tl-table th:last-child {
+  min-width: 125px;
+}
