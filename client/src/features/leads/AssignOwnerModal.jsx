@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -16,22 +17,66 @@ import {
 |--------------------------------------------------------------------------
 | Assign Owner Modal
 |--------------------------------------------------------------------------
+|
+| Rules:
+|
+| - The lead's Primary Branch cannot be changed here.
+| - Owner options come from the lead's Primary Branch.
+| - SUPER_ADMIN is global and may appear for every branch.
+| - Normal owners must belong to the same branch as the lead.
+|
 */
 
 const AssignOwnerModal = ({
   open,
+
   leadIds = [],
+
+  /*
+   * Pass the current lead when this
+   * modal is opened from LeadDetailPage.
+   */
+  lead = null,
+
+  /*
+   * Optional fallback for another page
+   * that already knows the branch.
+   */
+  branchId = null,
+
   onClose,
 }) => {
   /*
   |--------------------------------------------------------------------------
-  | Owners
+  | Effective Lead Branch
   |--------------------------------------------------------------------------
+  */
+
+  const effectiveBranchId =
+    lead?.branchId ||
+    branchId ||
+    null;
+
+  /*
+  |--------------------------------------------------------------------------
+  | Owner Options
+  |--------------------------------------------------------------------------
+  |
+  | Example:
+  |
+  | lead.branchId = 1
+  |
+  | GET /api/leads/owners?branchId=1
+  |
   */
 
   const ownersQuery =
     useLeadOwnersQuery(
-      open
+      effectiveBranchId,
+      open &&
+        Boolean(
+          effectiveBranchId
+        )
     );
 
   /*
@@ -45,7 +90,7 @@ const AssignOwnerModal = ({
 
   /*
   |--------------------------------------------------------------------------
-  | Data
+  | API Data
   |--------------------------------------------------------------------------
   */
 
@@ -56,6 +101,51 @@ const AssignOwnerModal = ({
       ?.owners ||
     [];
 
+  const selectedBranch =
+    ownersQuery
+      .data
+      ?.data
+      ?.selectedBranch ||
+    null;
+
+  /*
+  |--------------------------------------------------------------------------
+  | Resolved Branch
+  |--------------------------------------------------------------------------
+  */
+
+  const branch =
+    useMemo(
+      () => {
+        if (
+          selectedBranch
+        ) {
+          return selectedBranch;
+        }
+
+        if (
+          !lead
+        ) {
+          return null;
+        }
+
+        return {
+          id:
+            lead.branchId,
+
+          name:
+            lead.branchName,
+
+          code:
+            lead.branchCode,
+        };
+      },
+      [
+        lead,
+        selectedBranch,
+      ]
+    );
+
   /*
   |--------------------------------------------------------------------------
   | State
@@ -65,17 +155,20 @@ const AssignOwnerModal = ({
   const [
     ownerId,
     setOwnerId,
-  ] = useState("");
+  ] =
+    useState("");
 
   const [
     reason,
     setReason,
-  ] = useState("");
+  ] =
+    useState("");
 
   const [
     error,
     setError,
-  ] = useState("");
+  ] =
+    useState("");
 
   /*
   |--------------------------------------------------------------------------
@@ -89,21 +182,44 @@ const AssignOwnerModal = ({
     }
 
     setOwnerId("");
+
     setReason("");
+
     setError("");
   }, [
     open,
+    effectiveBranchId,
   ]);
 
   /*
   |--------------------------------------------------------------------------
-  | Closed
+  | Existing Owner
   |--------------------------------------------------------------------------
   */
 
-  if (!open) {
-    return null;
-  }
+  const currentOwnerId =
+    lead?.ownerId
+      ? Number(
+          lead.ownerId
+        )
+      : null;
+
+  /*
+  |--------------------------------------------------------------------------
+  | Close
+  |--------------------------------------------------------------------------
+  */
+
+  const handleClose =
+    () => {
+      if (
+        mutation.isPending
+      ) {
+        return;
+      }
+
+      onClose();
+    };
 
   /*
   |--------------------------------------------------------------------------
@@ -117,7 +233,7 @@ const AssignOwnerModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Validate Leads
+      | Validate Lead Selection
       |--------------------------------------------------------------------------
       */
 
@@ -126,6 +242,22 @@ const AssignOwnerModal = ({
       ) {
         setError(
           "Select one or more leads first."
+        );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Validate Lead Branch
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        !effectiveBranchId
+      ) {
+        setError(
+          "This lead does not have a Primary Branch. Assign a branch before changing the owner."
         );
 
         return;
@@ -147,19 +279,41 @@ const AssignOwnerModal = ({
 
       /*
       |--------------------------------------------------------------------------
+      | Prevent Same Owner
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        leadIds.length ===
+          1 &&
+        currentOwnerId &&
+        Number(
+          ownerId
+        ) ===
+          currentOwnerId
+      ) {
+        setError(
+          "This user already owns the lead."
+        );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
       | Save
       |--------------------------------------------------------------------------
       */
 
       try {
         for (
-          const leadId of
+          const itemLeadId of
           leadIds
         ) {
           await mutation.mutateAsync({
             leadId:
               Number(
-                leadId
+                itemLeadId
               ),
 
             data: {
@@ -184,10 +338,22 @@ const AssignOwnerModal = ({
             ?.response
             ?.data
             ?.message ||
+            requestError
+              ?.message ||
             "Unable to assign owner."
         );
       }
     };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Closed
+  |--------------------------------------------------------------------------
+  */
+
+  if (!open) {
+    return null;
+  }
 
   /*
   |--------------------------------------------------------------------------
@@ -196,7 +362,20 @@ const AssignOwnerModal = ({
   */
 
   return (
-    <div className="modal-backdrop">
+    <div
+      className="modal-backdrop"
+      onMouseDown={(
+        event
+      ) => {
+        if (
+          event.target ===
+            event.currentTarget &&
+          !mutation.isPending
+        ) {
+          handleClose();
+        }
+      }}
+    >
       <section
         className="tl-modal"
         role="dialog"
@@ -210,15 +389,22 @@ const AssignOwnerModal = ({
         <header className="modal-head">
           <div>
             <h2 id="assign-owner-title">
-              Assign owner
+              {leadIds.length >
+              1
+                ? "Assign owner"
+                : "Change owner"}
             </h2>
 
             <p>
-              Assign{" "}
-              {leadIds.length}{" "}
-              selected lead(s).
-              The change will be
-              recorded.
+              {leadIds.length >
+              1
+                ? `Assign ${leadIds.length} selected lead(s).`
+                : "Reassign this lead to another active owner."}
+
+              {" "}The change will
+              be recorded in the
+              activity and audit
+              history.
             </p>
           </div>
 
@@ -226,7 +412,7 @@ const AssignOwnerModal = ({
             type="button"
             className="icon-control"
             onClick={
-              onClose
+              handleClose
             }
             disabled={
               mutation.isPending
@@ -234,7 +420,9 @@ const AssignOwnerModal = ({
             aria-label="Close"
           >
             <X
-              size={15}
+              size={
+                15
+              }
             />
           </button>
         </header>
@@ -244,7 +432,9 @@ const AssignOwnerModal = ({
         {/* --------------------------------------------------------------- */}
 
         <div className="modal-body">
-          {/* Request / Mutation Error */}
+          {/* ------------------------------------------------------------- */}
+          {/* General Error */}
+          {/* ------------------------------------------------------------- */}
 
           {error && (
             <div className="error-box">
@@ -252,68 +442,141 @@ const AssignOwnerModal = ({
             </div>
           )}
 
-          {/* Owner API Error */}
+          {/* ------------------------------------------------------------- */}
+          {/* Missing Lead Branch */}
+          {/* ------------------------------------------------------------- */}
 
-          {ownersQuery.isError && (
+          {!effectiveBranchId && (
             <div className="error-box">
-              {ownersQuery
-                .error
-                ?.response
-                ?.data
-                ?.message ||
-                "Unable to load owners."}
-
-              <div
-                style={{
-                  marginTop:
-                    "8px",
-                }}
-              >
-                <button
-                  type="button"
-                  className="tl-link"
-                  onClick={() =>
-                    ownersQuery.refetch()
-                  }
-                >
-                  Try again
-                </button>
-              </div>
+              This lead does not
+              have a Primary Branch.
+              Assign a branch before
+              changing its owner.
             </div>
           )}
 
-          {/* No Owners */}
+          {/* ------------------------------------------------------------- */}
+          {/* Owner API Error */}
+          {/* ------------------------------------------------------------- */}
 
-          {!ownersQuery.isLoading &&
-            !ownersQuery.isError &&
+          {effectiveBranchId &&
+            ownersQuery
+              .isError && (
+              <div className="error-box">
+                {ownersQuery
+                  .error
+                  ?.response
+                  ?.data
+                  ?.message ||
+                  "Unable to load owners for this branch."}
+
+                <div
+                  style={{
+                    marginTop:
+                      "8px",
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="tl-link"
+                    onClick={() =>
+                      ownersQuery.refetch()
+                    }
+                  >
+                    Try again
+                  </button>
+                </div>
+              </div>
+            )}
+
+          {/* ------------------------------------------------------------- */}
+          {/* No Owners */}
+          {/* ------------------------------------------------------------- */}
+
+          {effectiveBranchId &&
+            !ownersQuery
+              .isLoading &&
+            !ownersQuery
+              .isError &&
             owners.length ===
               0 && (
               <div className="error-box">
                 No active owners are
-                available. Check the
+                available for this
+                branch. Check the
                 Users / Owners
                 module and make sure
-                the users are active.
+                the required users
+                are active.
               </div>
             )}
 
+          {/* ------------------------------------------------------------- */}
           {/* Form */}
+          {/* ------------------------------------------------------------- */}
 
           <div className="form-section">
             <div className="form-grid2">
-              {/* Owner */}
+              {/* --------------------------------------------------------- */}
+              {/* Lead Branch */}
+              {/* --------------------------------------------------------- */}
 
               <label>
-                Owner *
+                Primary branch
+
+                <input
+                  type="text"
+                  value={
+                    branch?.name ||
+                    lead
+                      ?.branchName ||
+                    ""
+                  }
+                  readOnly
+                  placeholder="No branch assigned"
+                />
+              </label>
+
+              {/* --------------------------------------------------------- */}
+              {/* Current Owner */}
+              {/* --------------------------------------------------------- */}
+
+              {lead && (
+                <label>
+                  Current owner
+
+                  <input
+                    type="text"
+                    value={
+                      lead.ownerName ||
+                      "—"
+                    }
+                    readOnly
+                  />
+                </label>
+              )}
+
+              {/* --------------------------------------------------------- */}
+              {/* New Owner */}
+              {/* --------------------------------------------------------- */}
+
+              <label>
+                New owner *
 
                 <select
                   value={
                     ownerId
                   }
                   disabled={
-                    ownersQuery.isLoading ||
-                    ownersQuery.isError ||
-                    mutation.isPending
+                    !effectiveBranchId ||
+                    ownersQuery
+                      .isLoading ||
+                    ownersQuery
+                      .isError ||
+                    mutation
+                      .isPending ||
+                    owners.length ===
+                      0
                   }
                   onChange={(
                     event
@@ -327,40 +590,88 @@ const AssignOwnerModal = ({
                   }}
                 >
                   <option value="">
-                    {ownersQuery.isLoading
-                      ? "Loading owners..."
-                      : owners.length ===
-                          0
-                        ? "No owners available"
-                        : "Select owner"}
+                    {!effectiveBranchId
+                      ? "Primary branch required"
+                      : ownersQuery
+                            .isLoading
+                        ? "Loading owners..."
+                        : owners.length ===
+                            0
+                          ? "No owners available"
+                          : "Select owner"}
                   </option>
 
                   {owners.map(
                     (
                       owner
-                    ) => (
-                      <option
-                        key={
+                    ) => {
+                      const isCurrent =
+                        currentOwnerId &&
+                        Number(
                           owner.id
-                        }
-                        value={
-                          owner.id
-                        }
-                      >
-                        {owner.fullName ||
-                          owner.name ||
-                          `User ${owner.id}`}
+                        ) ===
+                          Number(
+                            currentOwnerId
+                          );
 
-                        {owner.branchName
-                          ? ` · ${owner.branchName}`
-                          : ""}
-                      </option>
-                    )
+                      return (
+                        <option
+                          key={
+                            owner.id
+                          }
+                          value={
+                            owner.id
+                          }
+                          disabled={
+                            Boolean(
+                              isCurrent
+                            )
+                          }
+                        >
+                          {owner.fullName ||
+                            owner.name ||
+                            `User ${owner.id}`}
+
+                          {owner.role ===
+                          "SUPER_ADMIN"
+                            ? " · Global"
+                            : owner.branchName
+                              ? ` · ${owner.branchName}`
+                              : ""}
+
+                          {isCurrent
+                            ? " · Current"
+                            : ""}
+                        </option>
+                      );
+                    }
                   )}
                 </select>
+
+                {branch?.name && (
+                  <small
+                    style={{
+                      display:
+                        "block",
+
+                      marginTop:
+                        "6px",
+                    }}
+                  >
+                    Only active{" "}
+                    {
+                      branch.name
+                    }{" "}
+                    owners and global
+                    Super Admin users
+                    are available.
+                  </small>
+                )}
               </label>
 
+              {/* --------------------------------------------------------- */}
               {/* Reason */}
+              {/* --------------------------------------------------------- */}
 
               <label className="full">
                 Reason
@@ -371,20 +682,53 @@ const AssignOwnerModal = ({
                     reason
                   }
                   disabled={
-                    mutation.isPending
+                    mutation
+                      .isPending
                   }
                   placeholder="Reason for assignment / reassignment"
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setReason(
                       event.target
                         .value
-                    )
-                  }
+                    );
+
+                    setError("");
+                  }}
                 />
               </label>
             </div>
+
+            {/* ----------------------------------------------------------- */}
+            {/* Branch Information */}
+            {/* ----------------------------------------------------------- */}
+
+            {branch?.name && (
+              <div
+                className="brief-clarification"
+                style={{
+                  marginTop:
+                    "12px",
+                }}
+              >
+                <b>
+                  Ownership rule
+                </b>
+
+                <span>
+                  This lead remains
+                  assigned to the{" "}
+                  {
+                    branch.name
+                  }{" "}
+                  branch. Changing
+                  the owner does not
+                  change the lead's
+                  Primary Branch.
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -397,7 +741,7 @@ const AssignOwnerModal = ({
             type="button"
             className="tl-secondary"
             onClick={
-              onClose
+              handleClose
             }
             disabled={
               mutation.isPending
@@ -411,8 +755,11 @@ const AssignOwnerModal = ({
             className="tl-primary"
             disabled={
               mutation.isPending ||
-              ownersQuery.isLoading ||
-              ownersQuery.isError ||
+              !effectiveBranchId ||
+              ownersQuery
+                .isLoading ||
+              ownersQuery
+                .isError ||
               owners.length ===
                 0 ||
               !ownerId
@@ -423,10 +770,13 @@ const AssignOwnerModal = ({
           >
             {mutation.isPending
               ? leadIds.length >
-                1
+                  1
                 ? "Assigning..."
-                : "Assigning..."
-              : "Assign"}
+                : "Updating..."
+              : leadIds.length >
+                  1
+                ? "Assign owner"
+                : "Change owner"}
           </button>
         </footer>
       </section>

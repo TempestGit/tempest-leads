@@ -18,45 +18,75 @@ import {
 
 /*
 |--------------------------------------------------------------------------
+| Root Key
+|--------------------------------------------------------------------------
+*/
+
+const LEAD_QUERY_ROOT = [
+  "leads",
+];
+
+/*
+|--------------------------------------------------------------------------
 | Keys
 |--------------------------------------------------------------------------
 */
 
 export const leadKeys = {
-  all: [
-    "leads",
-  ],
+  all:
+    LEAD_QUERY_ROOT,
 
-  lists: () => [
-    ...leadKeys.all,
-    "list",
-  ],
+  lists:
+    () => [
+      ...LEAD_QUERY_ROOT,
+      "list",
+    ],
 
-  list: (
-    params
-  ) => [
-    ...leadKeys.lists(),
-    params,
-  ],
+  list:
+    (
+      params = {}
+    ) => [
+      ...LEAD_QUERY_ROOT,
+      "list",
+      params,
+    ],
 
-  details: () => [
-    ...leadKeys.all,
-    "detail",
-  ],
+  details:
+    () => [
+      ...LEAD_QUERY_ROOT,
+      "detail",
+    ],
 
-  detail: (
-    leadId
-  ) => [
-    ...leadKeys.details(),
-    Number(
+  detail:
+    (
       leadId
-    ),
-  ],
+    ) => [
+      ...LEAD_QUERY_ROOT,
+      "detail",
+      Number(
+        leadId
+      ),
+    ],
 
-  options: () => [
-    ...leadKeys.all,
-    "options",
-  ],
+  options:
+    () => [
+      ...LEAD_QUERY_ROOT,
+      "options",
+    ],
+
+  owners:
+    (
+      branchId = null
+    ) => [
+      ...LEAD_QUERY_ROOT,
+      "owners",
+
+      branchId
+        ? Number(
+            branchId
+          )
+        : "branches",
+    ],
 };
 
 /*
@@ -94,13 +124,55 @@ export const useLeadsQuery =
 */
 
 export const useLeadOptionsQuery =
-  () =>
+  (
+    enabled = true
+  ) =>
     useQuery({
       queryKey:
         leadKeys.options(),
 
       queryFn:
         getLeadOptionsRequest,
+
+      enabled:
+        Boolean(
+          enabled
+        ),
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Branches / Owners
+|--------------------------------------------------------------------------
+|
+| branchId = null
+| → loads branch options.
+|
+| branchId = 1
+| → loads owners available for branch 1.
+|
+*/
+
+export const useLeadOwnersQuery =
+  (
+    branchId = null,
+    enabled = true
+  ) =>
+    useQuery({
+      queryKey:
+        leadKeys.owners(
+          branchId
+        ),
+
+      queryFn: () =>
+        getLeadOwnersRequest(
+          branchId
+        ),
+
+      enabled:
+        Boolean(
+          enabled
+        ),
     });
 
 /*
@@ -142,9 +214,8 @@ const invalidateLeadData =
   ) => {
     await Promise.all([
       queryClient.invalidateQueries({
-        queryKey: [
-          "leads",
-        ],
+        queryKey:
+          LEAD_QUERY_ROOT,
       }),
 
       queryClient.invalidateQueries({
@@ -168,6 +239,12 @@ const invalidateLeadData =
       queryClient.invalidateQueries({
         queryKey: [
           "nurture",
+        ],
+      }),
+
+      queryClient.invalidateQueries({
+        queryKey: [
+          "teamAssignments",
         ],
       }),
     ]);
@@ -292,25 +369,3 @@ export const useMarkLeadLostMutation =
         },
     });
   };
-
-  /*
-|--------------------------------------------------------------------------
-| Lead Owners
-|--------------------------------------------------------------------------
-*/
-
-export const useLeadOwnersQuery =
-  (
-    enabled = true
-  ) =>
-    useQuery({
-      queryKey: [
-        "leads",
-        "owners",
-      ],
-
-      queryFn:
-        getLeadOwnersRequest,
-
-      enabled,
-    });

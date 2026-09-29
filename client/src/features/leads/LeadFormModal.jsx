@@ -55,36 +55,170 @@ const LeadFormModal = ({
     user,
   } = useAuth();
 
-  const ownersQuery =
-    useLeadOwnersQuery(
-      open
-    );
-
-  const createMutation =
-    useCreateLeadMutation();
+  /*
+  |--------------------------------------------------------------------------
+  | Form
+  |--------------------------------------------------------------------------
+  */
 
   const [
     step,
     setStep,
-  ] = useState(1);
+  ] =
+    useState(
+      1
+    );
 
   const [
     values,
     setValues,
-  ] = useState(
-    createLeadDefaults
-  );
+  ] =
+    useState(
+      createLeadDefaults
+    );
 
   const [
     errors,
     setErrors,
-  ] = useState({});
+  ] =
+    useState({});
+
+  /*
+  |--------------------------------------------------------------------------
+  | Branch Options
+  |--------------------------------------------------------------------------
+  |
+  | Always call without branchId.
+  |
+  | SUPER_ADMIN:
+  | returns all active branches.
+  |
+  | OWNER:
+  | returns their assigned branch.
+  |
+  */
+
+  const branchOptionsQuery =
+    useLeadOwnersQuery(
+      null,
+      open
+    );
+
+  const branches =
+    branchOptionsQuery
+      .data
+      ?.data
+      ?.branches ||
+    [];
+
+  /*
+  |--------------------------------------------------------------------------
+  | Owners For Selected Branch
+  |--------------------------------------------------------------------------
+  */
+
+  const ownersQuery =
+    useLeadOwnersQuery(
+      values.branchId ||
+        null,
+
+      open &&
+        Boolean(
+          values.branchId
+        )
+    );
 
   const owners =
     ownersQuery
       .data
       ?.data
-      ?.owners || [];
+      ?.owners ||
+    [];
+
+  /*
+  |--------------------------------------------------------------------------
+  | Create
+  |--------------------------------------------------------------------------
+  */
+
+  const createMutation =
+    useCreateLeadMutation();
+
+  /*
+  |--------------------------------------------------------------------------
+  | Selected Branch
+  |--------------------------------------------------------------------------
+  */
+
+  const selectedBranch =
+    useMemo(
+      () =>
+        branches.find(
+          (
+            branch
+          ) =>
+            Number(
+              branch.id
+            ) ===
+            Number(
+              values.branchId
+            )
+        ) ||
+        ownersQuery
+          .data
+          ?.data
+          ?.selectedBranch ||
+        null,
+      [
+        branches,
+        ownersQuery
+          .data,
+        values.branchId,
+      ]
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | Default Branch For Normal Owner
+  |--------------------------------------------------------------------------
+  |
+  | Normal users receive only one branch from the backend.
+  |
+  | Super Admin receives all branches and must choose manually.
+  |
+  */
+
+  useEffect(() => {
+    if (
+      !open ||
+      values.branchId ||
+      branches.length !==
+        1
+    ) {
+      return;
+    }
+
+    setValues(
+      (
+        current
+      ) => ({
+        ...current,
+
+        branchId:
+          String(
+            branches[0]
+              .id
+          ),
+
+        ownerId:
+          "",
+      })
+    );
+  }, [
+    branches,
+    open,
+    values.branchId,
+  ]);
 
   /*
   |--------------------------------------------------------------------------
@@ -101,9 +235,15 @@ const LeadFormModal = ({
           return "";
         }
 
+        /*
+         * Prefer currently logged-in
+         * user when available.
+         */
         const current =
           owners.find(
-            (owner) =>
+            (
+              owner
+            ) =>
               Number(
                 owner.id
               ) ===
@@ -112,9 +252,20 @@ const LeadFormModal = ({
               )
           );
 
+        if (
+          current
+        ) {
+          return String(
+            current.id
+          );
+        }
+
+        /*
+         * Otherwise use first
+         * available owner.
+         */
         return String(
-          current?.id ??
-            owners[0].id
+          owners[0].id
         );
       },
       [
@@ -130,39 +281,66 @@ const LeadFormModal = ({
   */
 
   useEffect(() => {
-    if (!open) {
+    if (
+      !open
+    ) {
       return;
     }
 
-    setStep(1);
+    setStep(
+      1
+    );
 
     setErrors({});
 
     setValues(
       createLeadDefaults()
     );
-  }, [open]);
+  }, [
+    open,
+  ]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Apply Default Owner
+  |--------------------------------------------------------------------------
+  */
 
   useEffect(() => {
     if (
       !open ||
+      !values.branchId ||
       !defaultOwnerId
     ) {
       return;
     }
 
     setValues(
-      (current) => ({
-        ...current,
+      (
+        current
+      ) => {
+        /*
+         * Do not overwrite a valid
+         * manual owner selection.
+         */
+        if (
+          current.ownerId
+        ) {
+          return current;
+        }
 
-        ownerId:
-          current.ownerId ||
-          defaultOwnerId,
-      })
+        return {
+          ...current,
+
+          ownerId:
+            defaultOwnerId,
+        };
+      }
     );
   }, [
     defaultOwnerId,
     open,
+    values.branchId,
   ]);
 
   /*
@@ -172,12 +350,16 @@ const LeadFormModal = ({
   */
 
   useEffect(() => {
-    if (!open) {
+    if (
+      !open
+    ) {
       return undefined;
     }
 
     const handler =
-      (event) => {
+      (
+        event
+      ) => {
         if (
           event.key ===
             "Escape" &&
@@ -202,25 +384,47 @@ const LeadFormModal = ({
   }, [
     open,
     onClose,
-    createMutation.isPending,
+    createMutation
+      .isPending,
   ]);
-
-  if (!open) {
-    return null;
-  }
 
   /*
   |--------------------------------------------------------------------------
-  | Change
+  | Close
+  |--------------------------------------------------------------------------
+  */
+
+  const handleClose =
+    () => {
+      if (
+        createMutation
+          .isPending
+      ) {
+        return;
+      }
+
+      onClose();
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Generic Change
   |--------------------------------------------------------------------------
   */
 
   const change =
-    (name) =>
-    (event) => {
+    (
+      name
+    ) =>
+    (
+      event
+    ) => {
       setValues(
-        (current) => ({
+        (
+          current
+        ) => ({
           ...current,
+
           [name]:
             event.target
               .value,
@@ -228,10 +432,74 @@ const LeadFormModal = ({
       );
 
       setErrors(
-        (current) => ({
+        (
+          current
+        ) => ({
           ...current,
+
           [name]:
             undefined,
+
+          root:
+            undefined,
+        })
+      );
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Branch Change
+  |--------------------------------------------------------------------------
+  |
+  | Important:
+  |
+  | Changing the primary branch MUST clear the existing owner.
+  |
+  | Example:
+  |
+  | Hyderabad / Venu
+  |
+  | changes to
+  |
+  | Pune / [empty owner]
+  |
+  | and Pune owners are loaded.
+  |
+  */
+
+  const changeBranch =
+    (
+      event
+    ) => {
+      const branchId =
+        event.target
+          .value;
+
+      setValues(
+        (
+          current
+        ) => ({
+          ...current,
+
+          branchId,
+
+          ownerId:
+            "",
+        })
+      );
+
+      setErrors(
+        (
+          current
+        ) => ({
+          ...current,
+
+          branchId:
+            undefined,
+
+          ownerId:
+            undefined,
+
           root:
             undefined,
         })
@@ -247,9 +515,13 @@ const LeadFormModal = ({
   const validateStep =
     () => {
       let schema;
+
       let data;
 
-      if (step === 1) {
+      if (
+        step ===
+        1
+      ) {
         schema =
           companyStepSchema;
 
@@ -274,7 +546,10 @@ const LeadFormModal = ({
         };
       }
 
-      if (step === 2) {
+      if (
+        step ===
+        2
+      ) {
         schema =
           contactStepSchema;
 
@@ -296,7 +571,10 @@ const LeadFormModal = ({
         };
       }
 
-      if (step === 3) {
+      if (
+        step ===
+        3
+      ) {
         schema =
           opportunityStepSchema;
 
@@ -318,17 +596,26 @@ const LeadFormModal = ({
         };
       }
 
-      if (step === 4) {
+      if (
+        step ===
+        4
+      ) {
         schema =
           ownershipStepSchema;
 
         data = {
+          branchId:
+            values.branchId,
+
           ownerId:
             values.ownerId,
         };
       }
 
-      if (step === 5) {
+      if (
+        step ===
+        5
+      ) {
         schema =
           nextActionStepSchema;
 
@@ -356,22 +643,29 @@ const LeadFormModal = ({
         result.success
       ) {
         setErrors({});
+
         return true;
       }
 
-      const nextErrors = {};
+      const nextErrors =
+        {};
 
       for (
         const issue of
-        result.error.issues
+        result.error
+          .issues
       ) {
         const key =
           issue.path[0];
 
         if (
-          !nextErrors[key]
+          !nextErrors[
+            key
+          ]
         ) {
-          nextErrors[key] =
+          nextErrors[
+            key
+          ] =
             issue.message;
         }
       }
@@ -398,9 +692,12 @@ const LeadFormModal = ({
       }
 
       setStep(
-        (current) =>
+        (
+          current
+        ) =>
           Math.min(
-            current + 1,
+            current +
+              1,
             5
           )
       );
@@ -443,8 +740,8 @@ const LeadFormModal = ({
           return;
         }
 
-        await createMutation.mutateAsync(
-          {
+        await createMutation
+          .mutateAsync({
             company: {
               name:
                 values.companyName,
@@ -490,11 +787,13 @@ const LeadFormModal = ({
               values.source,
 
             estimatedValueRupees:
-              values.estimatedValueRupees ===
+              values
+                .estimatedValueRupees ===
               ""
                 ? 0
                 : Number(
-                    values.estimatedValueRupees
+                    values
+                      .estimatedValueRupees
                   ),
 
             priority:
@@ -502,6 +801,23 @@ const LeadFormModal = ({
 
             description:
               values.description,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Primary Branch
+            |--------------------------------------------------------------------------
+            */
+
+            branchId:
+              Number(
+                values.branchId
+              ),
+
+            /*
+            |--------------------------------------------------------------------------
+            | Owner
+            |--------------------------------------------------------------------------
+            */
 
             ownerId:
               Number(
@@ -512,196 +828,29 @@ const LeadFormModal = ({
               values.nextAction,
 
             followUpAt:
-              date.toISOString(),
+              date
+                .toISOString(),
 
             knownRelationship:
-              values.knownRelationship ===
+              values
+                .knownRelationship ===
               "Yes / Existing",
-          }
-        );
+          });
 
         onClose();
-      } catch (error) {
-        const response =
-          error?.response
-            ?.data;
-
-        const apiErrors =
-          Array.isArray(
-            response?.errors
-          )
-            ? response.errors
-            : [];
-
-        const fieldMap = {
-          "company.name":
-            "companyName",
-
-          "company.industry":
-            "industry",
-
-          "company.city":
-            "city",
-
-          "company.website":
-            "website",
-
-          "company.agencyRelationship":
-            "agencyRelationship",
-
-          "company.marketingActivity":
-            "marketingActivity",
-
-          "contact.name":
-            "contactName",
-
-          "contact.designation":
-            "designation",
-
-          "contact.phone":
-            "phone",
-
-          "contact.email":
-            "email",
-
-          "contact.isDecisionMaker":
-            "decisionMaker",
-
-          serviceRequired:
-            "serviceRequired",
-
-          source:
-            "source",
-
-          estimatedValueRupees:
-            "estimatedValueRupees",
-
-          priority:
-            "priority",
-
-          description:
-            "description",
-
-          ownerId:
-            "ownerId",
-
-          nextAction:
-            "nextAction",
-
-          followUpAt:
-            "followUpDate",
-
-          knownRelationship:
-            "knownRelationship",
-        };
-
-        const stepMap = {
-          companyName: 1,
-          industry: 1,
-          city: 1,
-          website: 1,
-          agencyRelationship: 1,
-          marketingActivity: 1,
-
-          contactName: 2,
-          designation: 2,
-          phone: 2,
-          email: 2,
-          decisionMaker: 2,
-
-          serviceRequired: 3,
-          source: 3,
-          estimatedValueRupees: 3,
-          priority: 3,
-          description: 3,
-
-          ownerId: 4,
-
-          nextAction: 5,
-          followUpDate: 5,
-          followUpTime: 5,
-          knownRelationship: 5,
-        };
-
-        const nextErrors = {};
-
-        let firstErrorStep =
-          null;
-
-        for (
-          const item of
-          apiErrors
-        ) {
-          const rawField =
-            String(
-              item?.field ||
-              ""
-            ).replace(
-              /^body\./,
-              ""
-            );
-
-          const localField =
-            fieldMap[
-              rawField
-            ] ||
-            rawField;
-
-          if (
-            localField &&
-            !nextErrors[
-              localField
-            ]
-          ) {
-            nextErrors[
-              localField
-            ] =
-              item?.message ||
-              "Invalid value.";
-
-            const errorStep =
-              stepMap[
-                localField
-              ];
-
-            if (
-              errorStep &&
-              (
-                firstErrorStep ===
-                  null ||
-                errorStep <
-                  firstErrorStep
-              )
-            ) {
-              firstErrorStep =
-                errorStep;
-            }
-          }
-        }
-
-        nextErrors.root =
-          apiErrors.length
-            ? "Please correct the highlighted fields."
-            : response?.message ||
-              "Unable to create lead.";
-
-        setErrors(
-          nextErrors
-        );
-
-        if (
-          firstErrorStep
-        ) {
-          setStep(
-            firstErrorStep
-          );
-        }
-
-        console.error(
-          "Create lead failed:",
-          response ||
+      } catch (
+        error
+      ) {
+        setErrors({
+          root:
             error
-        );
+              ?.response
+              ?.data
+              ?.message ||
+            error
+              ?.message ||
+            "Unable to create lead.",
+        });
       }
     };
 
@@ -712,19 +861,39 @@ const LeadFormModal = ({
   */
 
   const fieldError =
-    (field) => {
+    (
+      field
+    ) => {
       if (
-        !errors[field]
+        !errors[
+          field
+        ]
       ) {
         return null;
       }
 
       return (
         <span className="form-error">
-          {errors[field]}
+          {
+            errors[
+              field
+            ]
+          }
         </span>
       );
     };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Not Open
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    !open
+  ) {
+    return null;
+  }
 
   /*
   |--------------------------------------------------------------------------
@@ -733,13 +902,31 @@ const LeadFormModal = ({
   */
 
   return (
-    <div className="modal-backdrop">
+    <div
+      className="modal-backdrop"
+      onMouseDown={(
+        event
+      ) => {
+        if (
+          event.target ===
+            event.currentTarget &&
+          !createMutation
+            .isPending
+        ) {
+          handleClose();
+        }
+      }}
+    >
       <section
         className="tl-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-lead-title"
       >
+        {/* --------------------------------------------------------------- */}
+        {/* Header */}
+        {/* --------------------------------------------------------------- */}
+
         <header className="modal-head">
           <div>
             <h2 id="add-lead-title">
@@ -757,96 +944,119 @@ const LeadFormModal = ({
             type="button"
             className="icon-control"
             onClick={
-              onClose
+              handleClose
             }
             disabled={
-              createMutation.isPending
+              createMutation
+                .isPending
             }
             aria-label="Close"
           >
-            <X size={15} />
+            <X
+              size={
+                15
+              }
+            />
           </button>
         </header>
 
+        {/* --------------------------------------------------------------- */}
+        {/* Body */}
+        {/* --------------------------------------------------------------- */}
+
         <div className="modal-body">
+          {/* ------------------------------------------------------------- */}
+          {/* Stepper */}
+          {/* ------------------------------------------------------------- */}
+
           <div className="lead-stepper">
             {STEPS.map(
-                (
+              (
                 label,
                 index
-                ) => {
+              ) => {
                 const stepNumber =
-                    index + 1;
+                  index +
+                  1;
 
                 const active =
-                    step ===
-                    stepNumber;
+                  step ===
+                  stepNumber;
 
                 const complete =
-                    step >
-                    stepNumber;
+                  step >
+                  stepNumber;
 
                 return (
-                    <button
-                    key={label}
+                  <button
+                    key={
+                      label
+                    }
                     type="button"
                     className={[
-                        "lead-step",
+                      "lead-step",
 
-                        active
+                      active
                         ? "is-active"
                         : "",
 
-                        complete
+                      complete
                         ? "is-complete"
                         : "",
                     ]
-                        .filter(
+                      .filter(
                         Boolean
-                        )
-                        .join(" ")}
+                      )
+                      .join(
+                        " "
+                      )}
                     onClick={() => {
-                        /*
-                        |--------------------------------------------------------------
-                        | User may move backwards only.
-                        |--------------------------------------------------------------
-                        */
-
-                        if (
+                      /*
+                       * Backward movement only.
+                       */
+                      if (
                         stepNumber <
                         step
-                        ) {
-                        setErrors({});
+                      ) {
+                        setErrors(
+                          {}
+                        );
 
                         setStep(
-                            stepNumber
+                          stepNumber
                         );
-                        }
+                      }
                     }}
-                    >
+                  >
                     <span className="lead-step-number">
-                        {complete
+                      {complete
                         ? "✓"
                         : stepNumber}
                     </span>
 
                     <span className="lead-step-copy">
-                        <small>
+                      <small>
                         Step{" "}
                         {
-                            stepNumber
+                          stepNumber
                         }
-                        </small>
+                      </small>
 
-                        <b>
-                        {label}
-                        </b>
+                      <b>
+                        {
+                          label
+                        }
+                      </b>
                     </span>
-                    </button>
+                  </button>
                 );
-                }
+              }
             )}
-            </div>
+          </div>
+
+          {/* ------------------------------------------------------------- */}
+          {/* Root Error */}
+          {/* ------------------------------------------------------------- */}
 
           {errors.root && (
             <div className="error-box">
@@ -856,9 +1066,12 @@ const LeadFormModal = ({
             </div>
           )}
 
-          {/* STEP 1 */}
+          {/* ------------------------------------------------------------- */}
+          {/* STEP 1 - Company */}
+          {/* ------------------------------------------------------------- */}
 
-          {step === 1 && (
+          {step ===
+            1 && (
             <div className="form-section">
               <h3>
                 Company
@@ -871,7 +1084,8 @@ const LeadFormModal = ({
 
                   <input
                     value={
-                      values.companyName
+                      values
+                        .companyName
                     }
                     onChange={
                       change(
@@ -891,7 +1105,8 @@ const LeadFormModal = ({
 
                   <select
                     value={
-                      values.industry
+                      values
+                        .industry
                     }
                     onChange={
                       change(
@@ -911,7 +1126,9 @@ const LeadFormModal = ({
                             item
                           }
                         >
-                          {item}
+                          {
+                            item
+                          }
                         </option>
                       )
                     )}
@@ -927,7 +1144,8 @@ const LeadFormModal = ({
 
                   <input
                     value={
-                      values.city
+                      values
+                        .city
                     }
                     onChange={
                       change(
@@ -942,7 +1160,8 @@ const LeadFormModal = ({
 
                   <input
                     value={
-                      values.website
+                      values
+                        .website
                     }
                     onChange={
                       change(
@@ -957,7 +1176,8 @@ const LeadFormModal = ({
 
                   <input
                     value={
-                      values.agencyRelationship
+                      values
+                        .agencyRelationship
                     }
                     onChange={
                       change(
@@ -973,7 +1193,8 @@ const LeadFormModal = ({
                   <textarea
                     rows="3"
                     value={
-                      values.marketingActivity
+                      values
+                        .marketingActivity
                     }
                     onChange={
                       change(
@@ -986,9 +1207,12 @@ const LeadFormModal = ({
             </div>
           )}
 
-          {/* STEP 2 */}
+          {/* ------------------------------------------------------------- */}
+          {/* STEP 2 - Contact */}
+          {/* ------------------------------------------------------------- */}
 
-          {step === 2 && (
+          {step ===
+            2 && (
             <div className="form-section">
               <h3>
                 Primary contact
@@ -1000,7 +1224,8 @@ const LeadFormModal = ({
 
                   <input
                     value={
-                      values.contactName
+                      values
+                        .contactName
                     }
                     onChange={
                       change(
@@ -1020,7 +1245,8 @@ const LeadFormModal = ({
 
                   <input
                     value={
-                      values.designation
+                      values
+                        .designation
                     }
                     onChange={
                       change(
@@ -1036,7 +1262,8 @@ const LeadFormModal = ({
                   <input
                     type="tel"
                     value={
-                      values.phone
+                      values
+                        .phone
                     }
                     onChange={
                       change(
@@ -1052,7 +1279,8 @@ const LeadFormModal = ({
                   <input
                     type="email"
                     value={
-                      values.email
+                      values
+                        .email
                     }
                     onChange={
                       change(
@@ -1071,7 +1299,8 @@ const LeadFormModal = ({
 
                   <select
                     value={
-                      values.decisionMaker
+                      values
+                        .decisionMaker
                     }
                     onChange={
                       change(
@@ -1079,11 +1308,11 @@ const LeadFormModal = ({
                       )
                     }
                   >
-                    <option>
+                    <option value="Yes">
                       Yes
                     </option>
 
-                    <option>
+                    <option value="No">
                       No
                     </option>
                   </select>
@@ -1092,9 +1321,12 @@ const LeadFormModal = ({
             </div>
           )}
 
-          {/* STEP 3 */}
+          {/* ------------------------------------------------------------- */}
+          {/* STEP 3 - Opportunity */}
+          {/* ------------------------------------------------------------- */}
 
-          {step === 3 && (
+          {step ===
+            3 && (
             <div className="form-section">
               <h3>
                 Opportunity
@@ -1107,7 +1339,8 @@ const LeadFormModal = ({
 
                   <input
                     value={
-                      values.serviceRequired
+                      values
+                        .serviceRequired
                     }
                     onChange={
                       change(
@@ -1127,7 +1360,8 @@ const LeadFormModal = ({
 
                   <select
                     value={
-                      values.source
+                      values
+                        .source
                     }
                     onChange={
                       change(
@@ -1147,11 +1381,17 @@ const LeadFormModal = ({
                             item
                           }
                         >
-                          {item}
+                          {
+                            item
+                          }
                         </option>
                       )
                     )}
                   </select>
+
+                  {fieldError(
+                    "source"
+                  )}
                 </label>
 
                 <label>
@@ -1163,7 +1403,8 @@ const LeadFormModal = ({
                     min="0"
                     step="1"
                     value={
-                      values.estimatedValueRupees
+                      values
+                        .estimatedValueRupees
                     }
                     onChange={
                       change(
@@ -1182,7 +1423,8 @@ const LeadFormModal = ({
 
                   <select
                     value={
-                      values.priority
+                      values
+                        .priority
                     }
                     onChange={
                       change(
@@ -1198,8 +1440,13 @@ const LeadFormModal = ({
                           key={
                             item
                           }
+                          value={
+                            item
+                          }
                         >
-                          {item}
+                          {
+                            item
+                          }
                         </option>
                       )
                     )}
@@ -1213,7 +1460,8 @@ const LeadFormModal = ({
                   <textarea
                     rows="3"
                     value={
-                      values.description
+                      values
+                        .description
                     }
                     onChange={
                       change(
@@ -1226,22 +1474,28 @@ const LeadFormModal = ({
             </div>
           )}
 
-          {/* STEP 4 */}
+          {/* ------------------------------------------------------------- */}
+          {/* STEP 4 - Ownership */}
+          {/* ------------------------------------------------------------- */}
 
-          {step === 4 && (
+          {step ===
+            4 && (
             <div className="form-section">
               <h3>
                 Ownership
               </h3>
 
-              {ownersQuery.isError && (
+              {/* Branch loading error */}
+
+              {branchOptionsQuery
+                .isError && (
                 <div className="error-box">
-                  {ownersQuery
+                  {branchOptionsQuery
                     .error
                     ?.response
                     ?.data
                     ?.message ||
-                    "Unable to load owners."}
+                    "Unable to load branches."}
 
                   <div
                     style={{
@@ -1253,7 +1507,8 @@ const LeadFormModal = ({
                       type="button"
                       className="tl-link"
                       onClick={() =>
-                        ownersQuery.refetch()
+                        branchOptionsQuery
+                          .refetch()
                       }
                     >
                       Try again
@@ -1262,22 +1517,86 @@ const LeadFormModal = ({
                 </div>
               )}
 
-              {!ownersQuery.isLoading &&
-                !ownersQuery.isError &&
-                owners.length === 0 && (
-                  <div className="error-box">
-                    No active owners are
-                    available.
-                  </div>
-                )}
-
               <div className="form-grid2">
+                {/* ------------------------------------------------------- */}
+                {/* Branch */}
+                {/* ------------------------------------------------------- */}
+
+                <label>
+                  Primary branch *
+
+                  <select
+                    value={
+                      values
+                        .branchId
+                    }
+                    onChange={
+                      changeBranch
+                    }
+                    disabled={
+                      branchOptionsQuery
+                        .isLoading ||
+                      branchOptionsQuery
+                        .isError ||
+                      branches.length ===
+                        0 ||
+                      (
+                        user?.role !==
+                          "SUPER_ADMIN" &&
+                        branches.length ===
+                          1
+                      )
+                    }
+                    autoFocus
+                  >
+                    <option value="">
+                      {branchOptionsQuery
+                        .isLoading
+                        ? "Loading branches..."
+                        : branches.length ===
+                            0
+                          ? "No branches available"
+                          : "Select branch"}
+                    </option>
+
+                    {branches.map(
+                      (
+                        branch
+                      ) => (
+                        <option
+                          key={
+                            branch.id
+                          }
+                          value={
+                            String(
+                              branch.id
+                            )
+                          }
+                        >
+                          {
+                            branch.name
+                          }
+                        </option>
+                      )
+                    )}
+                  </select>
+
+                  {fieldError(
+                    "branchId"
+                  )}
+                </label>
+
+                {/* ------------------------------------------------------- */}
+                {/* Owner */}
+                {/* ------------------------------------------------------- */}
+
                 <label>
                   Owner *
 
                   <select
                     value={
-                      values.ownerId
+                      values
+                        .ownerId
                     }
                     onChange={
                       change(
@@ -1285,17 +1604,27 @@ const LeadFormModal = ({
                       )
                     }
                     disabled={
-                      ownersQuery.isLoading ||
-                      ownersQuery.isError
+                      !values
+                        .branchId ||
+                      ownersQuery
+                        .isLoading ||
+                      ownersQuery
+                        .isError ||
+                      owners.length ===
+                        0
                     }
-                    autoFocus
                   >
                     <option value="">
-                      {ownersQuery.isLoading
-                        ? "Loading owners..."
-                        : owners.length === 0
-                          ? "No owners available"
-                          : "Select owner"}
+                      {!values
+                        .branchId
+                        ? "Select branch first"
+                        : ownersQuery
+                              .isLoading
+                          ? "Loading owners..."
+                          : owners.length ===
+                              0
+                            ? "No owners available"
+                            : "Select owner"}
                     </option>
 
                     {owners.map(
@@ -1307,16 +1636,21 @@ const LeadFormModal = ({
                             owner.id
                           }
                           value={
-                            owner.id
+                            String(
+                              owner.id
+                            )
                           }
                         >
                           {owner.fullName ||
                             owner.name ||
                             `User ${owner.id}`}
 
-                          {owner.branchName
-                            ? ` · ${owner.branchName}`
-                            : ""}
+                          {owner.role ===
+                          "SUPER_ADMIN"
+                            ? " · Global"
+                            : owner.branchName
+                              ? ` · ${owner.branchName}`
+                              : ""}
                         </option>
                       )
                     )}
@@ -1327,12 +1661,108 @@ const LeadFormModal = ({
                   )}
                 </label>
               </div>
+
+              {/* --------------------------------------------------------- */}
+              {/* Owner Query Error */}
+              {/* --------------------------------------------------------- */}
+
+              {values.branchId &&
+                ownersQuery
+                  .isError && (
+                  <div
+                    className="error-box"
+                    style={{
+                      marginTop:
+                        "12px",
+                    }}
+                  >
+                    {ownersQuery
+                      .error
+                      ?.response
+                      ?.data
+                      ?.message ||
+                      "Unable to load owners for the selected branch."}
+
+                    <div
+                      style={{
+                        marginTop:
+                          "8px",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="tl-link"
+                        onClick={() =>
+                          ownersQuery
+                            .refetch()
+                        }
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+              {/* --------------------------------------------------------- */}
+              {/* No Owners */}
+              {/* --------------------------------------------------------- */}
+
+              {values.branchId &&
+                !ownersQuery
+                  .isLoading &&
+                !ownersQuery
+                  .isError &&
+                owners.length ===
+                  0 && (
+                  <div
+                    className="error-box"
+                    style={{
+                      marginTop:
+                        "12px",
+                    }}
+                  >
+                    No active owners
+                    are available for
+                    this branch.
+                  </div>
+                )}
+
+              {/* --------------------------------------------------------- */}
+              {/* Selected Branch Summary */}
+              {/* --------------------------------------------------------- */}
+
+              {selectedBranch && (
+                <div
+                  className="brief-clarification"
+                  style={{
+                    marginTop:
+                      "12px",
+                  }}
+                >
+                  <b>
+                    Primary branch
+                  </b>
+
+                  <span>
+                    {
+                      selectedBranch.name
+                    }
+
+                    {selectedBranch.code
+                      ? ` (${selectedBranch.code})`
+                      : ""}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
-          {/* STEP 5 */}
+          {/* ------------------------------------------------------------- */}
+          {/* STEP 5 - Next Action */}
+          {/* ------------------------------------------------------------- */}
 
-          {step === 5 && (
+          {step ===
+            5 && (
             <div className="form-section">
               <h3>
                 Next action
@@ -1344,7 +1774,8 @@ const LeadFormModal = ({
 
                   <input
                     value={
-                      values.nextAction
+                      values
+                        .nextAction
                     }
                     onChange={
                       change(
@@ -1365,7 +1796,8 @@ const LeadFormModal = ({
                   <input
                     type="date"
                     value={
-                      values.followUpDate
+                      values
+                        .followUpDate
                     }
                     onChange={
                       change(
@@ -1385,7 +1817,8 @@ const LeadFormModal = ({
                   <input
                     type="time"
                     value={
-                      values.followUpTime
+                      values
+                        .followUpTime
                     }
                     onChange={
                       change(
@@ -1401,7 +1834,8 @@ const LeadFormModal = ({
 
                   <select
                     value={
-                      values.knownRelationship
+                      values
+                        .knownRelationship
                     }
                     onChange={
                       change(
@@ -1409,11 +1843,11 @@ const LeadFormModal = ({
                       )
                     }
                   >
-                    <option>
+                    <option value="No / Unknown">
                       No / Unknown
                     </option>
 
-                    <option>
+                    <option value="Yes / Existing">
                       Yes / Existing
                     </option>
                   </select>
@@ -1423,26 +1857,36 @@ const LeadFormModal = ({
           )}
         </div>
 
+        {/* --------------------------------------------------------------- */}
+        {/* Footer */}
+        {/* --------------------------------------------------------------- */}
+
         <footer className="modal-foot">
           <button
             type="button"
             className="tl-secondary"
             disabled={
-              createMutation.isPending
+              createMutation
+                .isPending
             }
             onClick={
-              onClose
+              handleClose
             }
           >
             Cancel
           </button>
 
-          {step < 5 ? (
+          {step <
+          5 ? (
             <button
               type="button"
               className="tl-primary"
               onClick={
                 continueForm
+              }
+              disabled={
+                createMutation
+                  .isPending
               }
             >
               Continue
@@ -1452,13 +1896,17 @@ const LeadFormModal = ({
               type="button"
               className="tl-primary"
               disabled={
-                createMutation.isPending
+                createMutation
+                  .isPending
               }
               onClick={
                 submit
               }
             >
-              Create lead
+              {createMutation
+                .isPending
+                ? "Creating..."
+                : "Create lead"}
             </button>
           )}
         </footer>

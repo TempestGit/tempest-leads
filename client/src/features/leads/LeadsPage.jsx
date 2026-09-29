@@ -547,7 +547,7 @@ const LeadsPage = () => {
           )}
         </select>
 
-        <button
+        {/* <button
           type="button"
           className="tl-secondary"
           disabled={
@@ -561,7 +561,7 @@ const LeadsPage = () => {
           }
         >
           Assign owner
-        </button>
+        </button> */}
 
         <button
           type="button"

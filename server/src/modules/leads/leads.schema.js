@@ -1,4 +1,6 @@
-import { z } from "zod";
+import {
+  z,
+} from "zod";
 
 /*
 |--------------------------------------------------------------------------
@@ -31,29 +33,6 @@ export const LEAD_STATUSES = [
   "Open",
   "Not interested",
   "Active Client",
-];
-
-/*
-|--------------------------------------------------------------------------
-| Industries
-|--------------------------------------------------------------------------
-*/
-
-export const LEAD_INDUSTRIES = [
-  "Real Estate",
-  "Healthcare",
-  "Agriculture",
-  "Retail",
-  "Education",
-  "Automobile",
-  "FMCG",
-  "BFSI",
-  "IT / SaaS",
-  "Hospitality",
-  "Pharma",
-  "Manufacturing",
-  "D2C / E-commerce",
-  "Other",
 ];
 
 /*
@@ -113,78 +92,6 @@ export const LOST_REASONS = [
 
 /*
 |--------------------------------------------------------------------------
-| Helpers
-|--------------------------------------------------------------------------
-*/
-
-const nullableText = (
-  maxLength
-) =>
-  z.preprocess(
-    (value) => {
-      if (
-        value === "" ||
-        value === null ||
-        value === undefined
-      ) {
-        return null;
-      }
-
-      return value;
-    },
-    z
-      .string()
-      .trim()
-      .max(maxLength)
-      .nullable()
-  );
-
-const optionalNullableText = (
-  maxLength
-) =>
-  z.preprocess(
-    (value) => {
-      if (
-        value === ""
-      ) {
-        return null;
-      }
-
-      return value;
-    },
-    z
-      .string()
-      .trim()
-      .max(maxLength)
-      .nullable()
-      .optional()
-  );
-
-const nullableEmail =
-  z.preprocess(
-    (value) => {
-      if (
-        value === "" ||
-        value === null ||
-        value === undefined
-      ) {
-        return null;
-      }
-
-      return value;
-    },
-    z
-      .string()
-      .trim()
-      .email(
-        "Enter a valid email address."
-      )
-      .max(190)
-      .nullable()
-  );
-
-/*
-|--------------------------------------------------------------------------
 | ID
 |--------------------------------------------------------------------------
 */
@@ -196,6 +103,22 @@ export const leadIdSchema =
         .number()
         .int()
         .positive(),
+  });
+
+/*
+|--------------------------------------------------------------------------
+| Owner Options Query
+|--------------------------------------------------------------------------
+*/
+
+export const leadOwnersQuerySchema =
+  z.object({
+    branchId:
+      z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
   });
 
 /*
@@ -245,7 +168,7 @@ export const leadListSchema =
       z
         .string()
         .trim()
-        .max(120)
+        .max(150)
         .optional(),
 
     companyId:
@@ -296,112 +219,11 @@ export const leadListSchema =
 
 /*
 |--------------------------------------------------------------------------
-| Existing Record Fields
-|--------------------------------------------------------------------------
-|
-| Used by PATCH /api/leads/:leadId.
-|
-*/
-
-const leadFormFields = {
-  companyId:
-    z.coerce
-      .number()
-      .int()
-      .positive(),
-
-  primaryContactId:
-    z.coerce
-      .number()
-      .int()
-      .positive(),
-
-  ownerId:
-    z.coerce
-      .number()
-      .int()
-      .positive(),
-
-  serviceRequired:
-    z
-      .string()
-      .trim()
-      .min(
-        2,
-        "Potential requirement is required."
-      )
-      .max(
-        255,
-        "Potential requirement cannot exceed 255 characters."
-      ),
-
-  source:
-    z
-      .enum(
-        LEAD_SOURCES,
-        {
-          message:
-            "Please select a valid lead source.",
-        }
-      ),
-
-  estimatedValueRupees:
-    z.coerce
-      .number()
-      .finite()
-      .min(
-        0,
-        "Opportunity value cannot be negative."
-      )
-      .default(0),
-
-  priority:
-    z
-      .enum(
-        LEAD_PRIORITIES
-      )
-      .default(
-        "Medium"
-      ),
-
-  description:
-    optionalNullableText(
-      5000
-    ),
-
-  nextAction:
-    z
-      .string()
-      .trim()
-      .min(
-        2,
-        "Next action is required."
-      )
-      .max(
-        500,
-        "Next action cannot exceed 500 characters."
-      ),
-
-  followUpAt:
-    z.coerce
-      .date({
-        error:
-          "Enter a valid follow-up date and time.",
-      }),
-
-  knownRelationship:
-    z
-      .boolean()
-      .default(false),
-};
-
-/*
-|--------------------------------------------------------------------------
-| Create Company Payload
+| Company Input
 |--------------------------------------------------------------------------
 */
 
-const createLeadCompanySchema =
+const leadCompanySchema =
   z.object({
     name:
       z
@@ -411,48 +233,58 @@ const createLeadCompanySchema =
           2,
           "Company name is required."
         )
-        .max(
-          190,
-          "Company name cannot exceed 190 characters."
-        ),
+        .max(190),
 
     industry:
-      z.enum(
-        LEAD_INDUSTRIES,
-        {
-          message:
-            "Please select a valid industry.",
-        }
-      ),
+      z
+        .string()
+        .trim()
+        .min(
+          1,
+          "Industry is required."
+        )
+        .max(150),
 
     city:
-      nullableText(
-        120
-      ),
+      z
+        .string()
+        .trim()
+        .max(120)
+        .nullable()
+        .optional(),
 
     website:
-      nullableText(
-        500
-      ),
+      z
+        .string()
+        .trim()
+        .max(500)
+        .nullable()
+        .optional(),
 
     agencyRelationship:
-      nullableText(
-        255
-      ),
+      z
+        .string()
+        .trim()
+        .max(255)
+        .nullable()
+        .optional(),
 
     marketingActivity:
-      nullableText(
-        5000
-      ),
+      z
+        .string()
+        .trim()
+        .max(5000)
+        .nullable()
+        .optional(),
   });
 
 /*
 |--------------------------------------------------------------------------
-| Create Contact Payload
+| Contact Input
 |--------------------------------------------------------------------------
 */
 
-const createLeadContactSchema =
+const leadContactSchema =
   z.object({
     name:
       z
@@ -462,23 +294,54 @@ const createLeadContactSchema =
           2,
           "Contact name is required."
         )
-        .max(
-          150,
-          "Contact name cannot exceed 150 characters."
-        ),
+        .max(190),
 
     designation:
-      nullableText(
-        150
-      ),
+      z
+        .string()
+        .trim()
+        .max(150)
+        .nullable()
+        .optional(),
 
     phone:
-      nullableText(
-        30
-      ),
+      z
+        .string()
+        .trim()
+        .max(30)
+        .nullable()
+        .optional(),
 
     email:
-      nullableEmail,
+      z
+        .string()
+        .trim()
+        .max(190)
+        .nullable()
+        .optional()
+        .refine(
+          (
+            value
+          ) => {
+            if (
+              !value
+            ) {
+              return true;
+            }
+
+            return z
+              .string()
+              .email()
+              .safeParse(
+                value
+              )
+              .success;
+          },
+          {
+            message:
+              "Enter a valid contact email.",
+          }
+        ),
 
     isDecisionMaker:
       z
@@ -488,131 +351,195 @@ const createLeadContactSchema =
 
 /*
 |--------------------------------------------------------------------------
-| Create
+| Common Lead Fields
+|--------------------------------------------------------------------------
+*/
+
+const ownerIdSchema =
+  z.coerce
+    .number()
+    .int()
+    .positive();
+
+const branchIdSchema =
+  z.coerce
+    .number()
+    .int()
+    .positive();
+
+const serviceRequiredSchema =
+  z
+    .string()
+    .trim()
+    .min(
+      2,
+      "Potential requirement is required."
+    )
+    .max(1000);
+
+const sourceSchema =
+  z
+    .string()
+    .trim()
+    .min(
+      1,
+      "Lead source is required."
+    )
+    .max(150);
+
+const estimatedValueSchema =
+  z.coerce
+    .number()
+    .min(0)
+    .default(0);
+
+const prioritySchema =
+  z
+    .enum(
+      LEAD_PRIORITIES
+    )
+    .default(
+      "Medium"
+    );
+
+const descriptionSchema =
+  z
+    .string()
+    .trim()
+    .max(5000)
+    .nullable()
+    .optional();
+
+const nextActionSchema =
+  z
+    .string()
+    .trim()
+    .min(
+      2,
+      "Next action is required."
+    )
+    .max(500);
+
+const followUpAtSchema =
+  z.coerce
+    .date();
+
+const knownRelationshipSchema =
+  z.coerce
+    .boolean()
+    .default(false);
+
+/*
+|--------------------------------------------------------------------------
+| Create Lead
 |--------------------------------------------------------------------------
 |
-| Add Lead creates/reuses Company + Contact inside one transaction.
-| Therefore POST /api/leads accepts nested company/contact objects rather than
-| requiring companyId and primaryContactId from the browser.
+| The Add Lead modal creates:
+|
+| Company
+| → Contact
+| → Lead
+|
+| in one backend transaction.
 |
 */
 
 export const createLeadSchema =
   z.object({
     company:
-      createLeadCompanySchema,
+      leadCompanySchema,
 
     contact:
-      createLeadContactSchema,
+      leadContactSchema,
+
+    branchId:
+      branchIdSchema,
 
     ownerId:
-      leadFormFields
-        .ownerId,
+      ownerIdSchema,
 
     serviceRequired:
-      leadFormFields
-        .serviceRequired,
+      serviceRequiredSchema,
 
     source:
-      leadFormFields
-        .source,
+      sourceSchema,
 
     estimatedValueRupees:
-      leadFormFields
-        .estimatedValueRupees,
+      estimatedValueSchema,
 
     priority:
-      leadFormFields
-        .priority,
+      prioritySchema,
 
     description:
-      optionalNullableText(
-        5000
-      ),
+      descriptionSchema,
 
     nextAction:
-      leadFormFields
-        .nextAction,
+      nextActionSchema,
 
     followUpAt:
-      leadFormFields
-        .followUpAt,
+      followUpAtSchema,
 
     knownRelationship:
-      z
-        .boolean()
-        .default(false),
+      knownRelationshipSchema,
   });
 
 /*
 |--------------------------------------------------------------------------
-| Update
+| Update Lead
 |--------------------------------------------------------------------------
 */
 
 export const updateLeadSchema =
-  z
-    .object({
-      companyId:
-        leadFormFields
-          .companyId
-          .optional(),
+  z.object({
+    companyId:
+      z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
 
-      primaryContactId:
-        leadFormFields
-          .primaryContactId
-          .optional(),
+    primaryContactId:
+      z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
 
-      serviceRequired:
-        leadFormFields
-          .serviceRequired
-          .optional(),
+    branchId:
+      branchIdSchema
+        .optional(),
 
-      source:
-        leadFormFields
-          .source
-          .optional(),
+    serviceRequired:
+      serviceRequiredSchema
+        .optional(),
 
-      estimatedValueRupees:
-        leadFormFields
-          .estimatedValueRupees
-          .optional(),
+    source:
+      sourceSchema
+        .optional(),
 
-      priority:
-        leadFormFields
-          .priority
-          .optional(),
+    estimatedValueRupees:
+      estimatedValueSchema
+        .optional(),
 
-      description:
-        optionalNullableText(
-          5000
-        ),
+    priority:
+      prioritySchema
+        .optional(),
 
-      nextAction:
-        leadFormFields
-          .nextAction
-          .optional(),
+    description:
+      descriptionSchema,
 
-      followUpAt:
-        leadFormFields
-          .followUpAt
-          .optional(),
+    nextAction:
+      nextActionSchema
+        .optional(),
 
-      knownRelationship:
-        z
-          .boolean()
-          .optional(),
-    })
-    .refine(
-      (data) =>
-        Object.keys(
-          data
-        ).length > 0,
-      {
-        message:
-          "At least one field must be provided.",
-      }
-    );
+    followUpAt:
+      followUpAtSchema
+        .optional(),
+
+    knownRelationship:
+      knownRelationshipSchema
+        .optional(),
+  });
 
 /*
 |--------------------------------------------------------------------------
@@ -647,10 +574,7 @@ export const changeLeadStageSchema =
 export const changeLeadOwnerSchema =
   z.object({
     ownerId:
-      z.coerce
-        .number()
-        .int()
-        .positive(),
+      ownerIdSchema,
 
     reason:
       z

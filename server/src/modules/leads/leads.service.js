@@ -22,23 +22,21 @@ import {
 
 import {
   createContact,
-  findMatchingContact,
   updateContactCode,
 } from "../contacts/contacts.repository.js";
-
-import {
-  listAssignableLeadOwners,
-} from "./leads.repository.js";
 
 import {
   closeLeadState,
   createLeadFollowup,
   createLeadStageHistory,
   findContactForCompany,
+  findLeadBranch,
   findLeadById,
   findLeadCompany,
   findLeadOwner,
   insertLead,
+  listActiveLeadBranches,
+  listAssignableLeadOwners,
   listLeadOptions,
   listLeads,
   updateLead,
@@ -112,14 +110,164 @@ const validateLeadRelations =
 
 /*
 |--------------------------------------------------------------------------
+| Validate Branch
+|--------------------------------------------------------------------------
+*/
+
+const validateBranch =
+  async (
+    branchId,
+    connection = pool
+  ) => {
+    if (!branchId) {
+      throw new ApiError(
+        422,
+        "Primary branch is required.",
+        [],
+        "BRANCH_REQUIRED"
+      );
+    }
+
+    const branch =
+      await findLeadBranch(
+        branchId,
+        connection
+      );
+
+    if (!branch) {
+      throw new ApiError(
+        404,
+        "Selected branch was not found or is inactive.",
+        [],
+        "BRANCH_NOT_FOUND"
+      );
+    }
+
+    return branch;
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Validate Current User Branch Access
+|--------------------------------------------------------------------------
+|
+| Super Admin:
+| - May create/manage leads in any active branch.
+|
+| Owner:
+| - May create/manage leads only inside their assigned branch.
+|
+*/
+
+const validateBranchAccess =
+  async (
+    currentUser,
+    branchId,
+    connection = pool
+  ) => {
+    const branch =
+      await validateBranch(
+        branchId,
+        connection
+      );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Super Admin
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      currentUser.role ===
+      "SUPER_ADMIN"
+    ) {
+      return branch;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Current Owner
+    |--------------------------------------------------------------------------
+    */
+
+    const currentOwner =
+      await findLeadOwner(
+        currentUser.id,
+        connection
+      );
+
+    if (!currentOwner) {
+      throw new ApiError(
+        404,
+        "Current user was not found.",
+        [],
+        "CURRENT_USER_NOT_FOUND"
+      );
+    }
+
+    if (
+      String(
+        currentOwner.status
+      ).toUpperCase() !==
+      "ACTIVE"
+    ) {
+      throw new ApiError(
+        403,
+        "Your user account is inactive.",
+        [],
+        "USER_INACTIVE"
+      );
+    }
+
+    if (
+      !currentOwner.branchId
+    ) {
+      throw new ApiError(
+        422,
+        "Your account does not have a branch assigned.",
+        [],
+        "USER_BRANCH_REQUIRED"
+      );
+    }
+
+    if (
+      Number(
+        currentOwner.branchId
+      ) !==
+      Number(
+        branchId
+      )
+    ) {
+      throw new ApiError(
+        403,
+        "You cannot manage leads for another branch.",
+        [],
+        "BRANCH_ACCESS_DENIED"
+      );
+    }
+
+    return branch;
+  };
+
+/*
+|--------------------------------------------------------------------------
 | Validate Owner
 |--------------------------------------------------------------------------
+|
+| Rules:
+|
+| 1. Owner must exist.
+| 2. Owner must be ACTIVE.
+| 3. SUPER_ADMIN is global and may own a lead from any branch.
+| 4. Normal OWNER must belong to the lead's primary branch.
+|
 */
 
 const validateOwner =
   async (
     ownerId,
-    connection
+    branchId,
+    connection = pool
   ) => {
     const owner =
       await findLeadOwner(
@@ -133,6 +281,79 @@ const validateOwner =
         "Owner not found.",
         [],
         "OWNER_NOT_FOUND"
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Active User
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      String(
+        owner.status
+      ).toUpperCase() !==
+      "ACTIVE"
+    ) {
+      throw new ApiError(
+        422,
+        "Selected owner is inactive.",
+        [],
+        "OWNER_INACTIVE"
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Super Admin
+    |--------------------------------------------------------------------------
+    |
+    | Super Admin has global access.
+    |
+    */
+
+    if (
+      owner.role ===
+      "SUPER_ADMIN"
+    ) {
+      return owner;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Owner Must Have Branch
+    |--------------------------------------------------------------------------
+    */
+
+    if (!owner.branchId) {
+      throw new ApiError(
+        422,
+        "Selected owner does not have a branch assigned.",
+        [],
+        "OWNER_BRANCH_REQUIRED"
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Owner Branch Must Match Lead Branch
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      Number(
+        owner.branchId
+      ) !==
+      Number(
+        branchId
+      )
+    ) {
+      throw new ApiError(
+        422,
+        "Selected owner does not belong to the lead branch.",
+        [],
+        "OWNER_BRANCH_MISMATCH"
       );
     }
 
@@ -234,6 +455,327 @@ export const getLeadService =
 
 /*
 |--------------------------------------------------------------------------
+| Create / Resolve Lead Company + Contact
+|--------------------------------------------------------------------------
+|
+| Add Lead captures company and primary contact information directly.
+|
+| Everything here runs using the SAME MySQL transaction connection used
+| when creating the lead.
+|
+| Flow:
+|
+| Company
+| -> Contact
+| -> Lead
+| -> Stage History
+| -> Activity
+| -> Follow-up
+| -> Audit
+| -> COMMIT
+|
+| Any error:
+|
+| -> ROLLBACK
+|
+*/
+
+const createLeadRelations =
+  async (
+    data,
+    currentUser,
+    connection
+  ) => {
+    /*
+    |--------------------------------------------------------------------------
+    | Company Input
+    |--------------------------------------------------------------------------
+    */
+
+    const companyInput =
+      data.company;
+
+    if (!companyInput) {
+      throw new ApiError(
+        422,
+        "Company information is required.",
+        [],
+        "COMPANY_REQUIRED"
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Find Existing Company
+    |--------------------------------------------------------------------------
+    |
+    | CRM model:
+    |
+    | ONE COMPANY
+    | -> MANY CONTACTS
+    |
+    | Therefore, when the exact company name already exists, use that company
+    | instead of creating another duplicate company record.
+    |
+    */
+
+    let company =
+      await findCompanyByName(
+        companyInput.name,
+        null,
+        connection
+      );
+
+    let companyId;
+
+    let companyCreated =
+      false;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Create Company When Missing
+    |--------------------------------------------------------------------------
+    */
+
+    if (company) {
+      companyId =
+        Number(
+          company.id
+        );
+    } else {
+      companyId =
+        Number(
+          await createCompany(
+            {
+              name:
+                companyInput.name,
+
+              industry:
+                companyInput.industry,
+
+              city:
+                companyInput.city ||
+                null,
+
+              website:
+                companyInput.website ||
+                null,
+
+              agencyRelationship:
+                companyInput
+                  .agencyRelationship ||
+                null,
+
+              country:
+                "India",
+
+              source:
+                data.source ||
+                "Other",
+
+              status:
+                "ACTIVE",
+
+              userId:
+                currentUser.id,
+            },
+            connection
+          )
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Company Public Code
+      |--------------------------------------------------------------------------
+      |
+      | Database ID:
+      |
+      | 1
+      |
+      | Public ID:
+      |
+      | CMP-1001
+      |
+      */
+
+      const companyCode =
+        `CMP-${1000 + companyId}`;
+
+      const companyCodeUpdated =
+        await updateCompanyCode(
+          companyId,
+          companyCode,
+          connection
+        );
+
+      if (!companyCodeUpdated) {
+        throw new ApiError(
+          500,
+          "Company was created but its company code could not be generated.",
+          [],
+          "COMPANY_CODE_UPDATE_FAILED"
+        );
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Confirm Company
+      |--------------------------------------------------------------------------
+      */
+
+      company =
+        await findLeadCompany(
+          companyId,
+          connection
+        );
+
+      if (!company) {
+        throw new ApiError(
+          500,
+          "Company was created but could not be loaded.",
+          [],
+          "COMPANY_CREATED_BUT_NOT_LOADED"
+        );
+      }
+
+      companyCreated =
+        true;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Primary Contact Input
+    |--------------------------------------------------------------------------
+    */
+
+    const contactInput =
+      data.contact;
+
+    if (!contactInput) {
+      throw new ApiError(
+        422,
+        "Primary contact information is required.",
+        [],
+        "CONTACT_REQUIRED"
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Create Contact
+    |--------------------------------------------------------------------------
+    |
+    | A new contact is created under the selected/resolved company.
+    |
+    */
+
+    const contactId =
+      Number(
+        await createContact(
+          {
+            companyId,
+
+            name:
+              contactInput.name,
+
+            designation:
+              contactInput.designation ||
+              null,
+
+            phone:
+              contactInput.phone ||
+              null,
+
+            email:
+              contactInput.email ||
+              null,
+
+            isDecisionMaker:
+              Boolean(
+                contactInput
+                  .isDecisionMaker
+              ),
+
+            userId:
+              currentUser.id,
+          },
+          connection
+        )
+      );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Contact Public Code
+    |--------------------------------------------------------------------------
+    |
+    | Database ID:
+    |
+    | 1
+    |
+    | Public ID:
+    |
+    | CON-2001
+    |
+    */
+
+    const contactCode =
+      `CON-${2000 + contactId}`;
+
+    const contactCodeUpdated =
+      await updateContactCode(
+        contactId,
+        contactCode,
+        connection
+      );
+
+    if (!contactCodeUpdated) {
+      throw new ApiError(
+        500,
+        "Contact was created but its contact code could not be generated.",
+        [],
+        "CONTACT_CODE_UPDATE_FAILED"
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Confirm Contact Belongs To Company
+    |--------------------------------------------------------------------------
+    */
+
+    const contact =
+      await findContactForCompany(
+        contactId,
+        companyId,
+        connection
+      );
+
+    if (!contact) {
+      throw new ApiError(
+        500,
+        "Contact was created but could not be loaded.",
+        [],
+        "CONTACT_CREATED_BUT_NOT_LOADED"
+      );
+    }
+
+    return {
+      companyId,
+
+      contactId,
+
+      companyCreated,
+
+      companyName:
+        companyInput.name,
+
+      contactName:
+        contactInput.name,
+    };
+  };
+
+/*
+|--------------------------------------------------------------------------
 | Create Lead
 |--------------------------------------------------------------------------
 */
@@ -249,239 +791,119 @@ export const createLeadService =
       await pool.getConnection();
 
     try {
+      /*
+      |--------------------------------------------------------------------------
+      | Begin Transaction
+      |--------------------------------------------------------------------------
+      */
+
       await connection.beginTransaction();
 
       /*
       |--------------------------------------------------------------------------
-      | Validate Owner
+      | Create / Resolve Company + Contact
+      |--------------------------------------------------------------------------
+      */
+
+      const relations =
+        await createLeadRelations(
+          data,
+          currentUser,
+          connection
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Build Lead Data
+      |--------------------------------------------------------------------------
+      |
+      | Frontend submits:
+      |
+      | company: {...}
+      | contact: {...}
+      |
+      | The database lead row requires:
+      |
+      | companyId
+      | primaryContactId
+      |
+      | We now have the real MySQL IDs.
+      |
+      */
+
+      const leadData = {
+        ...data,
+
+        companyId:
+          relations.companyId,
+
+        primaryContactId:
+          relations.contactId,
+      };
+
+      /*
+      |--------------------------------------------------------------------------
+      | Validate Company / Contact
+      |--------------------------------------------------------------------------
+      */
+
+      await validateLeadRelations(
+        {
+          companyId:
+            leadData.companyId,
+
+          primaryContactId:
+            leadData.primaryContactId,
+        },
+        connection
+      );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Validate Primary Branch
+      |--------------------------------------------------------------------------
+      */
+
+      const branch =
+        await validateBranchAccess(
+          currentUser,
+          leadData.branchId,
+          connection
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Validate Owner Against Branch
       |--------------------------------------------------------------------------
       */
 
       const owner =
         await validateOwner(
-          data.ownerId,
+          leadData.ownerId,
+          branch.id,
           connection
         );
-
-      /*
-      |--------------------------------------------------------------------------
-      | Resolve Company
-      |--------------------------------------------------------------------------
-      |
-      | Add Lead captures company data directly. Reuse an existing active
-      | company when the same name already exists; otherwise create it inside
-      | this transaction.
-      |
-      */
-
-      let company =
-        await findCompanyByName(
-          data.company.name,
-          null,
-          connection
-        );
-
-      let companyReused =
-        Boolean(
-          company
-        );
-
-      let companyId;
-
-      if (
-        company
-      ) {
-        companyId =
-          Number(
-            company.id
-          );
-      } else {
-        companyId =
-          Number(
-            await createCompany(
-              {
-                name:
-                  data.company.name,
-
-                industry:
-                  data.company.industry,
-
-                city:
-                  data.company.city,
-
-                website:
-                  data.company.website,
-
-                agencyRelationship:
-                  data.company
-                    .agencyRelationship,
-
-                notes:
-                  data.company
-                    .marketingActivity,
-
-                source:
-                  data.source,
-
-                status:
-                  "ACTIVE",
-
-                userId:
-                  currentUser.id,
-              },
-              connection
-            )
-          );
-
-        await updateCompanyCode(
-          companyId,
-          `CMP-${1000 + companyId}`,
-          connection
-        );
-
-        companyReused =
-          false;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Resolve Contact
-      |--------------------------------------------------------------------------
-      |
-      | Reuse an existing contact under the selected company when email or
-      | phone matches. Otherwise create a new Contact Master record.
-      |
-      */
-
-      let contact =
-        await findMatchingContact(
-          {
-            companyId,
-
-            email:
-              data.contact.email,
-
-            phone:
-              data.contact.phone,
-          },
-          connection
-        );
-
-      let contactReused =
-        Boolean(
-          contact
-        );
-
-      let primaryContactId;
-
-      if (
-        contact
-      ) {
-        primaryContactId =
-          Number(
-            contact.id
-          );
-      } else {
-        primaryContactId =
-          Number(
-            await createContact(
-              {
-                companyId,
-
-                name:
-                  data.contact.name,
-
-                designation:
-                  data.contact
-                    .designation,
-
-                phone:
-                  data.contact.phone,
-
-                email:
-                  data.contact.email,
-
-                isDecisionMaker:
-                  data.contact
-                    .isDecisionMaker,
-
-                userId:
-                  currentUser.id,
-              },
-              connection
-            )
-          );
-
-        await updateContactCode(
-          primaryContactId,
-          `CON-${2000 + primaryContactId}`,
-          connection
-        );
-
-        contactReused =
-          false;
-      }
 
       /*
       |--------------------------------------------------------------------------
       | Create Lead
       |--------------------------------------------------------------------------
-      |
-      | Lead branch defaults to the selected owner's home branch. This keeps
-      | Team Assignment branch filtering usable for newly created leads.
-      |
       */
-
-      const leadData = {
-        ownerId:
-          data.ownerId,
-
-        companyId,
-
-        primaryContactId,
-
-        branchId:
-          owner.branchId
-            ? Number(
-                owner.branchId
-              )
-            : null,
-
-        serviceRequired:
-          data.serviceRequired,
-
-        source:
-          data.source,
-
-        estimatedValueRupees:
-          data.estimatedValueRupees ??
-          0,
-
-        priority:
-          data.priority,
-
-        description:
-          data.description ??
-          null,
-
-        nextAction:
-          data.nextAction,
-
-        followUpAt:
-          data.followUpAt,
-
-        knownRelationship:
-          Boolean(
-            data.knownRelationship
-          ),
-      };
 
       const {
         leadId,
         leadCode,
       } =
         await insertLead(
-          leadData,
+          {
+            ...leadData,
+
+            branchId:
+              branch.id,
+
+            ownerId:
+              owner.id,
+          },
           currentUser.id,
           connection
         );
@@ -528,10 +950,7 @@ export const createLeadService =
             "New lead created",
 
           notes:
-            companyReused ||
-            contactReused
-              ? "Lead created using existing CRM master data where a match was found."
-              : "Company and primary contact captured.",
+            `Company, primary contact and lead created. Primary branch: ${branch.name}.`,
 
           userId:
             currentUser.id,
@@ -553,16 +972,16 @@ export const createLeadService =
           leadId,
 
           assignedTo:
-            data.ownerId,
+            owner.id,
 
           action:
-            data.nextAction,
+            leadData.nextAction,
 
           dueAt:
-            data.followUpAt,
+            leadData.followUpAt,
 
           priority:
-            data.priority,
+            leadData.priority,
 
           userId:
             currentUser.id,
@@ -572,7 +991,7 @@ export const createLeadService =
 
       /*
       |--------------------------------------------------------------------------
-      | Reload
+      | Reload Lead
       |--------------------------------------------------------------------------
       */
 
@@ -583,9 +1002,7 @@ export const createLeadService =
           connection
         );
 
-      if (
-        !lead
-      ) {
+      if (!lead) {
         throw new ApiError(
           500,
           "Lead was created but could not be loaded.",
@@ -622,22 +1039,46 @@ export const createLeadService =
         metadata: {
           leadCode,
 
-          companyId,
+          companyId:
+            relations.companyId,
 
-          primaryContactId,
+          companyName:
+            relations.companyName,
 
-          companyReused,
+          companyCreated:
+            relations.companyCreated,
 
-          contactReused,
+          primaryContactId:
+            relations.contactId,
+
+          contactName:
+            relations.contactName,
 
           branchId:
-            leadData.branchId,
+            branch.id,
+
+          branchName:
+            branch.name,
+
+          ownerId:
+            owner.id,
+
+          ownerName:
+            owner.fullName,
         },
 
         ipAddress,
+
         userAgent,
+
         connection,
       });
+
+      /*
+      |--------------------------------------------------------------------------
+      | Commit
+      |--------------------------------------------------------------------------
+      */
 
       await connection.commit();
 
@@ -645,6 +1086,16 @@ export const createLeadService =
     } catch (
       error
     ) {
+      /*
+      |--------------------------------------------------------------------------
+      | Rollback Everything
+      |--------------------------------------------------------------------------
+      |
+      | If company succeeds but contact/lead/follow-up/activity fails,
+      | the new records created in this transaction are rolled back.
+      |
+      */
+
       try {
         await connection.rollback();
       } catch {
@@ -676,6 +1127,12 @@ export const updateLeadService =
 
     try {
       await connection.beginTransaction();
+
+      /*
+      |--------------------------------------------------------------------------
+      | Existing Lead
+      |--------------------------------------------------------------------------
+      */
 
       const existing =
         await findLeadById(
@@ -719,6 +1176,47 @@ export const updateLeadService =
 
       /*
       |--------------------------------------------------------------------------
+      | Validate Branch Change
+      |--------------------------------------------------------------------------
+      |
+      | Branch validation is required only when branchId is included in the
+      | update payload.
+      |
+      | This prevents normal profile edits from unexpectedly failing because
+      | of unrelated historical data.
+      |
+      */
+
+      if (
+        data.branchId !==
+        undefined
+      ) {
+        const branch =
+          await validateBranchAccess(
+            currentUser,
+            data.branchId,
+            connection
+          );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Existing Owner Must Still Be Valid For New Branch
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+          existing.ownerId
+        ) {
+          await validateOwner(
+            existing.ownerId,
+            branch.id,
+            connection
+          );
+        }
+      }
+
+      /*
+      |--------------------------------------------------------------------------
       | Update
       |--------------------------------------------------------------------------
       */
@@ -747,13 +1245,28 @@ export const updateLeadService =
             "Lead details updated",
 
           notes:
-            "Lead profile information was updated.",
+            data.branchId !==
+              undefined &&
+            Number(
+              data.branchId
+            ) !==
+              Number(
+                existing.branchId
+              )
+              ? "Lead profile information and primary branch were updated."
+              : "Lead profile information was updated.",
 
           userId:
             currentUser.id,
         },
         connection
       );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Reload
+      |--------------------------------------------------------------------------
+      */
 
       const updated =
         await findLeadById(
@@ -788,10 +1301,27 @@ export const updateLeadService =
           updated,
 
         metadata:
-          null,
+          data.branchId !==
+            undefined
+            ? {
+                previousBranchId:
+                  existing.branchId,
+
+                newBranchId:
+                  updated.branchId,
+
+                previousBranchName:
+                  existing.branchName,
+
+                newBranchName:
+                  updated.branchName,
+              }
+            : null,
 
         ipAddress,
+
         userAgent,
+
         connection,
       });
 
@@ -832,6 +1362,12 @@ export const changeLeadStageService =
 
     try {
       await connection.beginTransaction();
+
+      /*
+      |--------------------------------------------------------------------------
+      | Existing Lead
+      |--------------------------------------------------------------------------
+      */
 
       const existing =
         await findLeadById(
@@ -1082,7 +1618,9 @@ export const changeLeadStageService =
         },
 
         ipAddress,
+
         userAgent,
+
         connection,
       });
 
@@ -1118,6 +1656,12 @@ export const changeLeadOwnerService =
     ipAddress,
     userAgent,
   }) => {
+    /*
+    |--------------------------------------------------------------------------
+    | Super Admin Only
+    |--------------------------------------------------------------------------
+    */
+
     if (
       currentUser.role !==
       "SUPER_ADMIN"
@@ -1136,6 +1680,12 @@ export const changeLeadOwnerService =
     try {
       await connection.beginTransaction();
 
+      /*
+      |--------------------------------------------------------------------------
+      | Existing Lead
+      |--------------------------------------------------------------------------
+      */
+
       const existing =
         await findLeadById(
           leadId,
@@ -1152,11 +1702,36 @@ export const changeLeadOwnerService =
         );
       }
 
+      /*
+      |--------------------------------------------------------------------------
+      | Lead Must Have Branch
+      |--------------------------------------------------------------------------
+      */
+
+      const branch =
+        await validateBranch(
+          existing.branchId,
+          connection
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Validate New Owner Against Lead Branch
+      |--------------------------------------------------------------------------
+      */
+
       const owner =
         await validateOwner(
           data.ownerId,
+          branch.id,
           connection
         );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Same Owner
+      |--------------------------------------------------------------------------
+      */
 
       if (
         Number(
@@ -1174,12 +1749,18 @@ export const changeLeadOwnerService =
         );
       }
 
+      /*
+      |--------------------------------------------------------------------------
+      | Update Lead Owner
+      |--------------------------------------------------------------------------
+      */
+
       await updateLeadOwner(
         {
           leadId,
 
           ownerId:
-            data.ownerId,
+            owner.id,
 
           userId:
             currentUser.id,
@@ -1199,16 +1780,23 @@ export const changeLeadOwnerService =
 
           SET
             assigned_to = ?,
-            updated_by = ?
+
+            updated_by = ?,
+
+            updated_at =
+              UTC_TIMESTAMP()
 
           WHERE
             lead_id = ?
+
             AND status =
               'PENDING'
         `,
         [
-          data.ownerId,
+          owner.id,
+
           currentUser.id,
+
           leadId,
         ]
       );
@@ -1238,6 +1826,12 @@ export const changeLeadOwnerService =
         },
         connection
       );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Reload
+      |--------------------------------------------------------------------------
+      */
 
       const updated =
         await findLeadById(
@@ -1285,10 +1879,18 @@ export const changeLeadOwnerService =
           reason:
             data.reason ||
             null,
+
+          branchId:
+            branch.id,
+
+          branchName:
+            branch.name,
         },
 
         ipAddress,
+
         userAgent,
+
         connection,
       });
 
@@ -1601,7 +2203,9 @@ export const markLeadLostService =
         },
 
         ipAddress,
+
         userAgent,
+
         connection,
       });
 
@@ -1623,48 +2227,207 @@ export const markLeadLostService =
     }
   };
 
-  /*
+/*
 |--------------------------------------------------------------------------
 | Get Assignable Owners
 |--------------------------------------------------------------------------
+|
+| SUPER_ADMIN
+| - Can request any active branch.
+| - Receives Super Admin + active owners from that branch.
+|
+| OWNER
+| - Branch is determined from the database.
+| - Cannot request another branch.
+| - Receives only their own user as the selectable owner.
+|
 */
 
 export const getLeadOwnersService =
   async (
-    currentUser
+    currentUser,
+    branchId = null
   ) => {
-    const owners =
-      await listAssignableLeadOwners();
+    /*
+    |--------------------------------------------------------------------------
+    | Active Branches
+    |--------------------------------------------------------------------------
+    */
+
+    const branches =
+      await listActiveLeadBranches();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Super Admin
+    |--------------------------------------------------------------------------
+    */
 
     if (
       currentUser.role ===
       "SUPER_ADMIN"
     ) {
+      /*
+       * No branch selected yet.
+       *
+       * Frontend first displays
+       * Primary Branch.
+       */
+
+      if (!branchId) {
+        return {
+          branches,
+
+          owners: [],
+        };
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Validate Requested Branch
+      |--------------------------------------------------------------------------
+      */
+
+      const branch =
+        await validateBranch(
+          branchId
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Branch Owners
+      |--------------------------------------------------------------------------
+      */
+
+      const owners =
+        await listAssignableLeadOwners(
+          branch.id
+        );
+
       return {
+        branches,
+
+        selectedBranch:
+          branch,
+
         owners,
       };
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Normal User / Owner
+    | Normal Owner
     |--------------------------------------------------------------------------
-    |
-    | Normal users can add leads, but they must not assign a new lead to
-    | another owner. Return only the signed-in active user.
-    |
     */
 
+    const currentOwner =
+      await findLeadOwner(
+        currentUser.id
+      );
+
+    if (!currentOwner) {
+      throw new ApiError(
+        404,
+        "Current user was not found.",
+        [],
+        "CURRENT_USER_NOT_FOUND"
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Active
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      String(
+        currentOwner.status
+      ).toUpperCase() !==
+      "ACTIVE"
+    ) {
+      throw new ApiError(
+        403,
+        "Your user account is inactive.",
+        [],
+        "USER_INACTIVE"
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Branch Required
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      !currentOwner.branchId
+    ) {
+      throw new ApiError(
+        422,
+        "Your account does not have a branch assigned.",
+        [],
+        "USER_BRANCH_REQUIRED"
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cannot Request Another Branch
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      branchId &&
+      Number(
+        branchId
+      ) !==
+        Number(
+          currentOwner.branchId
+        )
+    ) {
+      throw new ApiError(
+        403,
+        "You cannot access owners from another branch.",
+        [],
+        "BRANCH_ACCESS_DENIED"
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Their Branch
+    |--------------------------------------------------------------------------
+    */
+
+    const selectedBranch =
+      await validateBranch(
+        currentOwner.branchId
+      );
+
     return {
-      owners:
-        owners.filter(
-          (owner) =>
+      branches:
+        branches.filter(
+          (
+            branch
+          ) =>
             Number(
-              owner.id
+              branch.id
             ) ===
             Number(
-              currentUser.id
+              currentOwner.branchId
             )
         ),
+
+      selectedBranch,
+
+      /*
+       * Normal Owner cannot assign
+       * the lead to another user.
+       */
+
+      owners: [
+        currentOwner,
+      ],
     };
   };

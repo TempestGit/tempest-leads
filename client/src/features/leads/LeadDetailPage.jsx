@@ -1686,19 +1686,23 @@ const LeadDetailPage =
           open={
             ownerModalOpen
           }
+
           leadIds={[
             Number(
               lead.id
             ),
           ]}
+
+          lead={
+            lead
+          }
+
           onClose={() => {
             setOwnerModalOpen(
               false
             );
 
             leadQuery.refetch();
-
-            activitiesQuery.refetch();
           }}
         />
 

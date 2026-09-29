@@ -1,4 +1,6 @@
-import { z } from "zod";
+import {
+  z,
+} from "zod";
 
 /*
 |--------------------------------------------------------------------------
@@ -59,11 +61,8 @@ export const LEAD_SOURCES = [
   "Industry event",
   "Tender/RFP",
   "Funding news",
-  "New launch/rebrand",
   "Newspaper",
   "Magazine",
-  "Outdoor",
-  "TV/radio",
   "Digital/social",
   "Trade publication",
   "Other",
@@ -89,43 +88,47 @@ export const LEAD_PRIORITIES = [
 
 export const companyStepSchema =
   z.object({
-    companyName: z
-      .string()
-      .trim()
-      .min(
-        2,
-        "Company name is required."
-      )
-      .max(
-        190,
-        "Company name is too long."
+    companyName:
+      z
+        .string()
+        .trim()
+        .min(
+          2,
+          "Company name is required."
+        )
+        .max(
+          190,
+          "Company name is too long."
+        ),
+
+    industry:
+      z.enum(
+        LEAD_INDUSTRIES,
+        {
+          message:
+            "Industry is required.",
+        }
       ),
 
-    industry: z.enum(
-      LEAD_INDUSTRIES,
-      {
-        message:
-          "Industry is required.",
-      }
-    ),
+    city:
+      z
+        .string()
+        .trim()
+        .max(
+          120,
+          "City is too long."
+        )
+        .optional(),
 
-    city: z
-      .string()
-      .trim()
-      .max(
-        120,
-        "City is too long."
-      )
-      .optional(),
-
-    website: z
-      .string()
-      .trim()
-      .max(
-        500,
-        "Website is too long."
-      )
-      .optional(),
+    website:
+      z
+        .string()
+        .trim()
+        .max(
+          500,
+          "Website is too long."
+        )
+        .optional(),
 
     agencyRelationship:
       z
@@ -156,58 +159,67 @@ export const companyStepSchema =
 
 export const contactStepSchema =
   z.object({
-    contactName: z
-      .string()
-      .trim()
-      .min(
-        2,
-        "Contact name is required."
-      )
-      .max(
-        150,
-        "Contact name is too long."
-      ),
+    contactName:
+      z
+        .string()
+        .trim()
+        .min(
+          2,
+          "Contact name is required."
+        )
+        .max(
+          190,
+          "Contact name is too long."
+        ),
 
-    designation: z
-      .string()
-      .trim()
-      .max(
-        150,
-        "Designation is too long."
-      )
-      .optional(),
+    designation:
+      z
+        .string()
+        .trim()
+        .max(
+          150,
+          "Designation is too long."
+        )
+        .optional(),
 
-    phone: z
-      .string()
-      .trim()
-      .max(
-        30,
-        "Phone number is too long."
-      )
-      .optional(),
+    phone:
+      z
+        .string()
+        .trim()
+        .max(
+          30,
+          "Phone number is too long."
+        )
+        .optional(),
 
-    email: z
-      .string()
-      .trim()
-      .refine(
-        (value) => {
-          if (!value) {
-            return true;
+    email:
+      z
+        .string()
+        .trim()
+        .refine(
+          (
+            value
+          ) => {
+            if (
+              !value
+            ) {
+              return true;
+            }
+
+            return z
+              .string()
+              .email()
+              .safeParse(
+                value
+              )
+              .success;
+          },
+          {
+            message:
+              "Enter a valid email address.",
           }
-
-          return z
-            .string()
-            .email()
-            .safeParse(
-              value
-            ).success;
-        },
-        {
-          message:
-            "Enter a valid email address.",
-        }
-      )
-      .optional(),
+        )
+        .optional(),
 
     decisionMaker:
       z.enum([
@@ -224,45 +236,53 @@ export const contactStepSchema =
 
 export const opportunityStepSchema =
   z.object({
-    serviceRequired: z
-      .string()
-      .trim()
-      .min(
-        2,
-        "Potential requirement is required."
-      )
-      .max(
-        255,
-        "Potential requirement is too long."
-      ),
+    serviceRequired:
+      z
+        .string()
+        .trim()
+        .min(
+          2,
+          "Potential requirement is required."
+        )
+        .max(
+          500,
+          "Potential requirement is too long."
+        ),
 
-    source: z.enum(
-      LEAD_SOURCES,
-      {
-        message:
-          "Lead source is required.",
-      }
-    ),
+    source:
+      z.enum(
+        LEAD_SOURCES,
+        {
+          message:
+            "Lead source is required.",
+        }
+      ),
 
     estimatedValueRupees:
       z
         .string()
         .refine(
-          (value) => {
+          (
+            value
+          ) => {
             if (
-              value === ""
+              value ===
+              ""
             ) {
               return true;
             }
 
             const number =
-              Number(value);
+              Number(
+                value
+              );
 
             return (
               Number.isFinite(
                 number
               ) &&
-              number >= 0
+              number >=
+                0
             );
           },
           {
@@ -271,18 +291,20 @@ export const opportunityStepSchema =
           }
         ),
 
-    priority: z.enum(
-      LEAD_PRIORITIES
-    ),
+    priority:
+      z.enum(
+        LEAD_PRIORITIES
+      ),
 
-    description: z
-      .string()
-      .trim()
-      .max(
-        5000,
-        "Opportunity description is too long."
-      )
-      .optional(),
+    description:
+      z
+        .string()
+        .trim()
+        .max(
+          5000,
+          "Opportunity description is too long."
+        )
+        .optional(),
   });
 
 /*
@@ -293,13 +315,23 @@ export const opportunityStepSchema =
 
 export const ownershipStepSchema =
   z.object({
-    ownerId: z
-      .string()
-      .trim()
-      .min(
-        1,
-        "Owner is required."
-      ),
+    branchId:
+      z
+        .string()
+        .trim()
+        .min(
+          1,
+          "Primary branch is required."
+        ),
+
+    ownerId:
+      z
+        .string()
+        .trim()
+        .min(
+          1,
+          "Owner is required."
+        ),
   });
 
 /*
@@ -310,30 +342,33 @@ export const ownershipStepSchema =
 
 export const nextActionStepSchema =
   z.object({
-    nextAction: z
-      .string()
-      .trim()
-      .min(
-        2,
-        "Next action is required."
-      )
-      .max(
-        500,
-        "Next action is too long."
-      ),
+    nextAction:
+      z
+        .string()
+        .trim()
+        .min(
+          2,
+          "Next action is required."
+        )
+        .max(
+          500,
+          "Next action is too long."
+        ),
 
-    followUpDate: z
-      .string()
-      .trim()
-      .min(
-        1,
-        "Follow-up date is required."
-      ),
+    followUpDate:
+      z
+        .string()
+        .trim()
+        .min(
+          1,
+          "Follow-up date is required."
+        ),
 
-    followUpTime: z
-      .string()
-      .trim()
-      .optional(),
+    followUpTime:
+      z
+        .string()
+        .trim()
+        .optional(),
 
     knownRelationship:
       z.enum([
@@ -348,32 +383,35 @@ export const nextActionStepSchema =
 |--------------------------------------------------------------------------
 */
 
-const getLocalDate = () => {
-  const date =
-    new Date();
+const getLocalDate =
+  () => {
+    const date =
+      new Date();
 
-  const year =
-    date.getFullYear();
+    const year =
+      date.getFullYear();
 
-  const month =
-    String(
-      date.getMonth() +
-        1
-    ).padStart(
-      2,
-      "0"
+    const month =
+      String(
+        date.getMonth() +
+          1
+      ).padStart(
+        2,
+        "0"
+      );
+
+    const day =
+      String(
+        date.getDate()
+      ).padStart(
+        2,
+        "0"
+      );
+
+    return (
+      `${year}-${month}-${day}`
     );
-
-  const day =
-    String(
-      date.getDate()
-    ).padStart(
-      2,
-      "0"
-    );
-
-  return `${year}-${month}-${day}`;
-};
+  };
 
 /*
 |--------------------------------------------------------------------------
@@ -389,14 +427,17 @@ export const createLeadDefaults =
     |--------------------------------------------------------------------------
     */
 
-    companyName: "",
+    companyName:
+      "",
 
     industry:
       "Real Estate",
 
-    city: "",
+    city:
+      "",
 
-    website: "",
+    website:
+      "",
 
     agencyRelationship:
       "",
@@ -410,13 +451,17 @@ export const createLeadDefaults =
     |--------------------------------------------------------------------------
     */
 
-    contactName: "",
+    contactName:
+      "",
 
-    designation: "",
+    designation:
+      "",
 
-    phone: "",
+    phone:
+      "",
 
-    email: "",
+    email:
+      "",
 
     decisionMaker:
       "No",
@@ -448,7 +493,11 @@ export const createLeadDefaults =
     |--------------------------------------------------------------------------
     */
 
-    ownerId: "",
+    branchId:
+      "",
+
+    ownerId:
+      "",
 
     /*
     |--------------------------------------------------------------------------
@@ -456,7 +505,8 @@ export const createLeadDefaults =
     |--------------------------------------------------------------------------
     */
 
-    nextAction: "",
+    nextAction:
+      "",
 
     followUpDate:
       getLocalDate(),

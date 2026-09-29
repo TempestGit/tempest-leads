@@ -255,7 +255,7 @@ const Sidebar = ({
               </span>
             </button>
 
-            <button
+            {/* <button
               type="button"
               className="sidebar-action sidebar-collapse"
               onClick={
@@ -271,7 +271,7 @@ const Sidebar = ({
                   size={14}
                 />
               )}
-            </button>
+            </button> */}
           </div>
         </div>
       </aside>

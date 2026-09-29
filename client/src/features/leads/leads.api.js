@@ -20,18 +20,47 @@ export const getLeadsRequest =
 
     return response.data;
   };
-  
+
 /*
 |--------------------------------------------------------------------------
-| Lead Owners
+| Lead Owners / Branches
 |--------------------------------------------------------------------------
+|
+| No branch:
+|
+| GET /leads/owners
+|
+| Used to load available branches.
+|
+| With branch:
+|
+| GET /leads/owners?branchId=1
+|
+| Used to load owners for the selected branch.
+|
 */
 
 export const getLeadOwnersRequest =
-  async () => {
+  async (
+    branchId = null
+  ) => {
+    const params = {};
+
+    if (
+      branchId
+    ) {
+      params.branchId =
+        Number(
+          branchId
+        );
+    }
+
     const response =
       await apiClient.get(
-        "/leads/owners"
+        "/leads/owners",
+        {
+          params,
+        }
       );
 
     return response.data;

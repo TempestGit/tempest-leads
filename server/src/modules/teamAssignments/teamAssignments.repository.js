@@ -466,6 +466,8 @@ export const listAssignableUsers =
 
             u.role,
 
+            u.status,
+
             u.branch_id
               AS branchId,
 
@@ -485,6 +487,13 @@ export const listAssignableUsers =
 
           WHERE
             u.branch_id = ?
+
+            AND UPPER(
+              u.status
+            ) = 'ACTIVE'
+
+            AND u.deleted_at
+              IS NULL
 
           ORDER BY
             u.full_name ASC
@@ -508,6 +517,9 @@ export const listAssignableUsers =
 
         role:
           row.role,
+
+        status:
+          row.status,
 
         branchId:
           Number(
@@ -547,6 +559,8 @@ export const findAssignableUser =
 
             u.role,
 
+            u.status,
+
             u.branch_id
               AS branchId,
 
@@ -564,6 +578,13 @@ export const findAssignableUser =
 
           WHERE
             u.id = ?
+
+            AND UPPER(
+              u.status
+            ) = 'ACTIVE'
+
+            AND u.deleted_at
+              IS NULL
 
           LIMIT 1
         `,
@@ -592,6 +613,9 @@ export const findAssignableUser =
 
       role:
         row.role,
+
+      status:
+        row.status,
 
       branchId:
         row.branchId

@@ -12,6 +12,7 @@ import {
   createLeadSchema,
   leadIdSchema,
   leadListSchema,
+  leadOwnersQuerySchema,
   markLeadLostSchema,
   updateLeadSchema,
 } from "./leads.schema.js";
@@ -30,6 +31,12 @@ import {
 
 const router =
   express.Router();
+
+/*
+|--------------------------------------------------------------------------
+| Authentication
+|--------------------------------------------------------------------------
+*/
 
 router.use(
   authMiddleware
@@ -56,27 +63,40 @@ router.get(
 
 /*
 |--------------------------------------------------------------------------
-| Static Options Routes
+| Options
 |--------------------------------------------------------------------------
-|
-| Keep these ABOVE /:leadId so Express never treats "owners" or "options"
-| as a lead ID.
-|
 */
-
-router.get(
-  "/owners",
-
-  asyncHandler(
-    getLeadOwnersController
-  )
-);
 
 router.get(
   "/options",
 
   asyncHandler(
     getLeadOptionsController
+  )
+);
+
+/*
+|--------------------------------------------------------------------------
+| Owner Options
+|--------------------------------------------------------------------------
+|
+| Examples:
+|
+| GET /api/leads/owners
+| GET /api/leads/owners?branchId=1
+|
+*/
+
+router.get(
+  "/owners",
+
+  validateMiddleware({
+    query:
+      leadOwnersQuerySchema,
+  }),
+
+  asyncHandler(
+    getLeadOwnersController
   )
 );
 

@@ -79,6 +79,9 @@ export const mapLead =
       branchName:
         row.branchName,
 
+      branchCode:
+        row.branchCode,
+
       stage:
         row.stage,
 
@@ -185,6 +188,9 @@ const LEAD_SELECT = `
 
     branch.name
       AS branchName,
+
+    branch.code
+      AS branchCode,
 
     l.stage,
 
@@ -661,6 +667,15 @@ export const listLeadOptions =
             l.owner_id
               AS ownerId,
 
+            l.branch_id
+              AS branchId,
+
+            branch.name
+              AS branchName,
+
+            branch.code
+              AS branchCode,
+
             l.primary_contact_id
               AS primaryContactId,
 
@@ -684,6 +699,10 @@ export const listLeadOptions =
 
             AND c.deleted_at
               IS NULL
+
+          LEFT JOIN branches branch
+            ON branch.id =
+              l.branch_id
 
           WHERE
             ${conditions.join(
@@ -716,6 +735,19 @@ export const listLeadOptions =
                 row.ownerId
               )
             : null,
+
+        branchId:
+          row.branchId
+            ? Number(
+                row.branchId
+              )
+            : null,
+
+        branchName:
+          row.branchName,
+
+        branchCode:
+          row.branchCode,
 
         primaryContactId:
           row.primaryContactId
@@ -850,25 +882,37 @@ export const findLeadOwner =
       await connection.query(
         `
           SELECT
-            id,
+            u.id,
 
-            full_name
+            u.full_name
               AS fullName,
 
-            role,
+            u.email,
 
-            status,
+            u.role,
 
-            branch_id
-              AS branchId
+            u.status,
 
-          FROM users
+            u.branch_id
+              AS branchId,
+
+            b.name
+              AS branchName,
+
+            b.code
+              AS branchCode
+
+          FROM users u
+
+          LEFT JOIN branches b
+            ON b.id =
+              u.branch_id
 
           WHERE
-            id = ?
+            u.id = ?
 
-            AND UPPER(status) =
-              'ACTIVE'
+            AND u.deleted_at
+              IS NULL
 
           LIMIT 1
         `,
@@ -877,10 +921,43 @@ export const findLeadOwner =
         ]
       );
 
-    return (
-      rows[0] ||
-      null
-    );
+    if (
+      !rows.length
+    ) {
+      return null;
+    }
+
+    return {
+      id:
+        Number(
+          rows[0].id
+        ),
+
+      fullName:
+        rows[0].fullName,
+
+      email:
+        rows[0].email,
+
+      role:
+        rows[0].role,
+
+      status:
+        rows[0].status,
+
+      branchId:
+        rows[0].branchId
+          ? Number(
+              rows[0].branchId
+            )
+          : null,
+
+      branchName:
+        rows[0].branchName,
+
+      branchCode:
+        rows[0].branchCode,
+    };
   };
 
 /*
@@ -985,8 +1062,7 @@ export const insertLead =
 
           data.ownerId,
 
-          data.branchId ??
-            null,
+          data.branchId,
 
           data.priority,
 
@@ -1097,6 +1173,22 @@ export const updateLead =
       add(
         "primary_contact_id",
         data.primaryContactId
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Branch
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      data.branchId !==
+      undefined
+    ) {
+      add(
+        "branch_id",
+        data.branchId
       );
     }
 
@@ -1260,7 +1352,10 @@ export const updateLeadStage =
                 status
               ),
 
-            updated_by = ?
+            updated_by = ?,
+
+            updated_at =
+              UTC_TIMESTAMP()
 
           WHERE
             id = ?
@@ -1310,7 +1405,10 @@ export const updateLeadOwner =
           SET
             owner_id = ?,
 
-            updated_by = ?
+            updated_by = ?,
+
+            updated_at =
+              UTC_TIMESTAMP()
 
           WHERE
             id = ?
@@ -1367,7 +1465,10 @@ export const closeLeadState =
 
             follow_up_at = ?,
 
-            updated_by = ?
+            updated_by = ?,
+
+            updated_at =
+              UTC_TIMESTAMP()
 
           WHERE
             id = ?
@@ -1402,17 +1503,6 @@ export const closeLeadState =
 |--------------------------------------------------------------------------
 | Lead Stage History
 |--------------------------------------------------------------------------
-|
-| This is the important corrected section.
-|
-| Timestamp column:
-|
-| created_at
-|
-| NOT:
-|
-| changed_at
-|
 */
 
 export const createLeadStageHistory =
@@ -1556,7 +1646,117 @@ export const createLeadFollowup =
     );
   };
 
-  /*
+/*
+|--------------------------------------------------------------------------
+| Active Lead Branches
+|--------------------------------------------------------------------------
+*/
+
+export const listActiveLeadBranches =
+  async (
+    connection = pool
+  ) => {
+    const [
+      rows,
+    ] =
+      await connection.query(
+        `
+          SELECT
+            id,
+            code,
+            name
+
+          FROM branches
+
+          WHERE
+            is_active = 1
+
+          ORDER BY
+            FIELD(
+              code,
+              'HYDERABAD',
+              'PUNE',
+              'BANGALORE',
+              'MUMBAI'
+            ),
+            name ASC
+        `
+      );
+
+    return rows.map(
+      (
+        row
+      ) => ({
+        id:
+          Number(
+            row.id
+          ),
+
+        code:
+          row.code,
+
+        name:
+          row.name,
+      })
+    );
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Find Lead Branch
+|--------------------------------------------------------------------------
+*/
+
+export const findLeadBranch =
+  async (
+    branchId,
+    connection = pool
+  ) => {
+    const [
+      rows,
+    ] =
+      await connection.query(
+        `
+          SELECT
+            id,
+            code,
+            name
+
+          FROM branches
+
+          WHERE
+            id = ?
+
+            AND is_active = 1
+
+          LIMIT 1
+        `,
+        [
+          branchId,
+        ]
+      );
+
+    if (
+      !rows.length
+    ) {
+      return null;
+    }
+
+    return {
+      id:
+        Number(
+          rows[0].id
+        ),
+
+      code:
+        rows[0].code,
+
+      name:
+        rows[0].name,
+    };
+  };
+
+/*
 |--------------------------------------------------------------------------
 | Assignable Lead Owners
 |--------------------------------------------------------------------------
@@ -1564,8 +1764,15 @@ export const createLeadFollowup =
 
 export const listAssignableLeadOwners =
   async (
+    branchId,
     connection = pool
   ) => {
+    if (
+      !branchId
+    ) {
+      return [];
+    }
+
     const [
       rows,
     ] =
@@ -1602,9 +1809,30 @@ export const listAssignableLeadOwners =
             UPPER(u.status) =
               'ACTIVE'
 
+            AND u.deleted_at
+              IS NULL
+
+            AND (
+              u.role =
+                'SUPER_ADMIN'
+
+              OR u.branch_id = ?
+            )
+
           ORDER BY
+            CASE
+              WHEN u.role =
+                'SUPER_ADMIN'
+              THEN 0
+
+              ELSE 1
+            END,
+
             u.full_name ASC
-        `
+        `,
+        [
+          branchId,
+        ]
       );
 
     return rows.map(
