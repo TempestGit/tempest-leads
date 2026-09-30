@@ -4,6 +4,15 @@ import pool from "../../config/db.js";
 |--------------------------------------------------------------------------
 | Required Fields
 |--------------------------------------------------------------------------
+|
+| Decision Maker is intentionally NOT part of the Brief.
+|
+| Decision makers belong to Contacts:
+|
+| contacts.is_decision_maker = 1
+|
+| A company can have multiple decision makers.
+|
 */
 
 export const BRIEF_REQUIRED_FIELDS = [
@@ -15,7 +24,6 @@ export const BRIEF_REQUIRED_FIELDS = [
   "potentialScope",
   "timeline",
   "budget",
-  "decisionMaker",
   "approvalProcess",
   "expectedDeliverables",
   "clientExpectations",
@@ -30,142 +38,118 @@ export const BRIEF_REQUIRED_FIELDS = [
 |--------------------------------------------------------------------------
 */
 
-const mapBrief =
-  (row) => {
-    if (!row) {
-      return null;
-    }
+const mapBrief = (row) => {
+  if (!row) {
+    return null;
+  }
 
-    return {
-      id:
-        Number(
-          row.id
-        ),
+  return {
+    id: Number(row.id),
 
-      leadId:
-        Number(
-          row.leadId
-        ),
+    leadId: Number(row.leadId),
 
-      leadCode:
-        row.leadCode,
+    leadCode: row.leadCode,
 
-      companyName:
-        row.companyName,
+    companyName: row.companyName,
 
-      ownerId:
-        row.ownerId
-          ? Number(
-              row.ownerId
-            )
-          : null,
+    ownerId: row.ownerId
+      ? Number(row.ownerId)
+      : null,
 
-      ownerName:
-        row.ownerName,
+    ownerName: row.ownerName,
 
-      businessObjective:
-        row.businessObjective,
+    businessObjective:
+      row.businessObjective,
 
-      clientProblem:
-        row.clientProblem,
+    clientProblem:
+      row.clientProblem,
 
-      targetAudience:
-        row.targetAudience,
+    targetAudience:
+      row.targetAudience,
 
-      campaignRequirement:
-        row.campaignRequirement,
+    campaignRequirement:
+      row.campaignRequirement,
 
-      currentActivity:
-        row.currentActivity,
+    currentActivity:
+      row.currentActivity,
 
-      potentialScope:
-        row.potentialScope,
+    potentialScope:
+      row.potentialScope,
 
-      timeline:
-        row.timeline,
+    timeline:
+      row.timeline,
 
-      budget:
-        row.budget,
+    budget:
+      row.budget,
 
-      decisionMaker:
-        row.decisionMaker,
+    approvalProcess:
+      row.approvalProcess,
 
-      approvalProcess:
-        row.approvalProcess,
+    expectedDeliverables:
+      row.expectedDeliverables,
 
-      expectedDeliverables:
-        row.expectedDeliverables,
+    clientExpectations:
+      row.clientExpectations,
 
-      clientExpectations:
-        row.clientExpectations,
+    competitors:
+      row.competitors,
 
-      competitors:
-        row.competitors,
+    categoryInsights:
+      row.categoryInsights,
 
-      categoryInsights:
-        row.categoryInsights,
+    mandatoryRequirements:
+      row.mandatoryRequirements,
 
-      mandatoryRequirements:
-        row.mandatoryRequirements,
+    status:
+      row.status,
 
-      status:
-        row.status,
+    routeType:
+      row.routeType,
 
-      routeType:
-        row.routeType,
+    routeDecisionNote:
+      row.routeDecisionNote,
 
-      routeDecisionNote:
-        row.routeDecisionNote,
+    routeDecidedBy:
+      row.routeDecidedBy
+        ? Number(row.routeDecidedBy)
+        : null,
 
-      routeDecidedBy:
-        row.routeDecidedBy
-          ? Number(
-              row.routeDecidedBy
-            )
-          : null,
+    routeDecidedByName:
+      row.routeDecidedByName,
 
-      routeDecidedByName:
-        row.routeDecidedByName,
+    routeDecidedAt:
+      row.routeDecidedAt,
 
-      routeDecidedAt:
-        row.routeDecidedAt,
+    approvedBy:
+      row.approvedBy
+        ? Number(row.approvedBy)
+        : null,
 
-      approvedBy:
-        row.approvedBy
-          ? Number(
-              row.approvedBy
-            )
-          : null,
+    approvedByName:
+      row.approvedByName,
 
-      approvedByName:
-        row.approvedByName,
+    approvedAt:
+      row.approvedAt,
 
-      approvedAt:
-        row.approvedAt,
+    createdBy:
+      Number(row.createdBy),
 
-      createdBy:
-        Number(
-          row.createdBy
-        ),
+    createdByName:
+      row.createdByName,
 
-      createdByName:
-        row.createdByName,
+    updatedBy:
+      Number(row.updatedBy),
 
-      updatedBy:
-        Number(
-          row.updatedBy
-        ),
+    updatedByName:
+      row.updatedByName,
 
-      updatedByName:
-        row.updatedByName,
+    createdAt:
+      row.createdAt,
 
-      createdAt:
-        row.createdAt,
-
-      updatedAt:
-        row.updatedAt,
-    };
+    updatedAt:
+      row.updatedAt,
   };
+};
 
 /*
 |--------------------------------------------------------------------------
@@ -213,9 +197,6 @@ const BRIEF_SELECT = `
     b.timeline,
 
     b.budget,
-
-    b.decision_maker
-      AS decisionMaker,
 
     b.approval_process
       AS approvalProcess,
@@ -281,22 +262,19 @@ const BRIEF_SELECT = `
   FROM briefs b
 
   INNER JOIN leads l
-    ON l.id =
-      b.lead_id
+    ON l.id = b.lead_id
 
     AND l.deleted_at
       IS NULL
 
   INNER JOIN companies c
-    ON c.id =
-      l.company_id
+    ON c.id = l.company_id
 
     AND c.deleted_at
       IS NULL
 
   LEFT JOIN users owner
-    ON owner.id =
-      l.owner_id
+    ON owner.id = l.owner_id
 
   LEFT JOIN users route_user
     ON route_user.id =
@@ -348,9 +326,7 @@ export const findBriefByLeadId =
       );
     }
 
-    const [
-      rows,
-    ] =
+    const [rows] =
       await connection.query(
         `
           ${BRIEF_SELECT}
@@ -366,8 +342,7 @@ export const findBriefByLeadId =
       );
 
     return mapBrief(
-      rows[0] ||
-        null
+      rows[0] || null
     );
   };
 
@@ -405,9 +380,7 @@ export const findBriefLead =
       );
     }
 
-    const [
-      rows,
-    ] =
+    const [rows] =
       await connection.query(
         `
           SELECT
@@ -456,22 +429,18 @@ export const findBriefLead =
 
     return {
       id:
-        Number(
-          row.id
-        ),
+        Number(row.id),
 
       leadCode:
         row.leadCode,
 
       companyId:
-        Number(
-          row.companyId
-        ),
+        Number(row.companyId),
 
       ownerId:
-        Number(
-          row.ownerId
-        ),
+        row.ownerId
+          ? Number(row.ownerId)
+          : null,
 
       stage:
         row.stage,
@@ -499,6 +468,11 @@ export const findBriefLead =
 |--------------------------------------------------------------------------
 | Upsert Brief
 |--------------------------------------------------------------------------
+|
+| decision_maker is intentionally NOT written here.
+|
+| Decision makers are maintained in the contacts table.
+|
 */
 
 export const upsertBrief =
@@ -523,7 +497,6 @@ export const upsertBrief =
           potential_scope,
           timeline,
           budget,
-          decision_maker,
           approval_process,
           expected_deliverables,
           client_expectations,
@@ -551,7 +524,7 @@ export const upsertBrief =
 
           ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?,
-          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?,
 
           ?,
 
@@ -607,11 +580,6 @@ export const upsertBrief =
           budget =
             VALUES(
               budget
-            ),
-
-          decision_maker =
-            VALUES(
-              decision_maker
             ),
 
           approval_process =
@@ -693,7 +661,6 @@ export const upsertBrief =
         data.potentialScope,
         data.timeline,
         data.budget,
-        data.decisionMaker,
         data.approvalProcess,
         data.expectedDeliverables,
         data.clientExpectations,
@@ -733,9 +700,7 @@ export const updateLeadKnownRelationship =
     },
     connection = pool
   ) => {
-    const [
-      result,
-    ] =
+    const [result] =
       await connection.query(
         `
           UPDATE leads

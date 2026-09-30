@@ -52,19 +52,58 @@ const FieldError = ({
 |--------------------------------------------------------------------------
 | Add Contact Modal
 |--------------------------------------------------------------------------
+|
+| Normal usage:
+|
+| <ContactFormModal
+|   open={open}
+|   onClose={close}
+| />
+|
+| Lead-specific usage:
+|
+| <ContactFormModal
+|   open={open}
+|   onClose={close}
+|   fixedCompanyId={lead.companyId}
+|   fixedCompanyName={lead.companyName}
+| />
+|
 */
 
 const ContactFormModal = ({
   open,
   onClose,
+
+  fixedCompanyId = null,
+  fixedCompanyName = "",
 }) => {
   const createMutation =
     useCreateContactMutation();
 
   /*
   |--------------------------------------------------------------------------
+  | Fixed Company
+  |--------------------------------------------------------------------------
+  */
+
+  const hasFixedCompany =
+    fixedCompanyId !== null &&
+    fixedCompanyId !== undefined &&
+    String(
+      fixedCompanyId
+    ).trim() !== "";
+
+  /*
+  |--------------------------------------------------------------------------
   | Companies For Dropdown
   |--------------------------------------------------------------------------
+  |
+  | We keep this query because the same modal can still be opened from
+  | ContactsPage where the user needs to select a company.
+  |
+  | When fixedCompanyId exists, the dropdown is not displayed.
+  |
   */
 
   const {
@@ -108,8 +147,17 @@ const ContactFormModal = ({
         contactFormSchema
       ),
 
-    defaultValues:
-      defaultContactValues,
+    defaultValues: {
+      ...defaultContactValues,
+
+      companyId:
+        hasFixedCompany
+          ? String(
+              fixedCompanyId
+            )
+          : defaultContactValues
+              .companyId,
+    },
   });
 
   /*
@@ -119,14 +167,26 @@ const ContactFormModal = ({
   */
 
   useEffect(() => {
-    if (open) {
-      reset(
-        defaultContactValues
-      );
+    if (!open) {
+      return;
     }
+
+    reset({
+      ...defaultContactValues,
+
+      companyId:
+        hasFixedCompany
+          ? String(
+              fixedCompanyId
+            )
+          : defaultContactValues
+              .companyId,
+    });
   }, [
     open,
     reset,
+    hasFixedCompany,
+    fixedCompanyId,
   ]);
 
   /*
@@ -165,6 +225,12 @@ const ContactFormModal = ({
     onClose,
   ]);
 
+  /*
+  |--------------------------------------------------------------------------
+  | Closed
+  |--------------------------------------------------------------------------
+  */
+
   if (!open) {
     return null;
   }
@@ -182,13 +248,44 @@ const ContactFormModal = ({
   const submit =
     async (values) => {
       try {
+        /*
+        |--------------------------------------------------------------------------
+        | Force Company
+        |--------------------------------------------------------------------------
+        |
+        | If this modal was opened from Lead Detail, do NOT trust/change
+        | companyId from the form.
+        |
+        */
+
+        const payload = {
+          ...values,
+
+          companyId:
+            hasFixedCompany
+              ? Number(
+                  fixedCompanyId
+                )
+              : Number(
+                  values.companyId
+                ),
+        };
+
         await createMutation.mutateAsync(
-          values
+          payload
         );
 
-        reset(
-          defaultContactValues
-        );
+        reset({
+          ...defaultContactValues,
+
+          companyId:
+            hasFixedCompany
+              ? String(
+                  fixedCompanyId
+                )
+              : defaultContactValues
+                  .companyId,
+        });
 
         onClose();
       } catch (error) {
@@ -207,8 +304,27 @@ const ContactFormModal = ({
       }
     };
 
+  /*
+  |--------------------------------------------------------------------------
+  | Render
+  |--------------------------------------------------------------------------
+  */
+
   return (
-    <div className="modal-backdrop">
+    <div
+      className="modal-backdrop"
+      onMouseDown={(
+        event
+      ) => {
+        if (
+          event.target ===
+            event.currentTarget &&
+          !busy
+        ) {
+          onClose();
+        }
+      }}
+    >
       <section
         className="tl-modal"
         role="dialog"
@@ -222,6 +338,18 @@ const ContactFormModal = ({
             <h2 id="add-contact-title">
               Add contact
             </h2>
+
+            {hasFixedCompany &&
+              fixedCompanyName && (
+                <p className="muted">
+                  Adding contact to{" "}
+                  <b>
+                    {
+                      fixedCompanyName
+                    }
+                  </b>
+                </p>
+              )}
           </div>
 
           <button
@@ -264,44 +392,72 @@ const ContactFormModal = ({
 
             <div className="form-section">
               <div className="form-grid2">
+                {/* ------------------------------------------------------- */}
                 {/* Company */}
+                {/* ------------------------------------------------------- */}
 
                 <label>
                   Company *
 
-                  <select
-                    {...register(
-                      "companyId"
-                    )}
-                    disabled={
-                      companiesLoading
-                    }
-                  >
-                    <option value="">
-                      {companiesLoading
-                        ? "Loading companies..."
-                        : "Select company"}
-                    </option>
+                  {hasFixedCompany ? (
+                    <>
+                      {/*
+                       * Keep companyId registered with react-hook-form.
+                       * User cannot modify this value.
+                       */}
 
-                    {companies.map(
-                      (
-                        company
-                      ) => (
-                        <option
-                          key={
-                            company.id
-                          }
-                          value={
-                            company.id
-                          }
-                        >
-                          {
-                            company.name
-                          }
-                        </option>
-                      )
-                    )}
-                  </select>
+                      <input
+                        type="hidden"
+                        {...register(
+                          "companyId"
+                        )}
+                      />
+
+                      <input
+                        type="text"
+                        value={
+                          fixedCompanyName ||
+                          `Company #${fixedCompanyId}`
+                        }
+                        readOnly
+                        disabled
+                      />
+                    </>
+                  ) : (
+                    <select
+                      {...register(
+                        "companyId"
+                      )}
+                      disabled={
+                        companiesLoading
+                      }
+                    >
+                      <option value="">
+                        {companiesLoading
+                          ? "Loading companies..."
+                          : "Select company"}
+                      </option>
+
+                      {companies.map(
+                        (
+                          company
+                        ) => (
+                          <option
+                            key={
+                              company.id
+                            }
+                            value={
+                              company.id
+                            }
+                          >
+                            {
+                              company.name
+                            }
+                          </option>
+                        )
+                      )}
+                    </select>
+                  )}
 
                   <FieldError
                     message={
@@ -311,7 +467,9 @@ const ContactFormModal = ({
                   />
                 </label>
 
+                {/* ------------------------------------------------------- */}
                 {/* Name */}
+                {/* ------------------------------------------------------- */}
 
                 <label>
                   Name *
@@ -332,7 +490,9 @@ const ContactFormModal = ({
                   />
                 </label>
 
+                {/* ------------------------------------------------------- */}
                 {/* Designation */}
+                {/* ------------------------------------------------------- */}
 
                 <label>
                   Designation
@@ -352,7 +512,9 @@ const ContactFormModal = ({
                   />
                 </label>
 
+                {/* ------------------------------------------------------- */}
                 {/* Phone */}
+                {/* ------------------------------------------------------- */}
 
                 <label>
                   Phone
@@ -372,7 +534,9 @@ const ContactFormModal = ({
                   />
                 </label>
 
+                {/* ------------------------------------------------------- */}
                 {/* Email */}
+                {/* ------------------------------------------------------- */}
 
                 <label>
                   Email
@@ -392,7 +556,9 @@ const ContactFormModal = ({
                   />
                 </label>
 
+                {/* ------------------------------------------------------- */}
                 {/* Decision Maker */}
+                {/* ------------------------------------------------------- */}
 
                 <label>
                   Decision maker
@@ -442,7 +608,10 @@ const ContactFormModal = ({
               className="tl-primary"
               disabled={
                 busy ||
-                companiesLoading
+                (
+                  !hasFixedCompany &&
+                  companiesLoading
+                )
               }
             >
               {busy && (

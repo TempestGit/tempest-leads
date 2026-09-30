@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 
 import {
+  useContactsQuery,
+} from "../contacts/contacts.queries.js";
+
+import {
   useSaveBriefMutation,
 } from "./briefs.queries.js";
 
@@ -20,69 +24,33 @@ import {
 
 const STATUS_OPTIONS = [
   {
-    value:
-      "DRAFT",
-
-    label:
-      "Draft",
+    value: "DRAFT",
+    label: "Draft",
   },
   {
-    value:
-      "AWAITING_CLARIFICATION",
-
-    label:
-      "Awaiting clarification",
+    value: "AWAITING_CLARIFICATION",
+    label: "Awaiting clarification",
   },
   {
-    value:
-      "READY",
-
-    label:
-      "Ready",
+    value: "READY",
+    label: "Ready",
   },
   {
-    value:
-      "APPROVED",
-
-    label:
-      "Approved",
+    value: "APPROVED",
+    label: "Approved",
   },
 ];
 
 /*
 |--------------------------------------------------------------------------
-| Routes
+| Required Brief Fields
 |--------------------------------------------------------------------------
-*/
-
-const ROUTE_OPTIONS = [
-  {
-    value:
-      "",
-
-    label:
-      "Select route",
-  },
-  {
-    value:
-      "KNOWN_EXISTING",
-
-    label:
-      "Known / Existing",
-  },
-  {
-    value:
-      "NEW_UNKNOWN",
-
-    label:
-      "New / Unknown",
-  },
-];
-
-/*
-|--------------------------------------------------------------------------
-| Required Fields
-|--------------------------------------------------------------------------
+|
+| Decision Maker is intentionally NOT here.
+|
+| Decision makers belong to Contacts.
+| A company can have multiple decision makers.
+|
 */
 
 const REQUIRED_FIELDS = [
@@ -94,7 +62,6 @@ const REQUIRED_FIELDS = [
   "potentialScope",
   "timeline",
   "budget",
-  "decisionMaker",
   "approvalProcess",
   "expectedDeliverables",
   "clientExpectations",
@@ -110,155 +77,93 @@ const REQUIRED_FIELDS = [
 */
 
 const EMPTY_FORM = {
-  businessObjective:
-    "",
-
-  clientProblem:
-    "",
-
-  targetAudience:
-    "",
-
-  campaignRequirement:
-    "",
-
-  currentActivity:
-    "",
-
-  potentialScope:
-    "",
-
-  timeline:
-    "",
-
-  budget:
-    "",
-
-  decisionMaker:
-    "",
-
-  approvalProcess:
-    "",
-
-  expectedDeliverables:
-    "",
-
-  clientExpectations:
-    "",
-
-  competitors:
-    "",
-
-  categoryInsights:
-    "",
-
-  mandatoryRequirements:
-    "",
-
-  status:
-    "DRAFT",
-
-  routeType:
-    "",
-
-  routeDecisionNote:
-    "",
+  businessObjective: "",
+  clientProblem: "",
+  targetAudience: "",
+  campaignRequirement: "",
+  currentActivity: "",
+  potentialScope: "",
+  timeline: "",
+  budget: "",
+  approvalProcess: "",
+  expectedDeliverables: "",
+  clientExpectations: "",
+  competitors: "",
+  categoryInsights: "",
+  mandatoryRequirements: "",
+  status: "DRAFT",
+  routeDecisionNote: "",
 };
 
 /*
 |--------------------------------------------------------------------------
-| Normalize
+| Normalize Existing Brief
 |--------------------------------------------------------------------------
 */
 
-const normalizeForm =
-  (
-    brief
-  ) => {
-    if (!brief) {
-      return {
-        ...EMPTY_FORM,
-      };
-    }
-
+const normalizeForm = (
+  brief
+) => {
+  if (!brief) {
     return {
-      businessObjective:
-        brief.businessObjective ||
-        "",
-
-      clientProblem:
-        brief.clientProblem ||
-        "",
-
-      targetAudience:
-        brief.targetAudience ||
-        "",
-
-      campaignRequirement:
-        brief.campaignRequirement ||
-        "",
-
-      currentActivity:
-        brief.currentActivity ||
-        "",
-
-      potentialScope:
-        brief.potentialScope ||
-        "",
-
-      timeline:
-        brief.timeline ||
-        "",
-
-      budget:
-        brief.budget ||
-        "",
-
-      decisionMaker:
-        brief.decisionMaker ||
-        "",
-
-      approvalProcess:
-        brief.approvalProcess ||
-        "",
-
-      expectedDeliverables:
-        brief.expectedDeliverables ||
-        "",
-
-      clientExpectations:
-        brief.clientExpectations ||
-        "",
-
-      competitors:
-        brief.competitors ||
-        "",
-
-      categoryInsights:
-        brief.categoryInsights ||
-        "",
-
-      mandatoryRequirements:
-        brief.mandatoryRequirements ||
-        "",
-
-      status:
-        brief.status ||
-        "DRAFT",
-
-      routeType:
-        brief.routeType ||
-        "",
-
-      routeDecisionNote:
-        brief.routeDecisionNote ||
-        "",
+      ...EMPTY_FORM,
     };
+  }
+
+  return {
+    businessObjective:
+      brief.businessObjective || "",
+
+    clientProblem:
+      brief.clientProblem || "",
+
+    targetAudience:
+      brief.targetAudience || "",
+
+    campaignRequirement:
+      brief.campaignRequirement || "",
+
+    currentActivity:
+      brief.currentActivity || "",
+
+    potentialScope:
+      brief.potentialScope || "",
+
+    timeline:
+      brief.timeline || "",
+
+    budget:
+      brief.budget || "",
+
+    approvalProcess:
+      brief.approvalProcess || "",
+
+    expectedDeliverables:
+      brief.expectedDeliverables || "",
+
+    clientExpectations:
+      brief.clientExpectations || "",
+
+    competitors:
+      brief.competitors || "",
+
+    categoryInsights:
+      brief.categoryInsights || "",
+
+    mandatoryRequirements:
+      brief.mandatoryRequirements || "",
+
+    status:
+      brief.status || "DRAFT",
+
+    routeDecisionNote:
+      brief.routeDecisionNote || "",
   };
+};
 
 /*
 |--------------------------------------------------------------------------
-| Label
+| Field Labels
 |--------------------------------------------------------------------------
 */
 
@@ -273,22 +178,19 @@ const FIELD_LABELS = {
     "Target audience",
 
   campaignRequirement:
-    "Campaign requirement",
+    "Detailed campaign requirement",
 
   currentActivity:
-    "Current activity",
+    "Current marketing / campaign activity",
 
   potentialScope:
-    "Potential scope",
+    "Additional / future scope",
 
   timeline:
     "Timeline",
 
   budget:
-    "Budget",
-
-  decisionMaker:
-    "Decision maker",
+    "Client confirmed budget",
 
   approvalProcess:
     "Approval process",
@@ -311,7 +213,102 @@ const FIELD_LABELS = {
 
 /*
 |--------------------------------------------------------------------------
-| Form Modal
+| Route From Lead
+|--------------------------------------------------------------------------
+|
+| Do not ask Known / Existing again in the Brief.
+|
+| LeadFormModal already stores knownRelationship.
+|
+*/
+
+const getLeadRouteType = (
+  lead
+) => {
+  if (
+    lead?.knownRelationship ===
+      undefined ||
+    lead?.knownRelationship ===
+      null
+  ) {
+    return null;
+  }
+
+  const knownRelationship =
+    lead.knownRelationship === true ||
+    Number(
+      lead.knownRelationship
+    ) === 1;
+
+  return knownRelationship
+    ? "KNOWN_EXISTING"
+    : "NEW_UNKNOWN";
+};
+
+/*
+|--------------------------------------------------------------------------
+| Route Label
+|--------------------------------------------------------------------------
+*/
+
+const getRouteLabel = (
+  routeType
+) => {
+  if (
+    routeType ===
+    "KNOWN_EXISTING"
+  ) {
+    return "Known / Existing";
+  }
+
+  if (
+    routeType ===
+    "NEW_UNKNOWN"
+  ) {
+    return "New / Unknown";
+  }
+
+  return "Not available";
+};
+
+/*
+|--------------------------------------------------------------------------
+| Opportunity Value
+|--------------------------------------------------------------------------
+*/
+
+const formatOpportunityValue = (
+  value
+) => {
+  const amount =
+    Number(
+      value || 0
+    );
+
+  if (
+    !Number.isFinite(
+      amount
+    ) ||
+    amount <= 0
+  ) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat(
+    "en-IN",
+    {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }
+  ).format(
+    amount
+  );
+};
+
+/*
+|--------------------------------------------------------------------------
+| Brief Form Modal
 |--------------------------------------------------------------------------
 */
 
@@ -324,17 +321,101 @@ const BriefFormModal = ({
   const mutation =
     useSaveBriefMutation();
 
+  /*
+  |--------------------------------------------------------------------------
+  | Form
+  |--------------------------------------------------------------------------
+  */
+
   const [
     form,
     setForm,
-  ] = useState(
-    EMPTY_FORM
-  );
+  ] =
+    useState(
+      EMPTY_FORM
+    );
 
   const [
     error,
     setError,
-  ] = useState("");
+  ] =
+    useState("");
+
+  /*
+  |--------------------------------------------------------------------------
+  | Decision Makers
+  |--------------------------------------------------------------------------
+  |
+  | Decision makers come from Contacts.
+  |
+  | Nothing is stored again inside the Brief.
+  |
+  */
+
+  const decisionMakerParams =
+    useMemo(
+      () => ({
+        companyId:
+          lead?.companyId,
+
+        isDecisionMaker:
+          true,
+
+        status:
+          "ACTIVE",
+
+        page:
+          1,
+
+        limit:
+          100,
+
+        sort:
+          "name",
+
+        direction:
+          "asc",
+      }),
+      [
+        lead?.companyId,
+      ]
+    );
+
+  const decisionMakersQuery =
+    useContactsQuery(
+      decisionMakerParams
+    );
+
+  const decisionMakers =
+    lead?.companyId
+      ? decisionMakersQuery
+          .data
+          ?.data
+          ?.contacts ||
+        []
+      : [];
+
+  /*
+  |--------------------------------------------------------------------------
+  | Route
+  |--------------------------------------------------------------------------
+  */
+
+  const routeType =
+    useMemo(
+      () =>
+        getLeadRouteType(
+          lead
+        ),
+      [
+        lead,
+      ]
+    );
+
+  const routeLabel =
+    getRouteLabel(
+      routeType
+    );
 
   /*
   |--------------------------------------------------------------------------
@@ -397,25 +478,45 @@ const BriefFormModal = ({
 
   /*
   |--------------------------------------------------------------------------
-  | Field Handler
+  | Update Field
   |--------------------------------------------------------------------------
   */
 
-  const update =
-    (
-      field,
-      value
-    ) => {
-      setForm(
-        (
-          previous
-        ) => ({
-          ...previous,
+  const update = (
+    field,
+    value
+  ) => {
+    setForm(
+      (
+        previous
+      ) => ({
+        ...previous,
 
-          [field]:
-            value,
-        })
-      );
+        [field]:
+          value,
+      })
+    );
+
+    if (error) {
+      setError("");
+    }
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Close
+  |--------------------------------------------------------------------------
+  */
+
+  const handleClose =
+    () => {
+      if (
+        mutation.isPending
+      ) {
+        return;
+      }
+
+      onClose();
     };
 
   /*
@@ -429,34 +530,40 @@ const BriefFormModal = ({
       return undefined;
     }
 
-    const handleKeyDown =
-      (
-        event
-      ) => {
-        if (
-          event.key ===
-            "Escape" &&
-          !mutation.isPending
-        ) {
-          onClose();
-        }
-      };
+    const handleKeyDown = (
+      event
+    ) => {
+      if (
+        event.key ===
+          "Escape" &&
+        !mutation.isPending
+      ) {
+        onClose();
+      }
+    };
 
     window.addEventListener(
       "keydown",
       handleKeyDown
     );
 
-    return () =>
+    return () => {
       window.removeEventListener(
         "keydown",
         handleKeyDown
       );
+    };
   }, [
     open,
     onClose,
     mutation.isPending,
   ]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Closed
+  |--------------------------------------------------------------------------
+  */
 
   if (
     !open ||
@@ -477,7 +584,7 @@ const BriefFormModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Ready / Approved Gate
+      | Completeness Gate
       |--------------------------------------------------------------------------
       */
 
@@ -504,21 +611,15 @@ const BriefFormModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Route Required
+      | Route
       |--------------------------------------------------------------------------
       */
 
       if (
-        [
-          "READY",
-          "APPROVED",
-        ].includes(
-          form.status
-        ) &&
-        !form.routeType
+        !routeType
       ) {
         setError(
-          "Select Known / Existing or New / Unknown before progressing the brief."
+          "Lead route information is unavailable."
         );
 
         return;
@@ -526,13 +627,14 @@ const BriefFormModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Route Note
+      | Route Decision Note
       |--------------------------------------------------------------------------
       */
 
       if (
-        form.routeType &&
-        !form.routeDecisionNote.trim()
+        !form
+          .routeDecisionNote
+          .trim()
       ) {
         setError(
           "Route decision note is required."
@@ -540,6 +642,12 @@ const BriefFormModal = ({
 
         return;
       }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Save
+      |--------------------------------------------------------------------------
+      */
 
       try {
         await mutation.mutateAsync({
@@ -550,74 +658,113 @@ const BriefFormModal = ({
 
           data: {
             businessObjective:
-              form.businessObjective.trim() ||
+              form
+                .businessObjective
+                .trim() ||
               null,
 
             clientProblem:
-              form.clientProblem.trim() ||
+              form
+                .clientProblem
+                .trim() ||
               null,
 
             targetAudience:
-              form.targetAudience.trim() ||
+              form
+                .targetAudience
+                .trim() ||
               null,
 
             campaignRequirement:
-              form.campaignRequirement.trim() ||
+              form
+                .campaignRequirement
+                .trim() ||
               null,
 
             currentActivity:
-              form.currentActivity.trim() ||
+              form
+                .currentActivity
+                .trim() ||
               null,
 
             potentialScope:
-              form.potentialScope.trim() ||
+              form
+                .potentialScope
+                .trim() ||
               null,
 
             timeline:
-              form.timeline.trim() ||
+              form
+                .timeline
+                .trim() ||
               null,
 
             budget:
-              form.budget.trim() ||
+              form
+                .budget
+                .trim() ||
               null,
 
-            decisionMaker:
-              form.decisionMaker.trim() ||
-              null,
+            /*
+            |--------------------------------------------------------------------------
+            | NO decisionMaker
+            |--------------------------------------------------------------------------
+            |
+            | Decision makers already belong to Contacts.
+            |
+            */
 
             approvalProcess:
-              form.approvalProcess.trim() ||
+              form
+                .approvalProcess
+                .trim() ||
               null,
 
             expectedDeliverables:
-              form.expectedDeliverables.trim() ||
+              form
+                .expectedDeliverables
+                .trim() ||
               null,
 
             clientExpectations:
-              form.clientExpectations.trim() ||
+              form
+                .clientExpectations
+                .trim() ||
               null,
 
             competitors:
-              form.competitors.trim() ||
+              form
+                .competitors
+                .trim() ||
               null,
 
             categoryInsights:
-              form.categoryInsights.trim() ||
+              form
+                .categoryInsights
+                .trim() ||
               null,
 
             mandatoryRequirements:
-              form.mandatoryRequirements.trim() ||
+              form
+                .mandatoryRequirements
+                .trim() ||
               null,
 
             status:
               form.status,
 
-            routeType:
-              form.routeType ||
-              null,
+            /*
+            |--------------------------------------------------------------------------
+            | Route From Lead
+            |--------------------------------------------------------------------------
+            */
+
+            routeType,
 
             routeDecisionNote:
-              form.routeDecisionNote.trim() ||
+              form
+                .routeDecisionNote
+                .trim() ||
               null,
           },
         });
@@ -638,7 +785,7 @@ const BriefFormModal = ({
             response.errors
           )
         ) {
-          setError(
+          const fields =
             response.errors
               .map(
                 (
@@ -648,11 +795,23 @@ const BriefFormModal = ({
               )
               .filter(
                 Boolean
-              )
-              .join(
-                ", "
-              ) ||
-              response.message
+              );
+
+          setError(
+            fields.length
+              ? `Complete: ${fields
+                  .map(
+                    (
+                      field
+                    ) =>
+                      FIELD_LABELS[
+                        field
+                      ] ||
+                      field
+                  )
+                  .join(", ")}`
+              : response.message ||
+                  "Brief is incomplete."
           );
 
           return;
@@ -660,33 +819,55 @@ const BriefFormModal = ({
 
         setError(
           response?.message ||
+            requestError
+              ?.message ||
             "Unable to save brief."
         );
       }
     };
 
+  /*
+  |--------------------------------------------------------------------------
+  | Render
+  |--------------------------------------------------------------------------
+  */
+
   return (
-    <div className="modal-backdrop">
+    <div
+      className="modal-backdrop"
+      onMouseDown={(
+        event
+      ) => {
+        if (
+          event.target ===
+            event.currentTarget &&
+          !mutation.isPending
+        ) {
+          handleClose();
+        }
+      }}
+    >
       <section
         className="tl-modal brief-modal"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="brief-modal-title"
       >
         {/* Header */}
 
         <header className="modal-head">
           <div>
-            <h2>
+            <h2 id="brief-modal-title">
               {brief
                 ? "Edit brief"
                 : "Add brief"}
             </h2>
 
             <p>
-              Capture the client
-              requirement before
-              progressing the
-              opportunity.
+              Capture detailed
+              client requirements
+              without repeating
+              existing CRM data.
             </p>
           </div>
 
@@ -694,16 +875,14 @@ const BriefFormModal = ({
             type="button"
             className="icon-control"
             onClick={
-              onClose
+              handleClose
             }
             disabled={
               mutation.isPending
             }
             aria-label="Close"
           >
-            <X
-              size={15}
-            />
+            <X size={15} />
           </button>
         </header>
 
@@ -717,7 +896,224 @@ const BriefFormModal = ({
           )}
 
           {/* ------------------------------------------------------------- */}
-          {/* Progress */}
+          {/* Lead Context */}
+          {/* ------------------------------------------------------------- */}
+
+          <div className="form-section">
+            <h3>
+              Lead context
+            </h3>
+
+            <div className="info-grid">
+              <div className="info-field">
+                <small>
+                  Company
+                </small>
+
+                <b>
+                  {lead.companyName ||
+                    "—"}
+                </b>
+              </div>
+
+              <div className="info-field">
+                <small>
+                  Potential requirement
+                </small>
+
+                <b>
+                  {lead.serviceRequired ||
+                    "—"}
+                </b>
+              </div>
+
+              <div className="info-field">
+                <small>
+                  Opportunity value
+                </small>
+
+                <b>
+                  {formatOpportunityValue(
+                    lead.estimatedValueRupees
+                  )}
+                </b>
+              </div>
+
+              <div className="info-field">
+                <small>
+                  Primary contact
+                </small>
+
+                <b>
+                  {lead.primaryContactName ||
+                    "—"}
+                </b>
+              </div>
+
+              <div className="info-field">
+                <small>
+                  Primary branch
+                </small>
+
+                <b>
+                  {lead.branchName ||
+                    "—"}
+                </b>
+              </div>
+
+              <div className="info-field">
+                <small>
+                  Lead owner
+                </small>
+
+                <b>
+                  {lead.ownerName ||
+                    "—"}
+                </b>
+              </div>
+
+              <div className="info-field">
+                <small>
+                  Client / industry
+                  route
+                </small>
+
+                <b>
+                  {routeLabel}
+                </b>
+              </div>
+            </div>
+          </div>
+
+          {/* ------------------------------------------------------------- */}
+          {/* Decision Makers */}
+          {/* ------------------------------------------------------------- */}
+
+          <div className="form-section">
+            <h3>
+              Decision makers
+            </h3>
+
+            <p className="muted">
+              Taken automatically
+              from Company Contacts.
+              Update decision makers
+              from the Contacts
+              section, not from the
+              Brief.
+            </p>
+
+            {decisionMakersQuery
+              .isLoading && (
+              <div
+                className="brief-route-preview"
+                style={{
+                  marginTop:
+                    "12px",
+                }}
+              >
+                <span>
+                  Loading decision
+                  makers...
+                </span>
+              </div>
+            )}
+
+            {decisionMakersQuery
+              .isError && (
+              <div
+                className="error-box"
+                style={{
+                  marginTop:
+                    "12px",
+                }}
+              >
+                Unable to load
+                decision makers from
+                Contacts.
+              </div>
+            )}
+
+            {!decisionMakersQuery
+              .isLoading &&
+              !decisionMakersQuery
+                .isError &&
+              decisionMakers.length ===
+                0 && (
+                <div
+                  className="brief-route-preview"
+                  style={{
+                    marginTop:
+                      "12px",
+                  }}
+                >
+                  <b>
+                    No decision makers
+                  </b>
+
+                  <span>
+                    No active contact
+                    for this company
+                    is currently
+                    marked as a
+                    decision maker.
+                  </span>
+                </div>
+              )}
+
+            {decisionMakers.length >
+              0 && (
+              <div
+                className="info-grid"
+                style={{
+                  marginTop:
+                    "12px",
+                }}
+              >
+                {decisionMakers.map(
+                  (
+                    contact
+                  ) => (
+                    <div
+                      key={
+                        contact.id
+                      }
+                      className="info-field"
+                    >
+                      <small>
+                        {contact
+                          .designation ||
+                          "Decision maker"}
+                      </small>
+
+                      <b>
+                        {contact.name}
+                      </b>
+
+                      {contact.email && (
+                        <span className="muted">
+                          {
+                            contact.email
+                          }
+                        </span>
+                      )}
+
+                      {contact.phone && (
+                        <span className="muted">
+                          {
+                            contact.phone
+                          }
+                        </span>
+                      )}
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ------------------------------------------------------------- */}
+          {/* Completeness */}
           {/* ------------------------------------------------------------- */}
 
           <div className="brief-progress-card">
@@ -744,7 +1140,8 @@ const BriefFormModal = ({
               {completedCount} of{" "}
               {
                 REQUIRED_FIELDS.length
-              } required fields
+              }{" "}
+              required fields
               completed
             </small>
           </div>
@@ -870,13 +1267,15 @@ const BriefFormModal = ({
               </label>
 
               <label>
-                Campaign requirement *
+                Detailed campaign
+                requirement *
 
                 <textarea
                   rows="3"
                   value={
                     form.campaignRequirement
                   }
+                  placeholder="Add detailed requirements beyond the initial potential requirement."
                   onChange={(
                     event
                   ) =>
@@ -890,7 +1289,8 @@ const BriefFormModal = ({
               </label>
 
               <label>
-                Current activity *
+                Current marketing /
+                campaign activity *
 
                 <textarea
                   rows="3"
@@ -910,7 +1310,8 @@ const BriefFormModal = ({
               </label>
 
               <label>
-                Potential scope *
+                Additional / future
+                scope *
 
                 <textarea
                   rows="3"
@@ -932,12 +1333,13 @@ const BriefFormModal = ({
           </div>
 
           {/* ------------------------------------------------------------- */}
-          {/* Commercial Context */}
+          {/* Timeline & Commercial */}
           {/* ------------------------------------------------------------- */}
 
           <div className="form-section">
             <h3>
-              Timeline & commercial context
+              Timeline & commercial
+              context
             </h3>
 
             <div className="form-grid2">
@@ -963,7 +1365,8 @@ const BriefFormModal = ({
               </label>
 
               <label>
-                Budget *
+                Client confirmed
+                budget *
 
                 <input
                   type="text"
@@ -983,27 +1386,7 @@ const BriefFormModal = ({
                 />
               </label>
 
-              <label>
-                Decision maker *
-
-                <input
-                  type="text"
-                  value={
-                    form.decisionMaker
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    update(
-                      "decisionMaker",
-                      event.target
-                        .value
-                    )
-                  }
-                />
-              </label>
-
-              <label>
+              <label className="full">
                 Approval process *
 
                 <textarea
@@ -1011,6 +1394,7 @@ const BriefFormModal = ({
                   value={
                     form.approvalProcess
                   }
+                  placeholder="e.g. Marketing review → Management approval → Finance → PO"
                   onChange={(
                     event
                   ) =>
@@ -1026,7 +1410,7 @@ const BriefFormModal = ({
           </div>
 
           {/* ------------------------------------------------------------- */}
-          {/* Deliverables */}
+          {/* Delivery Expectations */}
           {/* ------------------------------------------------------------- */}
 
           <div className="form-section">
@@ -1116,7 +1500,8 @@ const BriefFormModal = ({
               </label>
 
               <label className="brief-full">
-                Mandatory requirements *
+                Mandatory
+                requirements *
 
                 <textarea
                   rows="4"
@@ -1138,7 +1523,7 @@ const BriefFormModal = ({
           </div>
 
           {/* ------------------------------------------------------------- */}
-          {/* Route */}
+          {/* Route Decision */}
           {/* ------------------------------------------------------------- */}
 
           <div className="form-section">
@@ -1146,78 +1531,25 @@ const BriefFormModal = ({
               Route decision
             </h3>
 
-            <p className="muted">
-              Is the client /
-              industry already
-              known?
-            </p>
+            <div className="brief-route-preview">
+              <b>
+                {routeLabel}
+              </b>
 
-            <div className="form-grid2">
-              <label>
-                Client / industry route
-
-                <select
-                  value={
-                    form.routeType
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    update(
-                      "routeType",
-                      event.target
-                        .value
-                    )
-                  }
-                >
-                  {ROUTE_OPTIONS.map(
-                    (
-                      option
-                    ) => (
-                      <option
-                        key={
-                          option.value
-                        }
-                        value={
-                          option.value
-                        }
-                      >
-                        {
-                          option.label
-                        }
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-
-              <label className="full">
-                Route decision note
-
-                <textarea
-                  rows="3"
-                  value={
-                    form.routeDecisionNote
-                  }
-                  placeholder="Explain why this route applies."
-                  onChange={(
-                    event
-                  ) =>
-                    update(
-                      "routeDecisionNote",
-                      event.target
-                        .value
-                    )
-                  }
-                />
-              </label>
+              <span>
+                Automatically taken
+                from the lead's
+                Known client /
+                industry selection.
+              </span>
             </div>
 
-            {form.routeType ===
+            {routeType ===
               "KNOWN_EXISTING" && (
               <div className="brief-route-preview">
                 <b>
                   Known / Existing
+                  route
                 </b>
 
                 <span>
@@ -1231,11 +1563,11 @@ const BriefFormModal = ({
               </div>
             )}
 
-            {form.routeType ===
+            {routeType ===
               "NEW_UNKNOWN" && (
               <div className="brief-route-preview">
                 <b>
-                  New / Unknown
+                  New / Unknown route
                 </b>
 
                 <span>
@@ -1249,10 +1581,38 @@ const BriefFormModal = ({
                 </span>
               </div>
             )}
+
+            <div
+              className="form-grid2"
+              style={{
+                marginTop: "12px",
+              }}
+            >
+              <label className="full">
+                Route decision note *
+
+                <textarea
+                  rows="3"
+                  value={
+                    form.routeDecisionNote
+                  }
+                  placeholder="Add route-specific context or notes."
+                  onChange={(
+                    event
+                  ) =>
+                    update(
+                      "routeDecisionNote",
+                      event.target
+                        .value
+                    )
+                  }
+                />
+              </label>
+            </div>
           </div>
 
           {/* ------------------------------------------------------------- */}
-          {/* Missing */}
+          {/* Missing Required Fields */}
           {/* ------------------------------------------------------------- */}
 
           {missingFields.length >
@@ -1274,9 +1634,7 @@ const BriefFormModal = ({
                       ] ||
                       field
                   )
-                  .join(
-                    ", "
-                  )}
+                  .join(", ")}
               </p>
             </div>
           )}
@@ -1289,7 +1647,7 @@ const BriefFormModal = ({
             type="button"
             className="tl-secondary"
             onClick={
-              onClose
+              handleClose
             }
             disabled={
               mutation.isPending

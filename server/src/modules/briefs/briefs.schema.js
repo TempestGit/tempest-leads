@@ -59,6 +59,17 @@ const optionalText = (
 |--------------------------------------------------------------------------
 | Save Brief
 |--------------------------------------------------------------------------
+|
+| IMPORTANT:
+|
+| Decision Maker is NOT stored through the Brief form.
+|
+| Decision makers belong to Contacts:
+|
+| contacts.is_decision_maker = 1
+|
+| A company may have multiple decision makers.
+|
 */
 
 export const saveBriefSchema =
@@ -85,9 +96,6 @@ export const saveBriefSchema =
       optionalText(500),
 
     budget:
-      optionalText(500),
-
-    decisionMaker:
       optionalText(500),
 
     approvalProcess:

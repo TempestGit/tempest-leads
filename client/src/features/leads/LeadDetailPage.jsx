@@ -22,6 +22,8 @@ import {
   useActivitiesQuery,
 } from "../activities/activities.queries.js";
 
+import ContactFormModal from "../contacts/ContactFormModal.jsx";
+
 /*
 |--------------------------------------------------------------------------
 | Lead Actions
@@ -102,6 +104,8 @@ const TABS = [
 | Format Date
 |--------------------------------------------------------------------------
 */
+
+
 
 const formatDateTime = (
   value
@@ -224,8 +228,8 @@ const getWorkflow = (
 
   return [
     "Brief",
-    "Understand Client + Industry",
-    "Team Assignment",
+    // "Understand Client + Industry",
+    // "Team Assignment",
     "Pitch",
     "Commercials",
     "Contract / PO",
@@ -328,6 +332,13 @@ const LeadDetailPage =
     const [
       meetingModalOpen,
       setMeetingModalOpen,
+    ] = useState(
+      false
+    );
+
+    const [
+      contactModalOpen,
+      setContactModalOpen,
     ] = useState(
       false
     );
@@ -919,7 +930,7 @@ const LeadDetailPage =
                   this lead.
                 </p>
 
-                <button
+                {/* <button
                   type="button"
                   className="tl-primary"
                   onClick={() =>
@@ -929,7 +940,7 @@ const LeadDetailPage =
                   }
                 >
                   + Add activity
-                </button>
+                </button> */}
               </div>
             ) : (
               <>
@@ -979,7 +990,7 @@ const LeadDetailPage =
                   )}
                 </div>
 
-                <button
+                {/* <button
                   type="button"
                   className="tl-primary"
                   onClick={() =>
@@ -989,7 +1000,7 @@ const LeadDetailPage =
                   }
                 >
                   + Add activity
-                </button>
+                </button> */}
               </>
             )}
           </aside>
@@ -1017,8 +1028,8 @@ const LeadDetailPage =
               type="button"
               className="tl-primary"
               onClick={() =>
-                navigate(
-                  "/contacts"
+                setContactModalOpen(
+                  true
                 )
               }
             >
@@ -1747,6 +1758,29 @@ const LeadDetailPage =
             activitiesQuery.refetch();
 
             leadQuery.refetch();
+          }}
+        />
+
+        {/* --------------------------------------------------------------- */}
+        {/* Add Contact */}
+        {/* --------------------------------------------------------------- */}
+
+        <ContactFormModal
+          open={
+            contactModalOpen
+          }
+          fixedCompanyId={
+            lead.companyId
+          }
+          fixedCompanyName={
+            lead.companyName
+          }
+          onClose={() => {
+            setContactModalOpen(
+              false
+            );
+
+            contactsQuery.refetch();
           }}
         />
 

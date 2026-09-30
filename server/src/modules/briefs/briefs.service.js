@@ -26,13 +26,9 @@ import {
 
 const emptyValue =
   (value) =>
-    value ===
-      null ||
-    value ===
-      undefined ||
-    String(
-      value
-    ).trim() === "";
+    value === null ||
+    value === undefined ||
+    String(value).trim() === "";
 
 /*
 |--------------------------------------------------------------------------
@@ -46,9 +42,7 @@ const calculateCompleteness =
       BRIEF_REQUIRED_FIELDS.filter(
         (field) =>
           emptyValue(
-            brief[
-              field
-            ]
+            brief[field]
           )
       );
 
@@ -80,6 +74,13 @@ const calculateCompleteness =
 |--------------------------------------------------------------------------
 | Empty Brief Shape
 |--------------------------------------------------------------------------
+|
+| Decision makers are NOT stored in the Brief.
+|
+| Decision makers come from Contacts where:
+|
+| contacts.is_decision_maker = 1
+|
 */
 
 const emptyBrief =
@@ -108,9 +109,6 @@ const emptyBrief =
       null,
 
     budget:
-      null,
-
-    decisionMaker:
       null,
 
     approvalProcess:
@@ -173,7 +171,6 @@ const mergeBrief =
       "potentialScope",
       "timeline",
       "budget",
-      "decisionMaker",
       "approvalProcess",
       "expectedDeliverables",
       "clientExpectations",
@@ -192,14 +189,11 @@ const mergeBrief =
     fields.forEach(
       (field) => {
         if (
-          incoming[
-            field
-          ] !== undefined
+          incoming[field] !==
+          undefined
         ) {
           result[field] =
-            incoming[
-              field
-            ];
+            incoming[field];
         }
       }
     );
@@ -359,6 +353,11 @@ export const saveBriefService =
       |--------------------------------------------------------------------------
       | Completeness Gate
       |--------------------------------------------------------------------------
+      |
+      | BRIEF_REQUIRED_FIELDS now contains only the 14 actual Brief fields.
+      |
+      | Decision Maker is intentionally excluded because it belongs to Contacts.
+      |
       */
 
       const completeness =
@@ -381,6 +380,7 @@ export const saveBriefService =
           completeness.missingFields.map(
             (field) => ({
               field,
+
               message:
                 "This brief field is required before progression.",
             })
@@ -462,6 +462,10 @@ export const saveBriefService =
       |--------------------------------------------------------------------------
       | Keep Lead Route Synchronized
       |--------------------------------------------------------------------------
+      |
+      | KNOWN_EXISTING -> known_relationship = 1
+      | NEW_UNKNOWN    -> known_relationship = 0
+      |
       */
 
       if (
