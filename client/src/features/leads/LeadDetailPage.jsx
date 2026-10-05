@@ -2,88 +2,68 @@ import {
   useMemo,
   useState,
 } from "react";
-
 import {
   useNavigate,
   useParams,
 } from "react-router-dom";
-
 import useAuth from "../auth/useAuth.js";
-
 import {
   useContactsQuery,
 } from "../contacts/contacts.queries.js";
-
 import {
   useLeadQuery,
 } from "./leads.queries.js";
-
 import {
   useActivitiesQuery,
 } from "../activities/activities.queries.js";
-
 import ContactFormModal from "../contacts/ContactFormModal.jsx";
-
+import LeadFormModal from "./LeadFormModal.jsx";
 /*
 |--------------------------------------------------------------------------
 | Lead Actions
 |--------------------------------------------------------------------------
 */
-
 import AssignOwnerModal from "./AssignOwnerModal.jsx";
 import ChangeStageModal from "./ChangeStageModal.jsx";
 import MarkLostModal from "./MarkLostModal.jsx";
-
 /*
 |--------------------------------------------------------------------------
 | Activities
 |--------------------------------------------------------------------------
 */
-
 import ActivityTimeline from "../activities/ActivityTimeline.jsx";
 import AddActivityModal from "../activities/AddActivityModal.jsx";
-
 /*
 |--------------------------------------------------------------------------
 | Meetings
 |--------------------------------------------------------------------------
 */
-
 import LeadMeetingsPanel from "../meetings/LeadMeetingsPanel.jsx";
 import ScheduleMeetingModal from "../meetings/ScheduleMeetingModal.jsx";
-
 /*
 |--------------------------------------------------------------------------
 | Follow-ups
 |--------------------------------------------------------------------------
 */
-
 import LeadFollowupsPanel from "../followups/LeadFollowupsPanel.jsx";
-
 /*
 |--------------------------------------------------------------------------
 | Brief
 |--------------------------------------------------------------------------
 */
-
 import LeadBriefPanel from "../briefs/LeadBriefPanel.jsx";
-
 import TeamAssignmentsPanel from "../teamAssignments/TeamAssignmentsPanel.jsx";
-
 /*
 |--------------------------------------------------------------------------
 | Nurture
 |--------------------------------------------------------------------------
 */
-
 import LeadNurturePanel from "../nurture/LeadNurturePanel.jsx";
-
 /*
 |--------------------------------------------------------------------------
 | Tabs
 |--------------------------------------------------------------------------
 */
-
 const TABS = [
   "Overview",
   "Contacts",
@@ -98,25 +78,19 @@ const TABS = [
   "Nurture",
   "Documents",
 ];
-
 /*
 |--------------------------------------------------------------------------
 | Format Date
 |--------------------------------------------------------------------------
 */
-
-
-
 const formatDateTime = (
   value
 ) => {
   if (!value) {
     return "—";
   }
-
   const date =
     new Date(value);
-
   if (
     Number.isNaN(
       date.getTime()
@@ -124,25 +98,21 @@ const formatDateTime = (
   ) {
     return "—";
   }
-
   return date.toLocaleString(
     "en-IN",
     {
       dateStyle:
         "medium",
-
       timeStyle:
         "short",
     }
   );
 };
-
 /*
 |--------------------------------------------------------------------------
 | Currency
 |--------------------------------------------------------------------------
 */
-
 const formatCurrency = (
   value
 ) => {
@@ -150,16 +120,13 @@ const formatCurrency = (
     Number(
       value || 0
     );
-
   return new Intl.NumberFormat(
     "en-IN",
     {
       style:
         "currency",
-
       currency:
         "INR",
-
       maximumFractionDigits:
         0,
     }
@@ -167,13 +134,11 @@ const formatCurrency = (
     amount
   );
 };
-
 /*
 |--------------------------------------------------------------------------
 | Status Class
 |--------------------------------------------------------------------------
 */
-
 const statusClass = (
   value
 ) =>
@@ -189,13 +154,11 @@ const statusClass = (
       "/",
       "-"
     );
-
 /*
 |--------------------------------------------------------------------------
 | Workflow
 |--------------------------------------------------------------------------
 */
-
 const getWorkflow = (
   lead
 ) => {
@@ -204,7 +167,6 @@ const getWorkflow = (
   | Known / Existing
   |--------------------------------------------------------------------------
   */
-
   if (
     lead.knownRelationship
   ) {
@@ -219,13 +181,11 @@ const getWorkflow = (
       "Active Client",
     ];
   }
-
   /*
   |--------------------------------------------------------------------------
   | New / Unknown
   |--------------------------------------------------------------------------
   */
-
   return [
     "Brief",
     // "Understand Client + Industry",
@@ -237,13 +197,11 @@ const getWorkflow = (
     "Active Client",
   ];
 };
-
 /*
 |--------------------------------------------------------------------------
 | Lifecycle Placeholder
 |--------------------------------------------------------------------------
 */
-
 const LifecyclePlaceholder = ({
   title,
   description,
@@ -254,144 +212,125 @@ const LifecyclePlaceholder = ({
         {title.toUpperCase()}
       </h2>
     </div>
-
     <p className="muted">
       {description}
     </p>
   </article>
 );
-
 /*
 |--------------------------------------------------------------------------
 | Lead Detail Page
 |--------------------------------------------------------------------------
 */
-
 const LeadDetailPage =
   () => {
     const {
       leadId,
     } =
       useParams();
-
     const navigate =
       useNavigate();
-
     const {
       user,
     } =
       useAuth();
-
     /*
     |--------------------------------------------------------------------------
     | Tab
     |--------------------------------------------------------------------------
     */
-
     const [
       activeTab,
       setActiveTab,
     ] = useState(
       "Overview"
     );
-
     /*
     |--------------------------------------------------------------------------
     | Modals
     |--------------------------------------------------------------------------
     */
-
+    const [
+      editDetailsOpen,
+      setEditDetailsOpen,
+    ] = useState(
+      false
+    );
     const [
       stageModalOpen,
       setStageModalOpen,
     ] = useState(
       false
     );
-
     const [
       ownerModalOpen,
       setOwnerModalOpen,
     ] = useState(
       false
     );
-
     const [
       lostModalOpen,
       setLostModalOpen,
     ] = useState(
       false
     );
-
     const [
       activityModalOpen,
       setActivityModalOpen,
     ] = useState(
       false
     );
-
     const [
       meetingModalOpen,
       setMeetingModalOpen,
     ] = useState(
       false
     );
-
     const [
       contactModalOpen,
       setContactModalOpen,
     ] = useState(
       false
     );
-
     /*
     |--------------------------------------------------------------------------
     | Requested Stage
     |--------------------------------------------------------------------------
     */
-
     const [
       requestedStage,
       setRequestedStage,
     ] = useState(
       "New"
     );
-
     /*
     |--------------------------------------------------------------------------
     | Lead
     |--------------------------------------------------------------------------
     */
-
     const leadQuery =
       useLeadQuery(
         leadId
       );
-
     const lead =
       leadQuery.data
         ?.data
         ?.lead ||
       null;
-
     /*
     |--------------------------------------------------------------------------
     | Contacts Query Params
     |--------------------------------------------------------------------------
     */
-
     const contactParams =
       useMemo(
         () => ({
           companyId:
             lead?.companyId,
-
           page: 1,
-
           limit: 100,
-
           sort:
             "createdAt",
-
           direction:
             "asc",
         }),
@@ -399,18 +338,15 @@ const LeadDetailPage =
           lead?.companyId,
         ]
       );
-
     /*
     |--------------------------------------------------------------------------
     | Contacts
     |--------------------------------------------------------------------------
     */
-
     const contactsQuery =
       useContactsQuery(
         contactParams
       );
-
     const contacts =
       lead
         ? contactsQuery
@@ -419,13 +355,11 @@ const LeadDetailPage =
             ?.contacts ||
           []
         : [];
-
     /*
     |--------------------------------------------------------------------------
     | Activity Query Params
     |--------------------------------------------------------------------------
     */
-
     const activityParams =
       useMemo(
         () => ({
@@ -433,46 +367,38 @@ const LeadDetailPage =
             Number(
               leadId
             ),
-
           page: 1,
-
           limit: 100,
         }),
         [
           leadId,
         ]
       );
-
     /*
     |--------------------------------------------------------------------------
     | Activities
     |--------------------------------------------------------------------------
     */
-
     const activitiesQuery =
       useActivitiesQuery(
         activityParams
       );
-
     const activities =
       activitiesQuery
         .data
         ?.data
         ?.activities ||
       [];
-
     const recentActivities =
       activities.slice(
         0,
         5
       );
-
     /*
     |--------------------------------------------------------------------------
     | Loading
     |--------------------------------------------------------------------------
     */
-
     if (
       leadQuery.isLoading
     ) {
@@ -482,7 +408,6 @@ const LeadDetailPage =
             <h2>
               Loading lead
             </h2>
-
             <p>
               Loading CRM
               profile...
@@ -491,13 +416,11 @@ const LeadDetailPage =
         </article>
       );
     }
-
     /*
     |--------------------------------------------------------------------------
     | Error
     |--------------------------------------------------------------------------
     */
-
     if (
       leadQuery.isError ||
       !lead
@@ -509,7 +432,6 @@ const LeadDetailPage =
               Unable to load
               lead
             </h2>
-
             <p>
               {leadQuery
                 .error
@@ -518,7 +440,6 @@ const LeadDetailPage =
                 ?.message ||
                 "Lead not found."}
             </p>
-
             <button
               type="button"
               className="tl-secondary"
@@ -534,13 +455,11 @@ const LeadDetailPage =
         </article>
       );
     }
-
     /*
     |--------------------------------------------------------------------------
     | Call
     |--------------------------------------------------------------------------
     */
-
     const callContact =
       () => {
         if (
@@ -548,17 +467,14 @@ const LeadDetailPage =
         ) {
           return;
         }
-
         window.location.href =
           `tel:${lead.primaryContactPhone}`;
       };
-
     /*
     |--------------------------------------------------------------------------
     | Email
     |--------------------------------------------------------------------------
     */
-
     const emailContact =
       () => {
         if (
@@ -566,17 +482,14 @@ const LeadDetailPage =
         ) {
           return;
         }
-
         window.location.href =
           `mailto:${lead.primaryContactEmail}`;
       };
-
     /*
     |--------------------------------------------------------------------------
     | WhatsApp
     |--------------------------------------------------------------------------
     */
-
     const whatsappContact =
       () => {
         if (
@@ -584,7 +497,6 @@ const LeadDetailPage =
         ) {
           return;
         }
-
         const number =
           String(
             lead.primaryContactPhone
@@ -592,20 +504,17 @@ const LeadDetailPage =
             /\D/g,
             ""
           );
-
         window.open(
           `https://wa.me/${number}`,
           "_blank",
           "noopener,noreferrer"
         );
       };
-
     /*
     |--------------------------------------------------------------------------
     | Open Stage Modal
     |--------------------------------------------------------------------------
     */
-
     const openStageModal =
       (
         nextStage =
@@ -614,181 +523,144 @@ const LeadDetailPage =
         setRequestedStage(
           nextStage
         );
-
         setStageModalOpen(
           true
         );
       };
-
     /*
     |--------------------------------------------------------------------------
     | Workflow
     |--------------------------------------------------------------------------
     */
-
     const workflow =
       getWorkflow(
         lead
       );
-
     const workflowIndex =
       workflow.indexOf(
         lead.stage
       );
-
     /*
     |--------------------------------------------------------------------------
     | Overview
     |--------------------------------------------------------------------------
     */
-
     const renderOverview =
       () => (
         <div className="detail-grid">
           {/* --------------------------------------------------------------- */}
           {/* Opportunity */}
           {/* --------------------------------------------------------------- */}
-
           <article className="tl-card">
             <div className="tl-card-head">
               <h2>
                 OPPORTUNITY
               </h2>
             </div>
-
             <div className="info-grid">
               {/* Lead ID */}
-
               <div className="info-field">
                 <small>
                   Lead ID
                 </small>
-
                 <b>
                   {
                     lead.leadCode
                   }
                 </b>
               </div>
-
               {/* Requirement */}
-
               <div className="info-field">
                 <small>
                   Potential
                   requirement
                 </small>
-
                 <b>
                   {lead.serviceRequired ||
                     "—"}
                 </b>
               </div>
-
               {/* Opportunity Value */}
-
               <div className="info-field">
                 <small>
                   Opportunity
                   value
                 </small>
-
                 <b>
                   {formatCurrency(
                     lead.estimatedValueRupees
                   )}
                 </b>
               </div>
-
               {/* Source */}
-
               <div className="info-field">
                 <small>
                   Lead source
                 </small>
-
                 <b>
                   {lead.source ||
                     "—"}
                 </b>
               </div>
-
               {/* Stage */}
-
               <div className="info-field">
                 <small>
                   Current stage
                 </small>
-
                 <b>
                   {
                     lead.stage
                   }
                 </b>
               </div>
-
               {/* Next Action */}
-
               <div className="info-field">
                 <small>
                   Next action
                 </small>
-
                 <b>
                   {lead.nextAction ||
                     "—"}
                 </b>
               </div>
-
               {/* Follow-up */}
-
               <div className="info-field">
                 <small>
                   Follow-up
                 </small>
-
                 <b>
                   {formatDateTime(
                     lead.followUpAt
                   )}
                 </b>
               </div>
-
               {/* Last Touch */}
-
               <div className="info-field">
                 <small>
                   Last touch
                 </small>
-
                 <b>
                   {formatDateTime(
                     lead.lastTouchAt
                   )}
                 </b>
               </div>
-
               {/* Route */}
-
               <div className="info-field">
                 <small>
                   Route
                 </small>
-
                 <b>
                   {lead.knownRelationship
                     ? "Known / Existing"
                     : "New / Unknown"}
                 </b>
               </div>
-
               {/* Stage Age */}
-
               <div className="info-field">
                 <small>
                   Stage age
                 </small>
-
                 <b>
                   {lead.stageAgeDays ||
                     0}{" "}
@@ -796,11 +668,9 @@ const LeadDetailPage =
                 </b>
               </div>
             </div>
-
             {/* ------------------------------------------------------------- */}
             {/* Route Decision */}
             {/* ------------------------------------------------------------- */}
-
             <div
               className="tl-card-head"
               style={{
@@ -812,7 +682,6 @@ const LeadDetailPage =
                 ROUTE DECISION
               </h2>
             </div>
-
             {workflowIndex ===
               -1 && (
               <div className="lead-route-notice mb-3">
@@ -820,7 +689,6 @@ const LeadDetailPage =
                   Current stage:{" "}
                   {lead.stage}
                 </b>
-
                 <span>
                   Route-specific
                   workflow begins
@@ -829,11 +697,9 @@ const LeadDetailPage =
                 </span>
               </div>
             )}
-
             {/* ------------------------------------------------------------- */}
             {/* Workflow */}
             {/* ------------------------------------------------------------- */}
-
             <div className="workflow">
               {workflow.map(
                 (
@@ -842,7 +708,6 @@ const LeadDetailPage =
                 ) => {
                   let state =
                     "";
-
                   if (
                     workflowIndex >=
                     0
@@ -854,7 +719,6 @@ const LeadDetailPage =
                       state =
                         "done";
                     }
-
                     if (
                       index ===
                       workflowIndex
@@ -863,7 +727,6 @@ const LeadDetailPage =
                         "current";
                     }
                   }
-
                   return (
                     <div
                       key={
@@ -875,7 +738,6 @@ const LeadDetailPage =
                         {index +
                           1}
                       </i>
-
                       <b>
                         {
                           item
@@ -887,17 +749,14 @@ const LeadDetailPage =
               )}
             </div>
           </article>
-
           {/* --------------------------------------------------------------- */}
           {/* Recent Activity */}
           {/* --------------------------------------------------------------- */}
-
           <aside className="tl-card">
             <div className="tl-card-head">
               <h2>
                 RECENT ACTIVITY
               </h2>
-
               <button
                 type="button"
                 className="tl-link"
@@ -910,7 +769,6 @@ const LeadDetailPage =
                 View all →
               </button>
             </div>
-
             {activitiesQuery
               .isLoading ? (
               <div className="empty-state">
@@ -923,13 +781,11 @@ const LeadDetailPage =
                 <h2>
                   No activity yet
                 </h2>
-
                 <p>
                   Add the first
                   interaction for
                   this lead.
                 </p>
-
                 {/* <button
                   type="button"
                   className="tl-primary"
@@ -959,25 +815,21 @@ const LeadDetailPage =
                           {activity.activityType ||
                             activity.type ||
                             "Activity"}
-
                           {activity.outcome
                             ? ` · ${activity.outcome}`
                             : ""}
                         </b>
-
                         <small>
                           {formatDateTime(
                             activity.occurredAt ||
                               activity.createdAt
                           )}
-
                           {activity.createdByName
                             ? ` · ${activity.createdByName}`
                             : activity.ownerName
                               ? ` · ${activity.ownerName}`
                               : ""}
                         </small>
-
                         {activity.notes && (
                           <small>
                             {
@@ -989,7 +841,6 @@ const LeadDetailPage =
                     )
                   )}
                 </div>
-
                 {/* <button
                   type="button"
                   className="tl-primary"
@@ -1006,13 +857,11 @@ const LeadDetailPage =
           </aside>
         </div>
       );
-
     /*
     |--------------------------------------------------------------------------
     | Contacts
     |--------------------------------------------------------------------------
     */
-
     const renderContacts =
       () => (
         <article className="tl-card">
@@ -1023,7 +872,6 @@ const LeadDetailPage =
                 contacts.length
               }
             </h2>
-
             <button
               type="button"
               className="tl-primary"
@@ -1036,7 +884,6 @@ const LeadDetailPage =
               + Add contact
             </button>
           </div>
-
           {contactsQuery
             .isLoading ? (
             <div className="empty-state">
@@ -1048,7 +895,6 @@ const LeadDetailPage =
               <h2>
                 No contacts
               </h2>
-
               <p>
                 No contacts are
                 attached to this
@@ -1063,30 +909,24 @@ const LeadDetailPage =
                     <th>
                       Contact ID
                     </th>
-
                     <th>
                       Name
                     </th>
-
                     <th>
                       Designation
                     </th>
-
                     <th>
                       Phone
                     </th>
-
                     <th>
                       Email
                     </th>
-
                     <th>
                       Decision
                       maker
                     </th>
                   </tr>
                 </thead>
-
                 <tbody>
                   {contacts.map(
                     (
@@ -1101,7 +941,6 @@ const LeadDetailPage =
                           {contact.contactCode ||
                             `CON-${contact.id}`}
                         </td>
-
                         <td>
                           <b>
                             {contact.name ||
@@ -1109,22 +948,18 @@ const LeadDetailPage =
                               "—"}
                           </b>
                         </td>
-
                         <td>
                           {contact.designation ||
                             "—"}
                         </td>
-
                         <td>
                           {contact.phone ||
                             "—"}
                         </td>
-
                         <td>
                           {contact.email ||
                             "—"}
                         </td>
-
                         <td>
                           {contact.isDecisionMaker
                             ? "Yes"
@@ -1139,13 +974,11 @@ const LeadDetailPage =
           )}
         </article>
       );
-
     /*
     |--------------------------------------------------------------------------
     | Activity Timeline
     |--------------------------------------------------------------------------
     */
-
     const renderActivities =
       () => (
         <article className="tl-card">
@@ -1153,7 +986,6 @@ const LeadDetailPage =
             <h2>
               ACTIVITY TIMELINE
             </h2>
-
             {/* <button
               type="button"
               className="tl-primary"
@@ -1166,7 +998,6 @@ const LeadDetailPage =
               + Add activity
             </button> */}
           </div>
-
           {activitiesQuery
             .isError ? (
             <div className="empty-state">
@@ -1174,7 +1005,6 @@ const LeadDetailPage =
                 Unable to load
                 activities
               </h2>
-
               <p>
                 {activitiesQuery
                   .error
@@ -1183,7 +1013,6 @@ const LeadDetailPage =
                   ?.message ||
                   "Something went wrong."}
               </p>
-
               <button
                 type="button"
                 className="tl-secondary"
@@ -1209,13 +1038,11 @@ const LeadDetailPage =
           )}
         </article>
       );
-
     /*
     |--------------------------------------------------------------------------
     | Tab Content
     |--------------------------------------------------------------------------
     */
-
     const renderTab =
       () => {
         /*
@@ -1223,46 +1050,39 @@ const LeadDetailPage =
         | Overview
         |--------------------------------------------------------------------------
         */
-
         if (
           activeTab ===
           "Overview"
         ) {
           return renderOverview();
         }
-
         /*
         |--------------------------------------------------------------------------
         | Contacts
         |--------------------------------------------------------------------------
         */
-
         if (
           activeTab ===
           "Contacts"
         ) {
           return renderContacts();
         }
-
         /*
         |--------------------------------------------------------------------------
         | Activity
         |--------------------------------------------------------------------------
         */
-
         if (
           activeTab ===
           "Activity Timeline"
         ) {
           return renderActivities();
         }
-
         /*
         |--------------------------------------------------------------------------
         | Meetings
         |--------------------------------------------------------------------------
         */
-
         if (
           activeTab ===
           "Meetings"
@@ -1275,13 +1095,11 @@ const LeadDetailPage =
             />
           );
         }
-
         /*
         |--------------------------------------------------------------------------
         | Follow-ups
         |--------------------------------------------------------------------------
         */
-
         if (
           activeTab ===
           "Follow-ups"
@@ -1294,13 +1112,11 @@ const LeadDetailPage =
             />
           );
         }
-
         /*
         |--------------------------------------------------------------------------
         | Brief
         |--------------------------------------------------------------------------
         */
-
         if (
           activeTab ===
           "Brief"
@@ -1313,7 +1129,6 @@ const LeadDetailPage =
             />
           );
         }
-
         if (
           activeTab ===
           "Pitch"
@@ -1323,7 +1138,6 @@ const LeadDetailPage =
               <TeamAssignmentsPanel
                 lead={lead}
               />
-
               <LifecyclePlaceholder
                 title="Pitch"
                 description="Versioned pitch records track team assignment, reviews and client feedback."
@@ -1331,13 +1145,11 @@ const LeadDetailPage =
             </div>
           );
         }
-
         /*
         |--------------------------------------------------------------------------
         | Nurture
         |--------------------------------------------------------------------------
         */
-
         if (
           activeTab ===
           "Nurture"
@@ -1350,27 +1162,21 @@ const LeadDetailPage =
             />
           );
         }
-
         /*
         |--------------------------------------------------------------------------
         | Upcoming Modules
         |--------------------------------------------------------------------------
         */
-
         const descriptions = {
           Commercials:
             "Commercial versions protect negotiation history instead of overwriting it.",
-
           "Contract / PO":
             "Track final scope, price, payment terms and documents.",
-
           Onboarding:
             "Mandatory checklist gates protect the move to Active Client.",
-
           Documents:
             "Document storage is ready for a future secure file service.",
         };
-
         return (
           <LifecyclePlaceholder
             title={
@@ -1385,19 +1191,16 @@ const LeadDetailPage =
           />
         );
       };
-
     /*
     |--------------------------------------------------------------------------
     | Render
     |--------------------------------------------------------------------------
     */
-
     return (
       <div className="lead-detail-page">
         {/* --------------------------------------------------------------- */}
         {/* Back */}
         {/* --------------------------------------------------------------- */}
-
         <button
           type="button"
           className="lead-back-btn"
@@ -1410,20 +1213,15 @@ const LeadDetailPage =
           <span aria-hidden="true">
             ←
           </span>
-
           Back to leads
         </button>
-
         {/* --------------------------------------------------------------- */}
         {/* Header */}
         {/* --------------------------------------------------------------- */}
-
         <article className="detail-header">
           {/* Meta */}
-
           <div className="detail-meta">
             {/* Stage */}
-
             <span
               className={`status ${statusClass(
                 lead.stage
@@ -1431,9 +1229,7 @@ const LeadDetailPage =
             >
               {lead.stage}
             </span>
-
             {/* Priority */}
-
             <span
               className={`priority ${statusClass(
                 lead.priority
@@ -1443,9 +1239,7 @@ const LeadDetailPage =
                 lead.priority
               }
             </span>
-
             {/* Status */}
-
             <span
               className={`status ${statusClass(
                 lead.status
@@ -1455,29 +1249,22 @@ const LeadDetailPage =
                 lead.status
               }
             </span>
-
             {/* Owner */}
-
             <span className="lead-owner">
               Owner:{" "}
-
               <b>
                 {lead.ownerName ||
                   "—"}
               </b>
             </span>
           </div>
-
           {/* Company */}
-
           <h1>
             {
               lead.companyName
             }
           </h1>
-
           {/* Details */}
-
           <p>
             {lead.industry ||
               "—"}{" "}
@@ -1487,19 +1274,27 @@ const LeadDetailPage =
             ·{" "}
             {lead.primaryContactName ||
               "—"}
-
             {lead.primaryContactDesignation
               ? `, ${lead.primaryContactDesignation}`
               : ""}
           </p>
-
           {/* ------------------------------------------------------------- */}
           {/* Actions */}
           {/* ------------------------------------------------------------- */}
-
           <div className="detail-actions">
+            {/* Edit Details */}
+            <button
+              type="button"
+              className="tl-secondary"
+              onClick={() =>
+                setEditDetailsOpen(
+                  true
+                )
+              }
+            >
+              Edit details
+            </button>
             {/* Call */}
-
             <button
               type="button"
               className="tl-secondary"
@@ -1512,9 +1307,7 @@ const LeadDetailPage =
             >
               Call
             </button>
-
             {/* Email */}
-
             <button
               type="button"
               className="tl-secondary"
@@ -1527,9 +1320,7 @@ const LeadDetailPage =
             >
               Email
             </button>
-
             {/* WhatsApp */}
-
             <button
               type="button"
               className="tl-secondary"
@@ -1542,9 +1333,7 @@ const LeadDetailPage =
             >
               WhatsApp
             </button>
-
             {/* Meeting */}
-
             <button
               type="button"
               className="tl-secondary"
@@ -1556,9 +1345,7 @@ const LeadDetailPage =
             >
               Schedule Meeting
             </button>
-
             {/* Activity */}
-
             <button
               type="button"
               className="tl-secondary"
@@ -1570,9 +1357,7 @@ const LeadDetailPage =
             >
               Add Activity
             </button>
-
             {/* Owner */}
-
             {user?.role ===
               "SUPER_ADMIN" && (
               <button
@@ -1587,9 +1372,7 @@ const LeadDetailPage =
                 Change Owner
               </button>
             )}
-
             {/* Stage */}
-
             <button
               type="button"
               className="tl-primary"
@@ -1601,9 +1384,7 @@ const LeadDetailPage =
             >
               Change stage
             </button>
-
             {/* Lost */}
-
             <button
               type="button"
               className="tl-danger"
@@ -1621,11 +1402,9 @@ const LeadDetailPage =
             </button>
           </div>
         </article>
-
         {/* --------------------------------------------------------------- */}
         {/* Tabs */}
         {/* --------------------------------------------------------------- */}
-
         <div className="tl-tabs">
           {TABS.map(
             (
@@ -1653,19 +1432,34 @@ const LeadDetailPage =
             )
           )}
         </div>
-
         {/* --------------------------------------------------------------- */}
         {/* Tab Content */}
         {/* --------------------------------------------------------------- */}
-
         <section>
           {renderTab()}
         </section>
-
+        {/* --------------------------------------------------------------- */}
+        {/* Edit Details */}
+        {/* --------------------------------------------------------------- */}
+        <LeadFormModal
+          open={
+            editDetailsOpen
+          }
+          mode="edit"
+          lead={
+            lead
+          }
+          onClose={() => {
+            setEditDetailsOpen(
+              false
+            );
+            leadQuery.refetch();
+            contactsQuery.refetch();
+          }}
+        />
         {/* --------------------------------------------------------------- */}
         {/* Change Stage */}
         {/* --------------------------------------------------------------- */}
-
         <ChangeStageModal
           open={
             stageModalOpen
@@ -1682,45 +1476,35 @@ const LeadDetailPage =
             setStageModalOpen(
               false
             );
-
             leadQuery.refetch();
-
             activitiesQuery.refetch();
           }}
         />
-
         {/* --------------------------------------------------------------- */}
         {/* Assign Owner */}
         {/* --------------------------------------------------------------- */}
-
         <AssignOwnerModal
           open={
             ownerModalOpen
           }
-
           leadIds={[
             Number(
               lead.id
             ),
           ]}
-
           lead={
             lead
           }
-
           onClose={() => {
             setOwnerModalOpen(
               false
             );
-
             leadQuery.refetch();
           }}
         />
-
         {/* --------------------------------------------------------------- */}
         {/* Mark Lost */}
         {/* --------------------------------------------------------------- */}
-
         <MarkLostModal
           open={
             lostModalOpen
@@ -1732,17 +1516,13 @@ const LeadDetailPage =
             setLostModalOpen(
               false
             );
-
             leadQuery.refetch();
-
             activitiesQuery.refetch();
           }}
         />
-
         {/* --------------------------------------------------------------- */}
         {/* Add Activity */}
         {/* --------------------------------------------------------------- */}
-
         <AddActivityModal
           open={
             activityModalOpen
@@ -1754,17 +1534,13 @@ const LeadDetailPage =
             setActivityModalOpen(
               false
             );
-
             activitiesQuery.refetch();
-
             leadQuery.refetch();
           }}
         />
-
         {/* --------------------------------------------------------------- */}
         {/* Add Contact */}
         {/* --------------------------------------------------------------- */}
-
         <ContactFormModal
           open={
             contactModalOpen
@@ -1779,15 +1555,12 @@ const LeadDetailPage =
             setContactModalOpen(
               false
             );
-
             contactsQuery.refetch();
           }}
         />
-
         {/* --------------------------------------------------------------- */}
         {/* Schedule Meeting */}
         {/* --------------------------------------------------------------- */}
-
         <ScheduleMeetingModal
           open={
             meetingModalOpen
@@ -1799,12 +1572,10 @@ const LeadDetailPage =
             setMeetingModalOpen(
               false
             );
-
             leadQuery.refetch();
           }}
         />
       </div>
     );
   };
-
 export default LeadDetailPage;
