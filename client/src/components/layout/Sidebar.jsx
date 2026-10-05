@@ -5,6 +5,8 @@ import {
   X,
 } from "lucide-react";
 
+import Logo from "../../../public/tempest-brand.png";
+
 import {
   NavLink,
 } from "react-router-dom";
@@ -137,7 +139,11 @@ const Sidebar = ({
           .join(" ")}
       >
         <div className="tl-brand">
-          <div className="tl-brand-mark">
+           <img
+              src={Logo}
+              alt="Tempest Leads"
+            />
+          {/* <div className="tl-brand-mark">
             T
           </div>
 
@@ -149,7 +155,7 @@ const Sidebar = ({
             <small>
               ACQUISITION CRM
             </small>
-          </div>
+          </div> */}
 
           {/* <button
             type="button"
