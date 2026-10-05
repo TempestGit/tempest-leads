@@ -182,15 +182,19 @@ export const contactStepSchema =
         )
         .optional(),
 
-    phone:
-      z
-        .string()
-        .trim()
-        .max(
-          30,
-          "Phone number is too long."
-        )
-        .optional(),
+    phone: z
+      .string()
+      .trim()
+      .refine(
+        (value) =>
+          value === "" ||
+          /^[6-9]\d{9}$/.test(value),
+        {
+          message:
+            "Enter a valid 10-digit mobile number.",
+        }
+      )
+      .optional(),
 
     email:
       z

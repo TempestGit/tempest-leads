@@ -43,6 +43,70 @@ const STEPS = [
 
 /*
 |--------------------------------------------------------------------------
+| Local Date / Time Helpers
+|--------------------------------------------------------------------------
+*/
+
+const getLocalDate = () => {
+  const now =
+    new Date();
+
+  const year =
+    now.getFullYear();
+
+  const month =
+    String(
+      now.getMonth() + 1
+    ).padStart(
+      2,
+      "0"
+    );
+
+  const day =
+    String(
+      now.getDate()
+    ).padStart(
+      2,
+      "0"
+    );
+
+  return `${year}-${month}-${day}`;
+};
+
+const getLocalTime = () => {
+  const now =
+    new Date();
+
+  const hours =
+    String(
+      now.getHours()
+    ).padStart(
+      2,
+      "0"
+    );
+
+  const minutes =
+    String(
+      now.getMinutes()
+    ).padStart(
+      2,
+      "0"
+    );
+
+  return `${hours}:${minutes}`;
+};
+
+const getCurrentDateTimeValues =
+  () => ({
+    date:
+      getLocalDate(),
+
+    time:
+      getLocalTime(),
+  });
+
+/*
+|--------------------------------------------------------------------------
 | Component
 |--------------------------------------------------------------------------
 */
@@ -287,15 +351,24 @@ const LeadFormModal = ({
       return;
     }
 
+    const now =
+      getCurrentDateTimeValues();
+
     setStep(
       1
     );
 
     setErrors({});
 
-    setValues(
-      createLeadDefaults()
-    );
+    setValues({
+      ...createLeadDefaults(),
+
+      followUpDate:
+        now.date,
+
+      followUpTime:
+        now.time,
+    });
   }, [
     open,
   ]);
@@ -696,8 +769,7 @@ const LeadFormModal = ({
           current
         ) =>
           Math.min(
-            current +
-              1,
+            current + 1,
             5
           )
       );
@@ -705,154 +777,224 @@ const LeadFormModal = ({
 
   /*
   |--------------------------------------------------------------------------
-  | Submit
+  | Previous
   |--------------------------------------------------------------------------
   */
 
-  const submit =
-    async () => {
+  const previousStep =
+    () => {
+      setErrors({});
+
+      setStep(
+        (
+          current
+        ) =>
+          Math.max(
+            current - 1,
+            1
+          )
+      );
+    };
+
+/*
+|--------------------------------------------------------------------------
+| Submit
+|--------------------------------------------------------------------------
+*/
+
+const submit =
+  async () => {
+    if (
+      !validateStep()
+    ) {
+      return;
+    }
+
+    try {
+      /*
+      |--------------------------------------------------------------------------
+      | Follow-up Date / Time
+      |--------------------------------------------------------------------------
+      */
+
+      const time =
+        values.followUpTime ||
+        getLocalTime();
+
+      const date =
+        new Date(
+          `${values.followUpDate}T${time}:00`
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Invalid Date
+      |--------------------------------------------------------------------------
+      */
+
       if (
-        !validateStep()
+        Number.isNaN(
+          date.getTime()
+        )
       ) {
+        setErrors({
+          followUpDate:
+            "Enter a valid follow-up date.",
+        });
+
         return;
       }
 
-      try {
-        const time =
-          values.followUpTime ||
-          "10:00";
+      /*
+      |--------------------------------------------------------------------------
+      | Prevent Past Date / Time
+      |--------------------------------------------------------------------------
+      |
+      | 60 second tolerance prevents a valid "current minute" from failing
+      | just because a few seconds passed before Create Lead was clicked.
+      |
+      */
 
-        const date =
-          new Date(
-            `${values.followUpDate}T${time}:00`
-          );
+      const now =
+        new Date();
 
-        if (
-          Number.isNaN(
-            date.getTime()
-          )
-        ) {
-          setErrors({
-            followUpDate:
-              "Enter a valid follow-up date.",
-          });
+      const minimumAllowed =
+        now.getTime() -
+        60 * 1000;
 
-          return;
-        }
-
-        await createMutation
-          .mutateAsync({
-            company: {
-              name:
-                values.companyName,
-
-              industry:
-                values.industry,
-
-              city:
-                values.city,
-
-              website:
-                values.website,
-
-              agencyRelationship:
-                values.agencyRelationship,
-
-              marketingActivity:
-                values.marketingActivity,
-            },
-
-            contact: {
-              name:
-                values.contactName,
-
-              designation:
-                values.designation,
-
-              phone:
-                values.phone,
-
-              email:
-                values.email,
-
-              isDecisionMaker:
-                values.decisionMaker ===
-                "Yes",
-            },
-
-            serviceRequired:
-              values.serviceRequired,
-
-            source:
-              values.source,
-
-            estimatedValueRupees:
-              values
-                .estimatedValueRupees ===
-              ""
-                ? 0
-                : Number(
-                    values
-                      .estimatedValueRupees
-                  ),
-
-            priority:
-              values.priority,
-
-            description:
-              values.description,
-
-            /*
-            |--------------------------------------------------------------------------
-            | Primary Branch
-            |--------------------------------------------------------------------------
-            */
-
-            branchId:
-              Number(
-                values.branchId
-              ),
-
-            /*
-            |--------------------------------------------------------------------------
-            | Owner
-            |--------------------------------------------------------------------------
-            */
-
-            ownerId:
-              Number(
-                values.ownerId
-              ),
-
-            nextAction:
-              values.nextAction,
-
-            followUpAt:
-              date
-                .toISOString(),
-
-            knownRelationship:
-              values
-                .knownRelationship ===
-              "Yes / Existing",
-          });
-
-        onClose();
-      } catch (
-        error
+      if (
+        date.getTime() <
+        minimumAllowed
       ) {
         setErrors({
-          root:
-            error
-              ?.response
-              ?.data
-              ?.message ||
-            error
-              ?.message ||
-            "Unable to create lead.",
+          followUpDate:
+            "Follow-up date and time cannot be in the past.",
+
+          followUpTime:
+            "Select the current time or a future time.",
         });
+
+        return;
       }
-    };
+
+      /*
+      |--------------------------------------------------------------------------
+      | Create Lead
+      |--------------------------------------------------------------------------
+      */
+
+      await createMutation
+        .mutateAsync({
+          company: {
+            name:
+              values.companyName,
+
+            industry:
+              values.industry,
+
+            city:
+              values.city,
+
+            website:
+              values.website,
+
+            agencyRelationship:
+              values.agencyRelationship,
+
+            marketingActivity:
+              values.marketingActivity,
+          },
+
+          contact: {
+            name:
+              values.contactName,
+
+            designation:
+              values.designation,
+
+            phone:
+              values.phone,
+
+            email:
+              values.email,
+
+            isDecisionMaker:
+              values.decisionMaker ===
+              "Yes",
+          },
+
+          serviceRequired:
+            values.serviceRequired,
+
+          source:
+            values.source,
+
+          estimatedValueRupees:
+            values
+              .estimatedValueRupees ===
+            ""
+              ? 0
+              : Number(
+                  values
+                    .estimatedValueRupees
+                ),
+
+          priority:
+            values.priority,
+
+          description:
+            values.description,
+
+          /*
+          |--------------------------------------------------------------------------
+          | Primary Branch
+          |--------------------------------------------------------------------------
+          */
+
+          branchId:
+            Number(
+              values.branchId
+            ),
+
+          /*
+          |--------------------------------------------------------------------------
+          | Owner
+          |--------------------------------------------------------------------------
+          */
+
+          ownerId:
+            Number(
+              values.ownerId
+            ),
+
+          nextAction:
+            values.nextAction,
+
+          followUpAt:
+            date.toISOString(),
+
+          knownRelationship:
+            values
+              .knownRelationship ===
+            "Yes / Existing",
+        });
+
+      onClose();
+    } catch (
+      error
+    ) {
+      setErrors({
+        root:
+          error
+            ?.response
+            ?.data
+            ?.message ||
+          error
+            ?.message ||
+          "Unable to create lead.",
+      });
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -895,6 +1037,12 @@ const LeadFormModal = ({
     return null;
   }
 
+  const today =
+    getLocalDate();
+
+  const currentTime =
+    getLocalTime();
+
   /*
   |--------------------------------------------------------------------------
   | Content
@@ -904,18 +1052,6 @@ const LeadFormModal = ({
   return (
     <div
       className="modal-backdrop"
-      onMouseDown={(
-        event
-      ) => {
-        if (
-          event.target ===
-            event.currentTarget &&
-          !createMutation
-            .isPending
-        ) {
-          handleClose();
-        }
-      }}
     >
       <section
         className="tl-modal"
@@ -1261,16 +1397,31 @@ const LeadFormModal = ({
 
                   <input
                     type="tel"
-                    value={
-                      values
-                        .phone
-                    }
-                    onChange={
-                      change(
-                        "phone"
-                      )
-                    }
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={values.phone}
+                    onChange={(event) => {
+                      const value =
+                        event.target.value
+                          .replace(/\D/g, "")
+                          .slice(0, 10);
+
+                      change("phone")({
+                        ...event,
+                        target: {
+                          ...event.target,
+                          value,
+                        },
+                      });
+                    }}
+                    placeholder="9876543210"
                   />
+
+                  {errors.phone && (
+                    <span className="form-error">
+                      {errors.phone}
+                    </span>
+                  )}
                 </label>
 
                 <label>
@@ -1795,15 +1946,76 @@ const LeadFormModal = ({
 
                   <input
                     type="date"
+                    min={
+                      today
+                    }
                     value={
                       values
                         .followUpDate
                     }
-                    onChange={
-                      change(
-                        "followUpDate"
-                      )
-                    }
+                    onChange={(event) => {
+                      const selectedDate =
+                        event.target.value;
+
+                      const nowTime =
+                        getLocalTime();
+
+                      setValues(
+                        (
+                          current
+                        ) => {
+                          let nextTime =
+                            current
+                              .followUpTime;
+
+                          /*
+                          * If the user selects today
+                          * and the selected time is
+                          * already past, move it to
+                          * the current time.
+                          */
+                          if (
+                            selectedDate ===
+                              getLocalDate() &&
+                            (
+                              !nextTime ||
+                              nextTime <
+                                nowTime
+                            )
+                          ) {
+                            nextTime =
+                              nowTime;
+                          }
+
+                          return {
+                            ...current,
+
+                            followUpDate:
+                              selectedDate,
+
+                            followUpTime:
+                              nextTime,
+                          };
+                        }
+                      );
+
+                      setErrors(
+                        (
+                          current
+                        ) => ({
+                          ...current,
+
+                          followUpDate:
+                            undefined,
+
+                          followUpTime:
+                            undefined,
+
+                          root:
+                            undefined,
+                        })
+                      );
+                    }}
                   />
 
                   {fieldError(
@@ -1812,20 +2024,80 @@ const LeadFormModal = ({
                 </label>
 
                 <label>
-                  Follow-up time
+                  Follow-up time *
 
                   <input
                     type="time"
+                    min={
+                      values
+                        .followUpDate ===
+                      today
+                        ? currentTime
+                        : undefined
+                    }
                     value={
                       values
                         .followUpTime
                     }
-                    onChange={
-                      change(
-                        "followUpTime"
-                      )
-                    }
+                    onChange={(event) => {
+                      const selectedTime =
+                        event.target.value;
+
+                      /*
+                      * If date is today, don't
+                      * accept a past time.
+                      */
+                      if (
+                        values
+                          .followUpDate ===
+                          getLocalDate() &&
+                        selectedTime <
+                          getLocalTime()
+                      ) {
+                        setErrors(
+                          (
+                            current
+                          ) => ({
+                            ...current,
+
+                            followUpTime:
+                              "Select the current time or a future time.",
+                          })
+                        );
+
+                        return;
+                      }
+
+                      setValues(
+                        (
+                          current
+                        ) => ({
+                          ...current,
+
+                          followUpTime:
+                            selectedTime,
+                        })
+                      );
+
+                      setErrors(
+                        (
+                          current
+                        ) => ({
+                          ...current,
+
+                          followUpTime:
+                            undefined,
+
+                          root:
+                            undefined,
+                        })
+                      );
+                    }}
                   />
+
+                  {fieldError(
+                    "followUpTime"
+                  )}
                 </label>
 
                 <label>
@@ -1862,22 +2134,23 @@ const LeadFormModal = ({
         {/* --------------------------------------------------------------- */}
 
         <footer className="modal-foot">
-          <button
-            type="button"
-            className="tl-secondary"
-            disabled={
-              createMutation
-                .isPending
-            }
-            onClick={
-              handleClose
-            }
-          >
-            Cancel
-          </button>
+          {step > 1 && (
+            <button
+              type="button"
+              className="tl-secondary"
+              disabled={
+                createMutation
+                  .isPending
+              }
+              onClick={
+                previousStep
+              }
+            >
+              Previous
+            </button>
+          )}
 
-          {step <
-          5 ? (
+          {step < 5 ? (
             <button
               type="button"
               className="tl-primary"

@@ -52,6 +52,36 @@ const getLocalDate =
 
 /*
 |--------------------------------------------------------------------------
+| Local Time
+|--------------------------------------------------------------------------
+*/
+
+const getLocalTime =
+  () => {
+    const date =
+      new Date();
+
+    const hours =
+      String(
+        date.getHours()
+      ).padStart(
+        2,
+        "0"
+      );
+
+    const minutes =
+      String(
+        date.getMinutes()
+      ).padStart(
+        2,
+        "0"
+      );
+
+    return `${hours}:${minutes}`;
+  };
+
+/*
+|--------------------------------------------------------------------------
 | Schedule Meeting
 |--------------------------------------------------------------------------
 */
@@ -74,9 +104,12 @@ const ScheduleMeetingModal = ({
     useMemo(
       () => ({
         page: 1,
+
         limit: 100,
+
         sort:
           "createdAt",
+
         direction:
           "desc",
       }),
@@ -120,7 +153,7 @@ const ScheduleMeetingModal = ({
     time,
     setTime,
   ] = useState(
-    "11:00"
+    getLocalTime()
   );
 
   const [
@@ -151,6 +184,20 @@ const ScheduleMeetingModal = ({
       return;
     }
 
+    /*
+     * Calculate the current date/time
+     * every time the modal opens.
+     *
+     * Do not use values calculated when
+     * the JavaScript file first loaded.
+     */
+
+    const currentDate =
+      getLocalDate();
+
+    const currentTime =
+      getLocalTime();
+
     setSelectedLeadId(
       lead?.id
         ? String(
@@ -162,11 +209,11 @@ const ScheduleMeetingModal = ({
     setTitle("");
 
     setDate(
-      getLocalDate()
+      currentDate
     );
 
     setTime(
-      "11:00"
+      currentTime
     );
 
     setMeetingType(
@@ -221,9 +268,27 @@ const ScheduleMeetingModal = ({
     mutation.isPending,
   ]);
 
+  /*
+  |--------------------------------------------------------------------------
+  | Not Open
+  |--------------------------------------------------------------------------
+  */
+
   if (!open) {
     return null;
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Current Date / Time
+  |--------------------------------------------------------------------------
+  */
+
+  const today =
+    getLocalDate();
+
+  const currentTime =
+    getLocalTime();
 
   /*
   |--------------------------------------------------------------------------
@@ -248,6 +313,115 @@ const ScheduleMeetingModal = ({
 
   /*
   |--------------------------------------------------------------------------
+  | Date Change
+  |--------------------------------------------------------------------------
+  */
+
+  const handleDateChange =
+    (
+      event
+    ) => {
+      const selectedDate =
+        event.target.value;
+
+      const nowDate =
+        getLocalDate();
+
+      const nowTime =
+        getLocalTime();
+
+      /*
+       * Browser min should already
+       * prevent this, but keep a
+       * JavaScript check as well.
+       */
+
+      if (
+        selectedDate &&
+        selectedDate <
+          nowDate
+      ) {
+        setError(
+          "Meeting date cannot be in the past."
+        );
+
+        return;
+      }
+
+      setDate(
+        selectedDate
+      );
+
+      /*
+       * If user changes the date back
+       * to today and the selected time
+       * is already in the past, move
+       * the time to the current time.
+       */
+
+      if (
+        selectedDate ===
+          nowDate &&
+        (
+          !time ||
+          time <
+            nowTime
+        )
+      ) {
+        setTime(
+          nowTime
+        );
+      }
+
+      setError("");
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Time Change
+  |--------------------------------------------------------------------------
+  */
+
+  const handleTimeChange =
+    (
+      event
+    ) => {
+      const selectedTime =
+        event.target.value;
+
+      const nowDate =
+        getLocalDate();
+
+      const nowTime =
+        getLocalTime();
+
+      /*
+       * Past times are not allowed
+       * when the meeting date is today.
+       */
+
+      if (
+        date ===
+          nowDate &&
+        selectedTime <
+          nowTime
+      ) {
+        setError(
+          "Meeting time cannot be in the past."
+        );
+
+        return;
+      }
+
+      setTime(
+        selectedTime
+      );
+
+      setError("");
+    };
+
+  /*
+  |--------------------------------------------------------------------------
   | Submit
   |--------------------------------------------------------------------------
   */
@@ -255,6 +429,12 @@ const ScheduleMeetingModal = ({
   const submit =
     async () => {
       setError("");
+
+      /*
+      |--------------------------------------------------------------------------
+      | Lead
+      |--------------------------------------------------------------------------
+      */
 
       if (
         !resolvedLead
@@ -266,6 +446,12 @@ const ScheduleMeetingModal = ({
         return;
       }
 
+      /*
+      |--------------------------------------------------------------------------
+      | Title
+      |--------------------------------------------------------------------------
+      */
+
       if (
         !title.trim()
       ) {
@@ -275,6 +461,12 @@ const ScheduleMeetingModal = ({
 
         return;
       }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Date / Time Required
+      |--------------------------------------------------------------------------
+      */
 
       if (
         !date ||
@@ -289,7 +481,7 @@ const ScheduleMeetingModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Browser Local Time -> UTC ISO
+      | Browser Local Time -> Date
       |--------------------------------------------------------------------------
       */
 
@@ -297,6 +489,12 @@ const ScheduleMeetingModal = ({
         new Date(
           `${date}T${time}:00`
         );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Invalid Date
+      |--------------------------------------------------------------------------
+      */
 
       if (
         Number.isNaN(
@@ -312,9 +510,45 @@ const ScheduleMeetingModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Prototype Does Not Ask For End Time.
-      | Use One Hour As Default Duration.
+      | Reject Past Date / Time
       |--------------------------------------------------------------------------
+      |
+      | The input min attributes improve the UI,
+      | but this check is still required because
+      | HTML validation can be bypassed.
+      |
+      | We allow the current minute. Without the
+      | tolerance, selecting 14:38 and clicking
+      | submit at 14:38:20 would incorrectly fail.
+      |
+      */
+
+      const now =
+        new Date();
+
+      const minimumAllowed =
+        now.getTime() -
+        60 * 1000;
+
+      if (
+        startsAt.getTime() <
+        minimumAllowed
+      ) {
+        setError(
+          "Meeting date and time cannot be in the past. Select the current time or a future time."
+        );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Default End Time
+      |--------------------------------------------------------------------------
+      |
+      | Prototype does not ask for an
+      | end time, so use one hour.
+      |
       */
 
       const endsAt =
@@ -324,6 +558,12 @@ const ScheduleMeetingModal = ({
               60 *
               1000
         );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Create Meeting
+      |--------------------------------------------------------------------------
+      */
 
       try {
         await mutation.mutateAsync({
@@ -373,10 +613,18 @@ const ScheduleMeetingModal = ({
             ?.response
             ?.data
             ?.message ||
+            requestError
+              ?.message ||
             "Unable to schedule meeting."
         );
       }
     };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Render
+  |--------------------------------------------------------------------------
+  */
 
   return (
     <div className="modal-backdrop">
@@ -412,7 +660,11 @@ const ScheduleMeetingModal = ({
             }
             aria-label="Close"
           >
-            <X size={15} />
+            <X
+              size={
+                15
+              }
+            />
           </button>
         </header>
 
@@ -442,12 +694,14 @@ const ScheduleMeetingModal = ({
                     }
                     onChange={(
                       event
-                    ) =>
+                    ) => {
                       setSelectedLeadId(
                         event.target
                           .value
-                      )
-                    }
+                      );
+
+                      setError("");
+                    }}
                   >
                     <option value="">
                       {leadsQuery.isLoading
@@ -470,7 +724,9 @@ const ScheduleMeetingModal = ({
                           {
                             item.companyName
                           }
+
                           {" · "}
+
                           {
                             item.leadCode
                           }
@@ -486,9 +742,15 @@ const ScheduleMeetingModal = ({
                   </small>
 
                   <b>
-                    {lead.companyName}
+                    {
+                      lead.companyName
+                    }
+
                     {" · "}
-                    {lead.leadCode}
+
+                    {
+                      lead.leadCode
+                    }
                   </b>
                 </div>
               )}
@@ -505,12 +767,14 @@ const ScheduleMeetingModal = ({
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setTitle(
                       event.target
                         .value
-                    )
-                  }
+                    );
+
+                    setError("");
+                  }}
                   autoFocus
                 />
               </label>
@@ -522,16 +786,14 @@ const ScheduleMeetingModal = ({
 
                 <input
                   type="date"
+                  min={
+                    today
+                  }
                   value={
                     date
                   }
-                  onChange={(
-                    event
-                  ) =>
-                    setDate(
-                      event.target
-                        .value
-                    )
+                  onChange={
+                    handleDateChange
                   }
                 />
               </label>
@@ -543,16 +805,17 @@ const ScheduleMeetingModal = ({
 
                 <input
                   type="time"
+                  min={
+                    date ===
+                    today
+                      ? currentTime
+                      : undefined
+                  }
                   value={
                     time
                   }
-                  onChange={(
-                    event
-                  ) =>
-                    setTime(
-                      event.target
-                        .value
-                    )
+                  onChange={
+                    handleTimeChange
                   }
                 />
               </label>

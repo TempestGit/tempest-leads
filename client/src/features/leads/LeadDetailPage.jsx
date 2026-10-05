@@ -1154,7 +1154,7 @@ const LeadDetailPage =
               ACTIVITY TIMELINE
             </h2>
 
-            <button
+            {/* <button
               type="button"
               className="tl-primary"
               onClick={() =>
@@ -1164,7 +1164,7 @@ const LeadDetailPage =
               }
             >
               + Add activity
-            </button>
+            </button> */}
           </div>
 
           {activitiesQuery

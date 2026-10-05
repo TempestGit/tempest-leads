@@ -92,6 +92,47 @@ export const LOST_REASONS = [
 
 /*
 |--------------------------------------------------------------------------
+| Current / Future Date Validation
+|--------------------------------------------------------------------------
+|
+| Follow-up date/time must not be in the past.
+|
+| A 60-second tolerance is allowed because frontend time inputs normally
+| work at minute precision.
+|
+| Example:
+|
+| User selects: 11:58
+| Request reaches server: 11:58:35
+|
+| This should still be accepted.
+|
+*/
+
+const isCurrentOrFutureDate = (
+  value
+) => {
+  if (
+    !(value instanceof Date) ||
+    Number.isNaN(
+      value.getTime()
+    )
+  ) {
+    return false;
+  }
+
+  const minimumAllowed =
+    Date.now() -
+    60 * 1000;
+
+  return (
+    value.getTime() >=
+    minimumAllowed
+  );
+};
+
+/*
+|--------------------------------------------------------------------------
 | ID
 |--------------------------------------------------------------------------
 */
@@ -308,9 +349,27 @@ const leadContactSchema =
       z
         .string()
         .trim()
-        .max(30)
         .nullable()
-        .optional(),
+        .optional()
+        .refine(
+          (value) => {
+            if (
+              value === null ||
+              value === undefined ||
+              value === ""
+            ) {
+              return true;
+            }
+
+            return /^[6-9]\d{9}$/.test(
+              value
+            );
+          },
+          {
+            message:
+              "Enter a valid 10-digit mobile number.",
+          }
+        ),
 
     email:
       z
@@ -420,9 +479,39 @@ const nextActionSchema =
     )
     .max(500);
 
+/*
+|--------------------------------------------------------------------------
+| Follow-up Date / Time
+|--------------------------------------------------------------------------
+|
+| Used by:
+|
+| - Create Lead
+| - Update Lead
+|
+| When followUpAt is supplied, it must:
+|
+| - Be a valid date/time
+| - Be the current time or future
+| - Never be in the past
+|
+| A 60-second tolerance matches the frontend validation.
+|
+*/
+
 const followUpAtSchema =
   z.coerce
-    .date();
+    .date({
+      error:
+        "Enter a valid follow-up date and time.",
+    })
+    .refine(
+      isCurrentOrFutureDate,
+      {
+        message:
+          "Follow-up date and time cannot be in the past.",
+      }
+    );
 
 const knownRelationshipSchema =
   z.coerce

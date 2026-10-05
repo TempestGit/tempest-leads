@@ -65,6 +65,46 @@ const toDateInput = (
 
 /*
 |--------------------------------------------------------------------------
+| Local Date
+|--------------------------------------------------------------------------
+|
+| Returns today's date using the browser's local timezone.
+|
+| Example:
+| 2026-10-01
+|
+*/
+
+const getLocalDate =
+  () => {
+    const date =
+      new Date();
+
+    const year =
+      date.getFullYear();
+
+    const month =
+      String(
+        date.getMonth() +
+          1
+      ).padStart(
+        2,
+        "0"
+      );
+
+    const day =
+      String(
+        date.getDate()
+      ).padStart(
+        2,
+        "0"
+      );
+
+    return `${year}-${month}-${day}`;
+  };
+
+/*
+|--------------------------------------------------------------------------
 | Add Activity Modal
 |--------------------------------------------------------------------------
 */
@@ -90,9 +130,12 @@ const AddActivityModal = ({
     useMemo(
       () => ({
         page: 1,
+
         limit: 100,
+
         sort:
           "createdAt",
+
         direction:
           "desc",
       }),
@@ -194,10 +237,26 @@ const AddActivityModal = ({
         ""
     );
 
-    setNextFollowUp(
+    /*
+     * Only use the existing follow-up
+     * when it is today or in the future.
+     *
+     * If the lead contains an old/past
+     * follow-up date, do not put that
+     * past date back into the field.
+     */
+
+    const existingFollowUp =
       toDateInput(
         lead?.followUpAt
-      )
+      );
+
+    setNextFollowUp(
+      existingFollowUp &&
+        existingFollowUp >=
+          getLocalDate()
+        ? existingFollowUp
+        : ""
     );
 
     setError("");
@@ -226,10 +285,22 @@ const AddActivityModal = ({
         ""
     );
 
-    setNextFollowUp(
+    /*
+     * Do not load an old follow-up
+     * date into the date input.
+     */
+
+    const existingFollowUp =
       toDateInput(
         resolvedLead.followUpAt
-      )
+      );
+
+    setNextFollowUp(
+      existingFollowUp &&
+        existingFollowUp >=
+          getLocalDate()
+        ? existingFollowUp
+        : ""
     );
   }, [
     open,
@@ -277,9 +348,77 @@ const AddActivityModal = ({
     mutation.isPending,
   ]);
 
+  /*
+  |--------------------------------------------------------------------------
+  | Not Open
+  |--------------------------------------------------------------------------
+  */
+
   if (!open) {
     return null;
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Current Date
+  |--------------------------------------------------------------------------
+  */
+
+  const today =
+    getLocalDate();
+
+  /*
+  |--------------------------------------------------------------------------
+  | Next Follow-up Change
+  |--------------------------------------------------------------------------
+  */
+
+  const handleNextFollowUpChange =
+    (
+      event
+    ) => {
+      const selectedDate =
+        event.target.value;
+
+      const currentDate =
+        getLocalDate();
+
+      /*
+       * Empty value is allowed because
+       * Next follow-up itself is optional.
+       */
+
+      if (!selectedDate) {
+        setNextFollowUp("");
+
+        setError("");
+
+        return;
+      }
+
+      /*
+       * Browser min normally prevents
+       * this, but keep a JavaScript
+       * check as additional protection.
+       */
+
+      if (
+        selectedDate <
+        currentDate
+      ) {
+        setError(
+          "Next follow-up date cannot be in the past."
+        );
+
+        return;
+      }
+
+      setNextFollowUp(
+        selectedDate
+      );
+
+      setError("");
+    };
 
   /*
   |--------------------------------------------------------------------------
@@ -350,6 +489,29 @@ const AddActivityModal = ({
         return;
       }
 
+      /*
+      |--------------------------------------------------------------------------
+      | Prevent Past Follow-up Date
+      |--------------------------------------------------------------------------
+      |
+      | Do not rely only on min={today}.
+      | Browser validation can be bypassed,
+      | so validate again before API request.
+      |
+      */
+
+      if (
+        hasDate &&
+        nextFollowUp <
+          getLocalDate()
+      ) {
+        setError(
+          "Next follow-up date cannot be in the past."
+        );
+
+        return;
+      }
+
       let nextFollowUpAt =
         null;
 
@@ -363,14 +525,18 @@ const AddActivityModal = ({
         hasAction &&
         hasDate
       ) {
-        const date =
+        const followUpDate =
           new Date(
             `${nextFollowUp}T10:00:00`
           );
 
+        /*
+         * Validate generated date.
+         */
+
         if (
           Number.isNaN(
-            date.getTime()
+            followUpDate.getTime()
           )
         ) {
           setError(
@@ -380,8 +546,34 @@ const AddActivityModal = ({
           return;
         }
 
+        /*
+         * Final date protection.
+         *
+         * Since this modal only asks for
+         * a date and not a time, today's
+         * date is valid regardless of
+         * whether 10:00 AM has passed.
+         */
+
+        const selectedDateOnly =
+          nextFollowUp;
+
+        const todayDateOnly =
+          getLocalDate();
+
+        if (
+          selectedDateOnly <
+          todayDateOnly
+        ) {
+          setError(
+            "Next follow-up date cannot be in the past."
+          );
+
+          return;
+        }
+
         nextFollowUpAt =
-          date.toISOString();
+          followUpDate.toISOString();
       }
 
       /*
@@ -424,10 +616,18 @@ const AddActivityModal = ({
             ?.response
             ?.data
             ?.message ||
+            requestError
+              ?.message ||
             "Unable to record activity."
         );
       }
     };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Render
+  |--------------------------------------------------------------------------
+  */
 
   return (
     <div className="modal-backdrop">
@@ -466,7 +666,11 @@ const AddActivityModal = ({
             }
             aria-label="Close"
           >
-            <X size={15} />
+            <X
+              size={
+                15
+              }
+            />
           </button>
         </header>
 
@@ -611,12 +815,14 @@ const AddActivityModal = ({
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setNextAction(
                       event.target
                         .value
-                    )
-                  }
+                    );
+
+                    setError("");
+                  }}
                 />
               </label>
 
@@ -648,16 +854,14 @@ const AddActivityModal = ({
 
                 <input
                   type="date"
+                  min={
+                    today
+                  }
                   value={
                     nextFollowUp
                   }
-                  onChange={(
-                    event
-                  ) =>
-                    setNextFollowUp(
-                      event.target
-                        .value
-                    )
+                  onChange={
+                    handleNextFollowUpChange
                   }
                 />
               </label>

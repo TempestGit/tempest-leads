@@ -147,7 +147,7 @@ const LeadMeetingsPanel = ({
             </p>
           </div>
 
-          <button
+          {/* <button
             type="button"
             className="tl-primary"
             onClick={() =>
@@ -157,7 +157,7 @@ const LeadMeetingsPanel = ({
             }
           >
             + Schedule meeting
-          </button>
+          </button> */}
         </div>
 
         {query.isError ? (

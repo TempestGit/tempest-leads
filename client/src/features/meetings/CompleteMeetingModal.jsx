@@ -13,7 +13,40 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| Default Follow-up
+| Local Date
+|--------------------------------------------------------------------------
+*/
+
+const getLocalDate =
+  () => {
+    const date =
+      new Date();
+
+    const year =
+      date.getFullYear();
+
+    const month =
+      String(
+        date.getMonth() + 1
+      ).padStart(
+        2,
+        "0"
+      );
+
+    const day =
+      String(
+        date.getDate()
+      ).padStart(
+        2,
+        "0"
+      );
+
+    return `${year}-${month}-${day}`;
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Tomorrow
 |--------------------------------------------------------------------------
 */
 
@@ -32,8 +65,7 @@ const getTomorrow =
 
     const month =
       String(
-        date.getMonth() +
-          1
+        date.getMonth() + 1
       ).padStart(
         2,
         "0"
@@ -63,6 +95,12 @@ const CompleteMeetingModal = ({
 }) => {
   const mutation =
     useCompleteMeetingMutation();
+
+  /*
+  |--------------------------------------------------------------------------
+  | State
+  |--------------------------------------------------------------------------
+  */
 
   const [
     notes,
@@ -108,6 +146,10 @@ const CompleteMeetingModal = ({
 
     setNextAction("");
 
+    /*
+     * Default follow-up remains tomorrow.
+     */
+
     setFollowUpDate(
       getTomorrow()
     );
@@ -118,12 +160,75 @@ const CompleteMeetingModal = ({
     meeting,
   ]);
 
+  /*
+  |--------------------------------------------------------------------------
+  | Not Open
+  |--------------------------------------------------------------------------
+  */
+
   if (
     !open ||
     !meeting
   ) {
     return null;
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Current Date
+  |--------------------------------------------------------------------------
+  */
+
+  const today =
+    getLocalDate();
+
+  /*
+  |--------------------------------------------------------------------------
+  | Follow-up Date Change
+  |--------------------------------------------------------------------------
+  */
+
+  const handleFollowUpDateChange =
+    (
+      event
+    ) => {
+      const selectedDate =
+        event.target.value;
+
+      /*
+       * Allow clearing so normal
+       * required validation can handle it.
+       */
+
+      if (!selectedDate) {
+        setFollowUpDate("");
+
+        setError("");
+
+        return;
+      }
+
+      /*
+       * Reject past date.
+       */
+
+      if (
+        selectedDate <
+        getLocalDate()
+      ) {
+        setError(
+          "Follow-up date cannot be in the past."
+        );
+
+        return;
+      }
+
+      setFollowUpDate(
+        selectedDate
+      );
+
+      setError("");
+    };
 
   /*
   |--------------------------------------------------------------------------
@@ -135,6 +240,12 @@ const CompleteMeetingModal = ({
     async () => {
       setError("");
 
+      /*
+      |--------------------------------------------------------------------------
+      | Notes
+      |--------------------------------------------------------------------------
+      */
+
       if (
         !notes.trim()
       ) {
@@ -144,6 +255,12 @@ const CompleteMeetingModal = ({
 
         return;
       }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Outcome
+      |--------------------------------------------------------------------------
+      */
 
       if (
         !outcome.trim()
@@ -155,6 +272,12 @@ const CompleteMeetingModal = ({
         return;
       }
 
+      /*
+      |--------------------------------------------------------------------------
+      | Next Action
+      |--------------------------------------------------------------------------
+      */
+
       if (
         !nextAction.trim()
       ) {
@@ -164,6 +287,12 @@ const CompleteMeetingModal = ({
 
         return;
       }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Follow-up Date
+      |--------------------------------------------------------------------------
+      */
 
       if (
         !followUpDate
@@ -175,10 +304,75 @@ const CompleteMeetingModal = ({
         return;
       }
 
-      const followUpAt =
-        new Date(
-          `${followUpDate}T10:00:00`
+      /*
+      |--------------------------------------------------------------------------
+      | Prevent Past Date
+      |--------------------------------------------------------------------------
+      */
+
+      const currentDate =
+        getLocalDate();
+
+      if (
+        followUpDate <
+        currentDate
+      ) {
+        setError(
+          "Follow-up date cannot be in the past."
         );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Build Follow-up Date / Time
+      |--------------------------------------------------------------------------
+      |
+      | This modal currently does not have a time field.
+      |
+      | If TODAY is selected:
+      | use current local time.
+      |
+      | If a FUTURE date is selected:
+      | use 10:00 AM.
+      |
+      | This prevents today's follow-up from becoming a past datetime
+      | when the current time is already after 10:00 AM.
+      |
+      */
+
+      let followUpAt;
+
+      if (
+        followUpDate ===
+        currentDate
+      ) {
+        /*
+         * Current time + small buffer.
+         *
+         * The buffer prevents the timestamp
+         * from becoming past while the
+         * request is being submitted.
+         */
+
+        followUpAt =
+          new Date(
+            Date.now() +
+              60 * 1000
+          );
+      } else {
+        followUpAt =
+          new Date(
+            `${followUpDate}T10:00:00`
+          );
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Validate Generated Date
+      |--------------------------------------------------------------------------
+      */
 
       if (
         Number.isNaN(
@@ -191,6 +385,33 @@ const CompleteMeetingModal = ({
 
         return;
       }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Final Past Date / Time Protection
+      |--------------------------------------------------------------------------
+      */
+
+      const minimumAllowed =
+        Date.now() -
+        60 * 1000;
+
+      if (
+        followUpAt.getTime() <
+        minimumAllowed
+      ) {
+        setError(
+          "Follow-up date cannot be in the past."
+        );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Request
+      |--------------------------------------------------------------------------
+      */
 
       try {
         await mutation.mutateAsync({
@@ -221,10 +442,18 @@ const CompleteMeetingModal = ({
             ?.response
             ?.data
             ?.message ||
+            requestError
+              ?.message ||
             "Unable to complete meeting."
         );
       }
     };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Render
+  |--------------------------------------------------------------------------
+  */
 
   return (
     <div className="modal-backdrop">
@@ -233,6 +462,8 @@ const CompleteMeetingModal = ({
         role="dialog"
         aria-modal="true"
       >
+        {/* Header */}
+
         <header className="modal-head">
           <div>
             <h2>
@@ -241,7 +472,9 @@ const CompleteMeetingModal = ({
 
             <p>
               <b>
-                {meeting.title}
+                {
+                  meeting.title
+                }
               </b>
             </p>
           </div>
@@ -255,10 +488,17 @@ const CompleteMeetingModal = ({
             disabled={
               mutation.isPending
             }
+            aria-label="Close"
           >
-            <X size={15} />
+            <X
+              size={
+                15
+              }
+            />
           </button>
         </header>
+
+        {/* Body */}
 
         <div className="modal-body">
           {error && (
@@ -269,6 +509,8 @@ const CompleteMeetingModal = ({
 
           <div className="form-section">
             <div className="form-grid2">
+              {/* Meeting Notes */}
+
               <label className="full">
                 Meeting notes *
 
@@ -279,73 +521,87 @@ const CompleteMeetingModal = ({
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setNotes(
                       event.target
                         .value
-                    )
-                  }
+                    );
+
+                    setError("");
+                  }}
                   autoFocus
                 />
               </label>
+
+              {/* Outcome */}
 
               <label>
                 Outcome *
 
                 <input
+                  type="text"
                   value={
                     outcome
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setOutcome(
                       event.target
                         .value
-                    )
-                  }
+                    );
+
+                    setError("");
+                  }}
                 />
               </label>
+
+              {/* Next Action */}
 
               <label>
                 Next action *
 
                 <input
+                  type="text"
                   value={
                     nextAction
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setNextAction(
                       event.target
                         .value
-                    )
-                  }
+                    );
+
+                    setError("");
+                  }}
                 />
               </label>
+
+              {/* Follow-up Date */}
 
               <label>
                 Follow-up date *
 
                 <input
                   type="date"
+                  min={
+                    today
+                  }
                   value={
                     followUpDate
                   }
-                  onChange={(
-                    event
-                  ) =>
-                    setFollowUpDate(
-                      event.target
-                        .value
-                    )
+                  onChange={
+                    handleFollowUpDateChange
                   }
                 />
               </label>
             </div>
           </div>
         </div>
+
+        {/* Footer */}
 
         <footer className="modal-foot">
           <button

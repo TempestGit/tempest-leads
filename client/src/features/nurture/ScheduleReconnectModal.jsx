@@ -15,6 +15,69 @@ import {
 
 /*
 |--------------------------------------------------------------------------
+| Local Date
+|--------------------------------------------------------------------------
+*/
+
+const getLocalDate =
+  () => {
+    const date =
+      new Date();
+
+    const year =
+      date.getFullYear();
+
+    const month =
+      String(
+        date.getMonth() + 1
+      ).padStart(
+        2,
+        "0"
+      );
+
+    const day =
+      String(
+        date.getDate()
+      ).padStart(
+        2,
+        "0"
+      );
+
+    return `${year}-${month}-${day}`;
+  };
+
+/*
+|--------------------------------------------------------------------------
+| Local Time
+|--------------------------------------------------------------------------
+*/
+
+const getLocalTime =
+  () => {
+    const date =
+      new Date();
+
+    const hours =
+      String(
+        date.getHours()
+      ).padStart(
+        2,
+        "0"
+      );
+
+    const minutes =
+      String(
+        date.getMinutes()
+      ).padStart(
+        2,
+        "0"
+      );
+
+    return `${hours}:${minutes}`;
+  };
+
+/*
+|--------------------------------------------------------------------------
 | Default Reconnect Date
 |--------------------------------------------------------------------------
 */
@@ -34,8 +97,7 @@ const getDefaultDate =
 
     const month =
       String(
-        date.getMonth() +
-          1
+        date.getMonth() + 1
       ).padStart(
         2,
         "0"
@@ -163,9 +225,20 @@ const ScheduleReconnectModal = ({
       "Reconnect"
     );
 
+    /*
+     * Keep existing behavior:
+     * default reconnect date is
+     * 30 days from today.
+     */
+
     setDate(
       getDefaultDate()
     );
+
+    /*
+     * Keep default future-date
+     * reconnect time as 10:00.
+     */
 
     setTime(
       "10:00"
@@ -222,9 +295,27 @@ const ScheduleReconnectModal = ({
     mutation.isPending,
   ]);
 
+  /*
+  |--------------------------------------------------------------------------
+  | Not Open
+  |--------------------------------------------------------------------------
+  */
+
   if (!open) {
     return null;
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Current Date / Time
+  |--------------------------------------------------------------------------
+  */
+
+  const today =
+    getLocalDate();
+
+  const currentTime =
+    getLocalTime();
 
   /*
   |--------------------------------------------------------------------------
@@ -254,6 +345,136 @@ const ScheduleReconnectModal = ({
 
   /*
   |--------------------------------------------------------------------------
+  | Date Change
+  |--------------------------------------------------------------------------
+  */
+
+  const handleDateChange =
+    (
+      event
+    ) => {
+      const selectedDate =
+        event.target.value;
+
+      const nowDate =
+        getLocalDate();
+
+      const nowTime =
+        getLocalTime();
+
+      /*
+       * Allow clearing.
+       */
+
+      if (!selectedDate) {
+        setDate("");
+
+        setError("");
+
+        return;
+      }
+
+      /*
+       * Reject past date.
+       */
+
+      if (
+        selectedDate <
+        nowDate
+      ) {
+        setError(
+          "Reconnect date cannot be in the past."
+        );
+
+        return;
+      }
+
+      setDate(
+        selectedDate
+      );
+
+      /*
+       * If the user selects today
+       * and the selected time has
+       * already passed, move it
+       * automatically to current time.
+       */
+
+      if (
+        selectedDate ===
+          nowDate &&
+        (
+          !time ||
+          time <
+            nowTime
+        )
+      ) {
+        setTime(
+          nowTime
+        );
+      }
+
+      setError("");
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Time Change
+  |--------------------------------------------------------------------------
+  */
+
+  const handleTimeChange =
+    (
+      event
+    ) => {
+      const selectedTime =
+        event.target.value;
+
+      const nowDate =
+        getLocalDate();
+
+      const nowTime =
+        getLocalTime();
+
+      /*
+       * Allow clearing.
+       */
+
+      if (!selectedTime) {
+        setTime("");
+
+        setError("");
+
+        return;
+      }
+
+      /*
+       * Past time is blocked only
+       * when today's date is selected.
+       */
+
+      if (
+        date ===
+          nowDate &&
+        selectedTime <
+          nowTime
+      ) {
+        setError(
+          "Reconnect time cannot be in the past."
+        );
+
+        return;
+      }
+
+      setTime(
+        selectedTime
+      );
+
+      setError("");
+    };
+
+  /*
+  |--------------------------------------------------------------------------
   | Submit
   |--------------------------------------------------------------------------
   */
@@ -261,6 +482,12 @@ const ScheduleReconnectModal = ({
   const submit =
     async () => {
       setError("");
+
+      /*
+      |--------------------------------------------------------------------------
+      | Related Lead
+      |--------------------------------------------------------------------------
+      */
 
       if (
         !resolvedLeadId
@@ -272,6 +499,12 @@ const ScheduleReconnectModal = ({
         return;
       }
 
+      /*
+      |--------------------------------------------------------------------------
+      | Action
+      |--------------------------------------------------------------------------
+      */
+
       if (
         !action.trim()
       ) {
@@ -281,6 +514,12 @@ const ScheduleReconnectModal = ({
 
         return;
       }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Date / Time
+      |--------------------------------------------------------------------------
+      */
 
       if (
         !date ||
@@ -293,10 +532,39 @@ const ScheduleReconnectModal = ({
         return;
       }
 
+      /*
+      |--------------------------------------------------------------------------
+      | Prevent Past Date
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        date <
+        getLocalDate()
+      ) {
+        setError(
+          "Reconnect date cannot be in the past."
+        );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Build Reconnect Date / Time
+      |--------------------------------------------------------------------------
+      */
+
       const dueAt =
         new Date(
           `${date}T${time}:00`
         );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Validate Date
+      |--------------------------------------------------------------------------
+      */
 
       if (
         Number.isNaN(
@@ -309,6 +577,43 @@ const ScheduleReconnectModal = ({
 
         return;
       }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Prevent Past Date / Time
+      |--------------------------------------------------------------------------
+      |
+      | Browser min attributes protect
+      | the normal UI flow.
+      |
+      | This additional validation
+      | protects submission too.
+      |
+      | Current minute receives a
+      | 60-second tolerance.
+      |
+      */
+
+      const minimumAllowed =
+        Date.now() -
+        60 * 1000;
+
+      if (
+        dueAt.getTime() <
+        minimumAllowed
+      ) {
+        setError(
+          "Reconnect date and time cannot be in the past. Select the current time or a future time."
+        );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Request
+      |--------------------------------------------------------------------------
+      */
 
       try {
         await mutation.mutateAsync({
@@ -340,10 +645,18 @@ const ScheduleReconnectModal = ({
             ?.response
             ?.data
             ?.message ||
+            requestError
+              ?.message ||
             "Unable to schedule reconnect."
         );
       }
     };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Render
+  |--------------------------------------------------------------------------
+  */
 
   return (
     <div className="modal-backdrop">
@@ -378,7 +691,11 @@ const ScheduleReconnectModal = ({
             }
             aria-label="Close"
           >
-            <X size={15} />
+            <X
+              size={
+                15
+              }
+            />
           </button>
         </header>
 
@@ -408,12 +725,14 @@ const ScheduleReconnectModal = ({
                     }
                     onChange={(
                       event
-                    ) =>
+                    ) => {
                       setSelectedLeadId(
                         event.target
                           .value
-                      )
-                    }
+                      );
+
+                      setError("");
+                    }}
                   >
                     <option value="">
                       {nurtureQuery.isLoading
@@ -436,7 +755,9 @@ const ScheduleReconnectModal = ({
                           {
                             item.companyName
                           }
+
                           {" · "}
+
                           {
                             item.leadCode
                           }
@@ -452,9 +773,15 @@ const ScheduleReconnectModal = ({
                   </small>
 
                   <b>
-                    {lead.companyName}
+                    {
+                      lead.companyName
+                    }
+
                     {" · "}
-                    {lead.leadCode}
+
+                    {
+                      lead.leadCode
+                    }
                   </b>
                 </div>
               )}
@@ -471,12 +798,14 @@ const ScheduleReconnectModal = ({
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setAction(
                       event.target
                         .value
-                    )
-                  }
+                    );
+
+                    setError("");
+                  }}
                 />
               </label>
 
@@ -487,16 +816,14 @@ const ScheduleReconnectModal = ({
 
                 <input
                   type="date"
+                  min={
+                    today
+                  }
                   value={
                     date
                   }
-                  onChange={(
-                    event
-                  ) =>
-                    setDate(
-                      event.target
-                        .value
-                    )
+                  onChange={
+                    handleDateChange
                   }
                 />
               </label>
@@ -504,20 +831,21 @@ const ScheduleReconnectModal = ({
               {/* Time */}
 
               <label>
-                Time
+                Time *
 
                 <input
                   type="time"
+                  min={
+                    date ===
+                    today
+                      ? currentTime
+                      : undefined
+                  }
                   value={
                     time
                   }
-                  onChange={(
-                    event
-                  ) =>
-                    setTime(
-                      event.target
-                        .value
-                    )
+                  onChange={
+                    handleTimeChange
                   }
                 />
               </label>
@@ -533,12 +861,14 @@ const ScheduleReconnectModal = ({
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setPriority(
                       event.target
                         .value
-                    )
-                  }
+                    );
+
+                    setError("");
+                  }}
                 >
                   <option value="High">
                     High

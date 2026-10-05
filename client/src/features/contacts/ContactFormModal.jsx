@@ -313,17 +313,6 @@ const ContactFormModal = ({
   return (
     <div
       className="modal-backdrop"
-      onMouseDown={(
-        event
-      ) => {
-        if (
-          event.target ===
-            event.currentTarget &&
-          !busy
-        ) {
-          onClose();
-        }
-      }}
     >
       <section
         className="tl-modal"

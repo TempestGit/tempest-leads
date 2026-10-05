@@ -58,6 +58,12 @@ const optionalNullableText = (
       .optional()
   );
 
+/*
+|--------------------------------------------------------------------------
+| Email Helpers
+|--------------------------------------------------------------------------
+*/
+
 const nullableEmail =
   z.preprocess(
     (value) => {
@@ -103,45 +109,172 @@ const optionalNullableEmail =
 
 /*
 |--------------------------------------------------------------------------
+| Phone Helpers
+|--------------------------------------------------------------------------
+|
+| Phone number is optional.
+|
+| When provided:
+|
+| - Must contain exactly 10 digits
+| - Must start with 6, 7, 8 or 9
+|
+| Valid:
+|
+| 9876543210
+| 8123456789
+| 7123456789
+| 6123456789
+|
+| Invalid:
+|
+| 1234567890
+| 987654321
+| 98765432100
+| +919876543210
+| 98765abc10
+|
+*/
+
+const nullablePhone =
+  z.preprocess(
+    (value) => {
+      if (
+        value === "" ||
+        value === null ||
+        value === undefined
+      ) {
+        return null;
+      }
+
+      return value;
+    },
+    z
+      .string()
+      .trim()
+      .refine(
+        (value) =>
+          /^[6-9]\d{9}$/.test(
+            value
+          ),
+        {
+          message:
+            "Enter a valid 10-digit mobile number.",
+        }
+      )
+      .nullable()
+  );
+
+const optionalNullablePhone =
+  z.preprocess(
+    (value) => {
+      if (
+        value === ""
+      ) {
+        return null;
+      }
+
+      return value;
+    },
+    z
+      .string()
+      .trim()
+      .refine(
+        (value) =>
+          /^[6-9]\d{9}$/.test(
+            value
+          ),
+        {
+          message:
+            "Enter a valid 10-digit mobile number.",
+        }
+      )
+      .nullable()
+      .optional()
+  );
+
+/*
+|--------------------------------------------------------------------------
 | Create Contact
 |--------------------------------------------------------------------------
 */
 
 export const createContactSchema =
   z.object({
-    companyId: z.coerce
-      .number()
-      .int(
-        "Company ID must be an integer."
-      )
-      .positive(
-        "Company is required."
-      ),
+    /*
+    |--------------------------------------------------------------------------
+    | Company
+    |--------------------------------------------------------------------------
+    */
 
-    name: z
-      .string()
-      .trim()
-      .min(
-        2,
-        "Contact name is required."
-      )
-      .max(
-        150,
-        "Contact name is too long."
-      ),
+    companyId:
+      z.coerce
+        .number()
+        .int(
+          "Company ID must be an integer."
+        )
+        .positive(
+          "Company is required."
+        ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Name
+    |--------------------------------------------------------------------------
+    */
+
+    name:
+      z
+        .string()
+        .trim()
+        .min(
+          2,
+          "Contact name is required."
+        )
+        .max(
+          150,
+          "Contact name is too long."
+        ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Designation
+    |--------------------------------------------------------------------------
+    */
 
     designation:
-      nullableText(150),
+      nullableText(
+        150
+      ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Phone
+    |--------------------------------------------------------------------------
+    */
 
     phone:
-      nullableText(30),
+      nullablePhone,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Email
+    |--------------------------------------------------------------------------
+    */
 
     email:
       nullableEmail,
 
-    isDecisionMaker: z
-      .boolean()
-      .default(false),
+    /*
+    |--------------------------------------------------------------------------
+    | Decision Maker
+    |--------------------------------------------------------------------------
+    */
+
+    isDecisionMaker:
+      z
+        .boolean()
+        .default(false),
   });
 
 /*
@@ -153,45 +286,94 @@ export const createContactSchema =
 export const updateContactSchema =
   z
     .object({
-      companyId: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional(),
+      /*
+      |--------------------------------------------------------------------------
+      | Company
+      |--------------------------------------------------------------------------
+      */
 
-      name: z
-        .string()
-        .trim()
-        .min(
-          2,
-          "Contact name is required."
-        )
-        .max(150)
-        .optional(),
+      companyId:
+        z.coerce
+          .number()
+          .int()
+          .positive()
+          .optional(),
+
+      /*
+      |--------------------------------------------------------------------------
+      | Name
+      |--------------------------------------------------------------------------
+      */
+
+      name:
+        z
+          .string()
+          .trim()
+          .min(
+            2,
+            "Contact name is required."
+          )
+          .max(150)
+          .optional(),
+
+      /*
+      |--------------------------------------------------------------------------
+      | Designation
+      |--------------------------------------------------------------------------
+      */
 
       designation:
         optionalNullableText(
           150
         ),
 
+      /*
+      |--------------------------------------------------------------------------
+      | Phone
+      |--------------------------------------------------------------------------
+      */
+
       phone:
-        optionalNullableText(
-          30
-        ),
+        optionalNullablePhone,
+
+      /*
+      |--------------------------------------------------------------------------
+      | Email
+      |--------------------------------------------------------------------------
+      */
 
       email:
         optionalNullableEmail,
+
+      /*
+      |--------------------------------------------------------------------------
+      | Decision Maker
+      |--------------------------------------------------------------------------
+      */
 
       isDecisionMaker:
         z
           .boolean()
           .optional(),
 
-      status: z
-        .enum(
-          CONTACT_STATUSES
-        )
-        .optional(),
+      /*
+      |--------------------------------------------------------------------------
+      | Status
+      |--------------------------------------------------------------------------
+      */
+
+      status:
+        z
+          .enum(
+            CONTACT_STATUSES
+          )
+          .optional(),
+
+      /*
+      |--------------------------------------------------------------------------
+      | Notes
+      |--------------------------------------------------------------------------
+      */
 
       notes:
         optionalNullableText(
@@ -200,8 +382,9 @@ export const updateContactSchema =
     })
     .refine(
       (data) =>
-        Object.keys(data)
-          .length > 0,
+        Object.keys(
+          data
+        ).length > 0,
       {
         message:
           "At least one field must be provided.",
@@ -216,14 +399,15 @@ export const updateContactSchema =
 
 export const contactIdSchema =
   z.object({
-    contactId: z.coerce
-      .number()
-      .int(
-        "Contact ID must be an integer."
-      )
-      .positive(
-        "Contact ID must be positive."
-      ),
+    contactId:
+      z.coerce
+        .number()
+        .int(
+          "Contact ID must be an integer."
+        )
+        .positive(
+          "Contact ID must be positive."
+        ),
   });
 
 /*
@@ -252,58 +436,101 @@ const queryBoolean =
 
 export const contactListSchema =
   z.object({
-    search: z
-      .string()
-      .trim()
-      .max(190)
-      .optional()
-      .default(""),
+    /*
+    |--------------------------------------------------------------------------
+    | Search
+    |--------------------------------------------------------------------------
+    */
 
-    companyId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional(),
+    search:
+      z
+        .string()
+        .trim()
+        .max(190)
+        .optional()
+        .default(""),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Company
+    |--------------------------------------------------------------------------
+    */
+
+    companyId:
+      z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Decision Maker
+    |--------------------------------------------------------------------------
+    */
 
     isDecisionMaker:
       queryBoolean,
 
-    status: z
-      .enum(
-        CONTACT_STATUSES
-      )
-      .optional(),
+    /*
+    |--------------------------------------------------------------------------
+    | Status
+    |--------------------------------------------------------------------------
+    */
 
-    page: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .default(1),
+    status:
+      z
+        .enum(
+          CONTACT_STATUSES
+        )
+        .optional(),
 
-    limit: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .default(20),
+    /*
+    |--------------------------------------------------------------------------
+    | Pagination
+    |--------------------------------------------------------------------------
+    */
 
-    sort: z
-      .enum([
-        "name",
-        "companyName",
-        "createdAt",
-        "updatedAt",
-      ])
-      .default(
-        "createdAt"
-      ),
+    page:
+      z.coerce
+        .number()
+        .int()
+        .min(1)
+        .default(1),
 
-    direction: z
-      .enum([
-        "asc",
-        "desc",
-      ])
-      .default(
-        "asc"
-      ),
+    limit:
+      z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .default(20),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sorting
+    |--------------------------------------------------------------------------
+    */
+
+    sort:
+      z
+        .enum([
+          "name",
+          "companyName",
+          "createdAt",
+          "updatedAt",
+        ])
+        .default(
+          "createdAt"
+        ),
+
+    direction:
+      z
+        .enum([
+          "asc",
+          "desc",
+        ])
+        .default(
+          "asc"
+        ),
   });

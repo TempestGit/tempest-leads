@@ -30,6 +30,70 @@ export const FOLLOWUP_VIEWS = [
 
 /*
 |--------------------------------------------------------------------------
+| Future Date Validation
+|--------------------------------------------------------------------------
+|
+| Follow-up date/time must not be in the past.
+|
+| A small 60-second tolerance is allowed because:
+|
+| - Frontend time inputs normally work at minute precision.
+| - Network requests take some time.
+| - A user may select the current minute and submit several seconds later.
+|
+| Example:
+|
+| Selected: 11:58:00
+| Submitted: 11:58:35
+|
+| This should still be accepted.
+|
+*/
+
+const isCurrentOrFutureDate = (
+  value
+) => {
+  if (
+    !(value instanceof Date) ||
+    Number.isNaN(
+      value.getTime()
+    )
+  ) {
+    return false;
+  }
+
+  const minimumAllowed =
+    Date.now() -
+    60 * 1000;
+
+  return (
+    value.getTime() >=
+    minimumAllowed
+  );
+};
+
+/*
+|--------------------------------------------------------------------------
+| Future Date Schema
+|--------------------------------------------------------------------------
+*/
+
+const futureDateSchema =
+  z.coerce
+    .date({
+      error:
+        "Enter a valid date and time.",
+    })
+    .refine(
+      isCurrentOrFutureDate,
+      {
+        message:
+          "Date and time cannot be in the past.",
+      }
+    );
+
+/*
+|--------------------------------------------------------------------------
 | Follow-up ID
 |--------------------------------------------------------------------------
 */
@@ -87,6 +151,12 @@ export const followupListSchema =
 |--------------------------------------------------------------------------
 | Schedule Follow-up
 |--------------------------------------------------------------------------
+|
+| dueAt:
+| - Required
+| - Must be a valid date
+| - Cannot be in the past
+|
 */
 
 export const createFollowupSchema =
@@ -110,8 +180,7 @@ export const createFollowupSchema =
         .max(500),
 
     dueAt:
-      z.coerce
-        .date(),
+      futureDateSchema,
 
     priority:
       z.enum(
@@ -131,6 +200,12 @@ export const createFollowupSchema =
 |--------------------------------------------------------------------------
 | Complete Follow-up
 |--------------------------------------------------------------------------
+|
+| nextFollowUpAt:
+| - Required
+| - Must be valid
+| - Cannot be in the past
+|
 */
 
 export const completeFollowupSchema =
@@ -166,8 +241,7 @@ export const completeFollowupSchema =
         .max(500),
 
     nextFollowUpAt:
-      z.coerce
-        .date(),
+      futureDateSchema,
 
     nextPriority:
       z
@@ -181,13 +255,18 @@ export const completeFollowupSchema =
 |--------------------------------------------------------------------------
 | Reschedule Follow-up
 |--------------------------------------------------------------------------
+|
+| dueAt:
+| - Required
+| - Must be valid
+| - Cannot be in the past
+|
 */
 
 export const rescheduleFollowupSchema =
   z.object({
     dueAt:
-      z.coerce
-        .date(),
+      futureDateSchema,
 
     action:
       z
