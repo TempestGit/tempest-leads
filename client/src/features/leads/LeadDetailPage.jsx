@@ -210,11 +210,11 @@ const getWorkflow = (
   ) {
     return [
       "Brief",
-      "Scope Confirmation",
+      // "Understand Client + Industry",
+      // "Team Assignment",
+      "Pitch",
       "Commercials",
       "Contract / PO",
-      "Team Assignment",
-      "Pitch",
       "Onboarding",
       "Active Client",
     ];
