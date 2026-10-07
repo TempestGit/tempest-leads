@@ -6,171 +6,95 @@ import {
   updateCompanyService,
 } from "./companies.service.js";
 
-/*
-|--------------------------------------------------------------------------
-| Metadata
-|--------------------------------------------------------------------------
-*/
+const getRequestMetadata = (req) => ({
+  ipAddress: req.ip || null,
 
-const getRequestMetadata =
-  (req) => ({
-    ipAddress:
-      req.ip || null,
+  userAgent: req.get("user-agent") || null,
+});
 
-    userAgent:
-      req.get(
-        "user-agent"
-      ) || null,
+export const listCompaniesController = async (req, res) => {
+  const result = await getCompaniesService(req.validated.query, req.user);
+
+  res.status(200).json({
+    success: true,
+    data: result,
+  });
+};
+
+export const getCompanyController = async (req, res) => {
+  const { companyId } = req.validated.params;
+
+  const company = await getCompanyService(companyId, req.user);
+
+  res.status(200).json({
+    success: true,
+
+    data: {
+      company,
+    },
+  });
+};
+
+export const createCompanyController = async (req, res) => {
+  const company = await createCompanyService({
+    data: req.validated.body,
+
+    userId: req.user.id,
+
+    ...getRequestMetadata(req),
   });
 
-/*
-|--------------------------------------------------------------------------
-| GET /api/companies
-|--------------------------------------------------------------------------
-*/
+  res.status(201).json({
+    success: true,
 
-export const listCompaniesController =
-  async (req, res) => {
-    const result =
-      await getCompaniesService(
-        req.validated.query,
-        req.user
-      );
+    message: "Company created.",
 
-    res.status(200).json({
-      success: true,
-      data: result,
-    });
-  };
+    data: {
+      company,
+    },
+  });
+};
 
-/*
-|--------------------------------------------------------------------------
-| GET /api/companies/:companyId
-|--------------------------------------------------------------------------
-*/
+export const updateCompanyController = async (req, res) => {
+  const { companyId } = req.validated.params;
 
-export const getCompanyController =
-  async (req, res) => {
-    const {
-      companyId,
-    } =
-      req.validated.params;
+  const company = await updateCompanyService({
+    companyId,
 
-    const company =
-      await getCompanyService(
-        companyId
-      );
+    data: req.validated.body,
 
-    res.status(200).json({
-      success: true,
+    currentUser: req.user,
 
-      data: {
-        company,
-      },
-    });
-  };
+    userId: req.user.id,
 
-/*
-|--------------------------------------------------------------------------
-| POST /api/companies
-|--------------------------------------------------------------------------
-*/
+    ...getRequestMetadata(req),
+  });
 
-export const createCompanyController =
-  async (req, res) => {
-    const company =
-      await createCompanyService({
-        data:
-          req.validated.body,
+  res.status(200).json({
+    success: true,
 
-        userId:
-          req.user.id,
+    message: "Company updated.",
 
-        ...getRequestMetadata(
-          req
-        ),
-      });
+    data: {
+      company,
+    },
+  });
+};
 
-    res.status(201).json({
-      success: true,
+export const deleteCompanyController = async (req, res) => {
+  const { companyId } = req.validated.params;
 
-      message:
-        "Company created.",
+  await deleteCompanyService({
+    companyId,
 
-      data: {
-        company,
-      },
-    });
-  };
+    userId: req.user.id,
 
-/*
-|--------------------------------------------------------------------------
-| PATCH /api/companies/:companyId
-|--------------------------------------------------------------------------
-*/
+    ...getRequestMetadata(req),
+  });
 
-export const updateCompanyController =
-  async (req, res) => {
-    const {
-      companyId,
-    } =
-      req.validated.params;
+  res.status(200).json({
+    success: true,
 
-    const company =
-      await updateCompanyService({
-        companyId,
-
-        data:
-          req.validated.body,
-
-        userId:
-          req.user.id,
-
-        ...getRequestMetadata(
-          req
-        ),
-      });
-
-    res.status(200).json({
-      success: true,
-
-      message:
-        "Company updated.",
-
-      data: {
-        company,
-      },
-    });
-  };
-
-/*
-|--------------------------------------------------------------------------
-| DELETE /api/companies/:companyId
-|--------------------------------------------------------------------------
-*/
-
-export const deleteCompanyController =
-  async (req, res) => {
-    const {
-      companyId,
-    } =
-      req.validated.params;
-
-    await deleteCompanyService({
-      companyId,
-
-      userId:
-        req.user.id,
-
-      ...getRequestMetadata(
-        req
-      ),
-    });
-
-    res.status(200).json({
-      success: true,
-
-      message:
-        "Company deleted.",
-    });
-  };
+    message: "Company deleted.",
+  });
+};

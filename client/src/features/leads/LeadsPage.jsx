@@ -1,21 +1,12 @@
-import {
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import {
-  useNavigate,
-} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import useAuth from "../auth/useAuth.js";
 
-import {
-  useLeadsQuery,
-} from "./leads.queries.js";
+import { useLeadsQuery } from "./leads.queries.js";
 
-import {
-  LEAD_STAGES,
-} from "./leads.schema.js";
+import { LEAD_STAGES } from "./leads.schema.js";
 
 import LeadFormModal from "./LeadFormModal.jsx";
 
@@ -23,475 +14,255 @@ import AssignOwnerModal from "./AssignOwnerModal.jsx";
 
 import ChangeStageModal from "./ChangeStageModal.jsx";
 
-
-
-/*
-|--------------------------------------------------------------------------
-| Date
-|--------------------------------------------------------------------------
-*/
-
-const formatDate = (
-  value
-) => {
+const formatDate = (value) => {
   if (!value) {
     return "—";
   }
 
-  const date =
-    new Date(value);
+  const date = new Date(value);
 
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
+  if (Number.isNaN(date.getTime())) {
     return "—";
   }
 
-  return date.toLocaleDateString(
-    "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-    }
-  );
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+  });
 };
 
-/*
-|--------------------------------------------------------------------------
-| Time
-|--------------------------------------------------------------------------
-*/
-
-const formatTime = (
-  value
-) => {
+const formatTime = (value) => {
   if (!value) {
     return "—";
   }
 
-  const date =
-    new Date(value);
+  const date = new Date(value);
 
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
+  if (Number.isNaN(date.getTime())) {
     return "—";
   }
 
-  return date.toLocaleTimeString(
-    "en-IN",
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }
-  );
+  return date.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 };
 
-/*
-|--------------------------------------------------------------------------
-| Classes
-|--------------------------------------------------------------------------
-*/
-
-const stageClass = (
-  stage
-) =>
+const stageClass = (stage) =>
   String(stage || "")
-    .replaceAll(
-      " ",
-      "-"
-    )
-    .replaceAll(
-      "/",
-      "-"
-    );
+    .replaceAll(" ", "-")
+    .replaceAll("/", "-");
 
-const priorityClass = (
-  priority
-) =>
-  String(
-    priority || ""
-  ).toLowerCase();
+const priorityClass = (priority) => String(priority || "").toLowerCase();
 
-/*
-|--------------------------------------------------------------------------
-| CSV
-|--------------------------------------------------------------------------
-*/
-
-const csvValue = (
-  value
-) =>
-  `"${String(
-    value ?? ""
-  ).replaceAll(
-    '"',
-    '""'
-  )}"`;
-
-/*
-|--------------------------------------------------------------------------
-| Leads Page
-|--------------------------------------------------------------------------
-*/
+const csvValue = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
 
 const LeadsPage = () => {
-  const navigate =
-  useNavigate();
-  const {
-    user,
-  } = useAuth();
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const [
-    view,
-    setView,
-  ] = useState(
-    "table"
+  const [view, setView] = useState("table");
+
+  const [search, setSearch] = useState("");
+
+  const [stage, setStage] = useState("");
+
+  const [selected, setSelected] = useState([]);
+
+  const [addOpen, setAddOpen] = useState(false);
+
+  const [ownerOpen, setOwnerOpen] = useState(false);
+
+  const [stageOpen, setStageOpen] = useState(false);
+
+  const [draggedLead, setDraggedLead] = useState(null);
+
+  const [droppedStage, setDroppedStage] = useState("New");
+
+  const [dropNotice, setDropNotice] = useState("");
+
+  // Selection must never refer to leads hidden by the current filters.
+  useEffect(() => {
+    setSelected([]);
+  }, [search, stage]);
+
+  const params = useMemo(
+    () => ({
+      search: search.trim(),
+
+      ...(stage
+        ? {
+            stage,
+          }
+        : {}),
+
+      page: 1,
+      limit: 100,
+      sort: "createdAt",
+      direction: "desc",
+    }),
+    [search, stage],
   );
 
-  const [
-    search,
-    setSearch,
-  ] = useState("");
+  const { data, isLoading, isError, error, refetch } = useLeadsQuery(params);
 
-  const [
-    stage,
-    setStage,
-  ] = useState("");
+  const leads = data?.data?.leads || [];
 
-  const [
-    selected,
-    setSelected,
-  ] = useState([]);
+  const selectedLeads = leads.filter((lead) => selected.includes(lead.id));
 
-  const [
-    addOpen,
-    setAddOpen,
-  ] = useState(false);
-
-  const [
-    ownerOpen,
-    setOwnerOpen,
-  ] = useState(false);
-
-  const [
-    stageOpen,
-    setStageOpen,
-  ] = useState(false);
-
-  const [
-    draggedLead,
-    setDraggedLead,
-  ] = useState(null);
-
-  const [
-    droppedStage,
-    setDroppedStage,
-  ] = useState("New");
-
-  /*
-  |--------------------------------------------------------------------------
-  | Params
-  |--------------------------------------------------------------------------
-  */
-
-  const params =
-    useMemo(
-      () => ({
-        search:
-          search.trim(),
-
-        ...(stage
-          ? {
-              stage,
-            }
-          : {}),
-
-        page: 1,
-        limit: 100,
-        sort:
-          "createdAt",
-        direction:
-          "desc",
-      }),
-      [
-        search,
-        stage,
-      ]
-    );
-
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } =
-    useLeadsQuery(
-      params
-    );
-
-  const leads =
-    data?.data
-      ?.leads || [];
-
-  /*
-  |--------------------------------------------------------------------------
-  | Selection
-  |--------------------------------------------------------------------------
-  */
+  // Bulk "Assign owner" is only possible when every selected lead is in
+  // the same branch (owners are chosen per branch).
+  const sharedBranchId =
+    selectedLeads.length > 0 &&
+    selectedLeads.every(
+      (lead) => lead.branchId && lead.branchId === selectedLeads[0].branchId,
+    )
+      ? selectedLeads[0].branchId
+      : null;
 
   const allSelected =
-    leads.length > 0 &&
-    leads.every(
-      (lead) =>
-        selected.includes(
-          lead.id
-        )
+    leads.length > 0 && leads.every((lead) => selected.includes(lead.id));
+
+  const toggleAll = (checked) => {
+    if (checked) {
+      setSelected(leads.map((lead) => lead.id));
+
+      return;
+    }
+
+    setSelected([]);
+  };
+
+  const toggleLead = (leadId) => {
+    setSelected((current) =>
+      current.includes(leadId)
+        ? current.filter((id) => id !== leadId)
+        : [...current, leadId],
     );
+  };
 
-  const toggleAll =
-    (checked) => {
-      if (checked) {
-        setSelected(
-          leads.map(
-            (lead) =>
-              lead.id
-          )
-        );
+  const exportLeads = () => {
+    if (!leads.length) {
+      return;
+    }
 
-        return;
-      }
+    const rows = [
+      [
+        "Lead ID",
+        "Company",
+        "Contact",
+        "Industry",
+        "Source",
+        "Owner",
+        "Stage",
+        "Status",
+        "Priority",
+        "Last touch",
+        "Next action",
+        "Follow-up",
+      ],
 
-      setSelected([]);
-    };
+      ...leads.map((lead) => [
+        lead.leadCode,
+        lead.companyName,
+        lead.primaryContactName,
+        lead.industry,
+        lead.source,
+        lead.ownerName,
+        lead.stage,
+        lead.status,
+        lead.priority,
+        lead.lastTouchAt,
+        lead.nextAction,
+        lead.followUpAt,
+      ]),
+    ];
 
-  const toggleLead =
-    (leadId) => {
-      setSelected(
-        (current) =>
-          current.includes(
-            leadId
-          )
-            ? current.filter(
-                (id) =>
-                  id !==
-                  leadId
-              )
-            : [
-                ...current,
-                leadId,
-              ]
-      );
-    };
+    const csv = rows.map((row) => row.map(csvValue).join(",")).join("\n");
 
-  /*
-  |--------------------------------------------------------------------------
-  | Export
-  |--------------------------------------------------------------------------
-  */
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;",
+    });
 
-  const exportLeads =
-    () => {
-      if (!leads.length) {
-        return;
-      }
+    const url = URL.createObjectURL(blob);
 
-      const rows = [
-        [
-          "Lead ID",
-          "Company",
-          "Contact",
-          "Industry",
-          "Source",
-          "Owner",
-          "Stage",
-          "Status",
-          "Priority",
-          "Last touch",
-          "Next action",
-          "Follow-up",
-        ],
+    const anchor = document.createElement("a");
 
-        ...leads.map(
-          (lead) => [
-            lead.leadCode,
-            lead.companyName,
-            lead.primaryContactName,
-            lead.industry,
-            lead.source,
-            lead.ownerName,
-            lead.stage,
-            lead.status,
-            lead.priority,
-            lead.lastTouchAt,
-            lead.nextAction,
-            lead.followUpAt,
-          ]
-        ),
-      ];
+    anchor.href = url;
 
-      const csv =
-        rows
-          .map(
-            (row) =>
-              row
-                .map(
-                  csvValue
-                )
-                .join(",")
-          )
-          .join("\n");
+    anchor.download = "tempest-leads.csv";
 
-      const blob =
-        new Blob(
-          [csv],
-          {
-            type:
-              "text/csv;charset=utf-8;",
-          }
-        );
+    document.body.appendChild(anchor);
 
-      const url =
-        URL.createObjectURL(
-          blob
-        );
+    anchor.click();
+    anchor.remove();
 
-      const anchor =
-        document.createElement(
-          "a"
-        );
+    URL.revokeObjectURL(url);
+  };
 
-      anchor.href =
-        url;
+  const handleDrop = (targetStage) => {
+    if (!draggedLead || draggedLead.stage === targetStage) {
+      setDraggedLead(null);
 
-      anchor.download =
-        "tempest-leads.csv";
+      return;
+    }
 
-      document.body.appendChild(
-        anchor
+    // Closing a lead needs a reason and the Nurture choice, so it must go
+    // through "Mark lost" on the lead page, not the generic stage modal.
+    if (targetStage === "Lost") {
+      setDropNotice(
+        'To mark a lead as Lost, open the lead and use "Mark lost".',
       );
 
-      anchor.click();
-      anchor.remove();
+      setDraggedLead(null);
 
-      URL.revokeObjectURL(
-        url
-      );
-    };
+      return;
+    }
 
-  /*
-  |--------------------------------------------------------------------------
-  | Kanban Drop
-  |--------------------------------------------------------------------------
-  |
-  | We do not silently mutate the stage.
-  | Dropping a card opens the mandatory reason modal.
-  |
-  */
+    setDropNotice("");
 
-  const handleDrop =
-    (
-      targetStage
-    ) => {
-      if (
-        !draggedLead ||
-        draggedLead.stage ===
-          targetStage
-      ) {
-        setDraggedLead(
-          null
-        );
+    setSelected([draggedLead.id]);
 
-        return;
-      }
+    setDroppedStage(targetStage);
 
-      setSelected([
-        draggedLead.id,
-      ]);
+    setDraggedLead(null);
 
-      setDroppedStage(
-        targetStage
-      );
+    setStageOpen(true);
+  };
 
-      setDraggedLead(
-        null
-      );
-
-      setStageOpen(
-        true
-      );
-    };
-
-  /*
-  |--------------------------------------------------------------------------
-  | Admin
-  |--------------------------------------------------------------------------
-  */
-
-  const isAdmin =
-    user?.role ===
-    "SUPER_ADMIN";
+  const isAdmin = user?.role === "SUPER_ADMIN";
 
   return (
     <>
       <div className="tl-title-row">
         <div>
-          <h1>
-            Leads & Pipeline
-          </h1>
+          <h1>Leads & Pipeline</h1>
 
           <p>
-            Every open lead
-            has an owner,
-            stage, last touch
-            and next action.
+            Every open lead has an owner, stage, last touch and next action.
           </p>
         </div>
 
         <div className="button-row">
-          {/* <button
-            type="button"
-            className="tl-secondary"
-            onClick={() =>
-              setView(
-                (current) =>
-                  current ===
-                  "table"
-                    ? "kanban"
-                    : "table"
-              )
-            }
-          >
-            {view ===
-            "table"
-              ? "Kanban view"
-              : "Table view"}
-          </button> */}
-
           <button
             type="button"
             className="tl-secondary"
-            onClick={
-              exportLeads
+            onClick={() =>
+              setView((current) => (current === "table" ? "kanban" : "table"))
             }
           >
+            {view === "table" ? "Kanban view" : "Table view"}
+          </button>
+
+          <button type="button" className="tl-secondary" onClick={exportLeads}>
             Export
           </button>
 
           <button
             type="button"
             className="tl-primary"
-            onClick={() =>
-              setAddOpen(
-                true
-              )
-            }
+            onClick={() => setAddOpen(true)}
           >
             + Add Lead
           </button>
@@ -504,79 +275,46 @@ const LeadsPage = () => {
         <input
           className="filter-input"
           value={search}
-          onChange={(
-            event
-          ) =>
-            setSearch(
-              event.target
-                .value
-            )
-          }
+          onChange={(event) => setSearch(event.target.value)}
           placeholder="Search ID, company, contact, email or phone"
         />
 
         <select
           className="filter-select"
           value={stage}
-          onChange={(
-            event
-          ) =>
-            setStage(
-              event.target
-                .value
-            )
-          }
+          onChange={(event) => setStage(event.target.value)}
         >
-          <option value="">
-            All stages
-          </option>
+          <option value="">All stages</option>
 
-          {LEAD_STAGES.map(
-            (item) => (
-              <option
-                key={
-                  item
-                }
-                value={
-                  item
-                }
-              >
-                {item}
-              </option>
-            )
-          )}
+          {LEAD_STAGES.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
         </select>
-
-        {/* <button
-          type="button"
-          className="tl-secondary"
-          disabled={
-            !selected.length ||
-            !isAdmin
-          }
-          onClick={() =>
-            setOwnerOpen(
-              true
-            )
-          }
-        >
-          Assign owner
-        </button> */}
 
         <button
           type="button"
           className="tl-secondary"
-          disabled={
-            !selected.length
+          title={
+            selected.length && !sharedBranchId
+              ? "Selected leads belong to different branches or have no branch. Select leads from one branch."
+              : undefined
           }
-          onClick={() => {
-            setDroppedStage(
-              "New"
-            );
+          disabled={!selected.length || !isAdmin || !sharedBranchId}
+          onClick={() => setOwnerOpen(true)}
+        >
+          Assign owner
+        </button>
 
-            setStageOpen(
-              true
-            );
+        <button
+          type="button"
+          className="tl-secondary"
+          disabled={!selected.length}
+          onClick={() => {
+            setDroppedStage("New");
+
+            setStageOpen(true);
           }}
         >
           Change stage
@@ -588,438 +326,245 @@ const LeadsPage = () => {
       {isLoading && (
         <article className="tl-card">
           <div className="empty-state">
-            <h2>
-              Loading leads
-            </h2>
+            <h2>Loading leads</h2>
 
-            <p>
-              Loading pipeline
-              records...
-            </p>
+            <p>Loading pipeline records...</p>
           </div>
         </article>
       )}
 
       {/* Error */}
 
-      {!isLoading &&
-        isError && (
-          <article className="tl-card">
-            <div className="empty-state">
-              <h2>
-                Unable to load
-                leads
-              </h2>
+      {!isLoading && isError && (
+        <article className="tl-card">
+          <div className="empty-state">
+            <h2>Unable to load leads</h2>
 
-              <p>
-                {error
-                  ?.response
-                  ?.data
-                  ?.message ||
-                  "Something went wrong while loading leads."}
-              </p>
+            <p>
+              {error?.response?.data?.message ||
+                "Something went wrong while loading leads."}
+            </p>
 
-              <button
-                type="button"
-                className="tl-primary"
-                onClick={() =>
-                  refetch()
-                }
-              >
-                Try again
-              </button>
-            </div>
-          </article>
-        )}
+            <button
+              type="button"
+              className="tl-primary"
+              onClick={() => refetch()}
+            >
+              Try again
+            </button>
+          </div>
+        </article>
+      )}
 
       {/* Table */}
 
-      {!isLoading &&
-        !isError &&
-        view ===
-          "table" && (
-          <article className="tl-card no-pad">
-            <div className="table-wrap">
-              <table className="tl-table">
-                <thead>
-                  <tr>
-                    <th>
+      {!isLoading && !isError && view === "table" && (
+        <article className="tl-card no-pad">
+          <div className="table-wrap">
+            <table className="tl-table">
+              <thead>
+                <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={(event) => toggleAll(event.target.checked)}
+                    />
+                  </th>
+
+                  <th>Lead ID</th>
+
+                  <th>Company / contact</th>
+
+                  <th>Industry</th>
+
+                  <th>Source</th>
+
+                  <th>Owner</th>
+
+                  <th>Stage</th>
+
+                  <th>Priority</th>
+
+                  <th>Last touch</th>
+
+                  <th>Next action</th>
+
+                  <th>Follow-up</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {leads.map((lead) => (
+                  <tr
+                    key={lead.id}
+                    style={{
+                      cursor: "pointer",
+                    }}
+                    onClick={() => navigate(`/leads/${lead.id}`)}
+                  >
+                    <td>
                       <input
+                        className="pick"
                         type="checkbox"
-                        checked={
-                          allSelected
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          toggleAll(
-                            event
-                              .target
-                              .checked
-                          )
-                        }
+                        checked={selected.includes(lead.id)}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => toggleLead(lead.id)}
                       />
-                    </th>
+                    </td>
 
-                    <th>
-                      Lead ID
-                    </th>
+                    <td>
+                      <b>{lead.leadCode}</b>
 
-                    <th>
-                      Company /
-                      contact
-                    </th>
+                      <small>{lead.status}</small>
+                    </td>
 
-                    <th>
-                      Industry
-                    </th>
+                    <td>
+                      <b>{lead.companyName}</b>
 
-                    <th>
-                      Source
-                    </th>
+                      <small>{lead.primaryContactName || "—"}</small>
+                    </td>
 
-                    <th>
-                      Owner
-                    </th>
+                    <td>{lead.industry || "—"}</td>
 
-                    <th>
-                      Stage
-                    </th>
+                    <td>{lead.source || "—"}</td>
 
-                    <th>
-                      Priority
-                    </th>
+                    <td>{lead.ownerName || "—"}</td>
 
-                    <th>
-                      Last touch
-                    </th>
+                    <td>
+                      <span className={`status ${stageClass(lead.stage)}`}>
+                        {lead.stage}
+                      </span>
+                    </td>
 
-                    <th>
-                      Next action
-                    </th>
+                    <td>
+                      <span
+                        className={`priority ${priorityClass(lead.priority)}`}
+                      >
+                        {lead.priority}
+                      </span>
+                    </td>
 
-                    <th>
-                      Follow-up
-                    </th>
+                    <td>{formatDate(lead.lastTouchAt)}</td>
+
+                    <td>{lead.nextAction || "—"}</td>
+
+                    <td>
+                      {formatDate(lead.followUpAt)}
+
+                      <small>{formatTime(lead.followUpAt)}</small>
+                    </td>
                   </tr>
-                </thead>
+                ))}
 
-                <tbody>
-                  {leads.map(
-                    (lead) => (
-                      <tr
-                        key={lead.id}
-                        style={{
-                            cursor: "pointer",
-                        }}
-                        onClick={() =>
-                            navigate(
-                            `/leads/${lead.id}`
-                            )
-                        }
-                      >
-                        <td>
-                            <input
-                                className="pick"
-                                type="checkbox"
-                                checked={
-                                    selected.includes(
-                                    lead.id
-                                    )
-                                }
-                                onClick={(
-                                    event
-                                ) =>
-                                    event.stopPropagation()
-                                }
-                                onChange={() =>
-                                    toggleLead(
-                                    lead.id
-                                    )
-                                }
-                            />
-                        </td>
+                {!leads.length && (
+                  <tr>
+                    <td colSpan={11}>
+                      <div className="empty-state">
+                        <h2>No leads found</h2>
 
-                        <td>
-                          <b>
-                            {
-                              lead.leadCode
-                            }
-                          </b>
+                        <p>Clear filters or add a new company lead.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-                          <small>
-                            {
-                              lead.status
-                            }
-                          </small>
-                        </td>
+          <div className="table-pagination">
+            <span>{leads.length} records</span>
 
-                        <td>
-                          <b>
-                            {
-                              lead.companyName
-                            }
-                          </b>
-
-                          <small>
-                            {lead.primaryContactName ||
-                              "—"}
-                          </small>
-                        </td>
-
-                        <td>
-                          {lead.industry ||
-                            "—"}
-                        </td>
-
-                        <td>
-                          {lead.source ||
-                            "—"}
-                        </td>
-
-                        <td>
-                          {lead.ownerName ||
-                            "—"}
-                        </td>
-
-                        <td>
-                          <span
-                            className={`status ${stageClass(
-                              lead.stage
-                            )}`}
-                          >
-                            {
-                              lead.stage
-                            }
-                          </span>
-                        </td>
-
-                        <td>
-                          <span
-                            className={`priority ${priorityClass(
-                              lead.priority
-                            )}`}
-                          >
-                            {
-                              lead.priority
-                            }
-                          </span>
-                        </td>
-
-                        <td>
-                          {formatDate(
-                            lead.lastTouchAt
-                          )}
-                        </td>
-
-                        <td>
-                          {lead.nextAction ||
-                            "—"}
-                        </td>
-
-                        <td>
-                          {formatDate(
-                            lead.followUpAt
-                          )}
-
-                          <small>
-                            {formatTime(
-                              lead.followUpAt
-                            )}
-                          </small>
-                        </td>
-                      </tr>
-                    )
-                  )}
-
-                  {!leads.length && (
-                    <tr>
-                      <td
-                        colSpan={
-                          11
-                        }
-                      >
-                        <div className="empty-state">
-                          <h2>
-                            No leads
-                            found
-                          </h2>
-
-                          <p>
-                            Clear filters
-                            or add a new
-                            company lead.
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="table-pagination">
-              <span>
-                {leads.length}{" "}
-                records
-              </span>
-
-              <span>
-                Page 1 of 1
-              </span>
-            </div>
-          </article>
-        )}
+            <span>Page 1 of 1</span>
+          </div>
+        </article>
+      )}
 
       {/* Kanban */}
 
-      {!isLoading &&
-        !isError &&
-        view ===
-          "kanban" && (
-          <article className="kanban">
-            {LEAD_STAGES.map(
-              (
-                stageName
-              ) => {
-                const stageLeads =
-                  leads.filter(
-                    (lead) =>
-                      lead.stage ===
-                      stageName
-                  );
+      {!isLoading && !isError && view === "kanban" && dropNotice && (
+        <div className="error-box">{dropNotice}</div>
+      )}
 
-                return (
-                  <section
-                    key={
-                      stageName
-                    }
-                    className="kanban-col"
-                    onDragOver={(
-                      event
-                    ) =>
-                      event.preventDefault()
-                    }
-                    onDrop={() =>
-                      handleDrop(
-                        stageName
-                      )
-                    }
+      {!isLoading && !isError && view === "kanban" && (
+        <article className="kanban">
+          {LEAD_STAGES.map((stageName) => {
+            const stageLeads = leads.filter((lead) => lead.stage === stageName);
+
+            return (
+              <section
+                key={stageName}
+                className="kanban-col"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => handleDrop(stageName)}
+              >
+                <header>
+                  <span>{stageName}</span>
+
+                  <b>{stageLeads.length}</b>
+                </header>
+
+                {stageLeads.map((lead) => (
+                  <article
+                    key={lead.id}
+                    className="kanban-card"
+                    draggable
+                    onDragStart={() => setDraggedLead(lead)}
+                    onDragEnd={() => setDraggedLead(null)}
+                    onClick={() => navigate(`/leads/${lead.id}`)}
                   >
-                    <header>
-                      <span>
-                        {stageName}
+                    <b>{lead.companyName}</b>
+
+                    <small>
+                      {lead.primaryContactName || "—"} · {lead.ownerName || "—"}
+                    </small>
+
+                    <footer>
+                      <span
+                        className={`priority ${priorityClass(lead.priority)}`}
+                      >
+                        {lead.priority}
                       </span>
 
-                      <b>
-                        {
-                          stageLeads.length
-                        }
-                      </b>
-                    </header>
-
-                    {stageLeads.map(
-                      (
-                        lead
-                      ) => (
-                        <article
-                            key={lead.id}
-                            className="kanban-card"
-                            draggable
-                            onClick={() =>
-                                navigate(
-                                `/leads/${lead.id}`
-                                )
-                            }
-                        >
-                          <b>
-                            {
-                              lead.companyName
-                            }
-                          </b>
-
-                          <small>
-                            {lead.primaryContactName ||
-                              "—"}{" "}
-                            ·{" "}
-                            {lead.ownerName ||
-                              "—"}
-                          </small>
-
-                          <footer>
-                            <span
-                              className={`priority ${priorityClass(
-                                lead.priority
-                              )}`}
-                            >
-                              {
-                                lead.priority
-                              }
-                            </span>
-
-                            <small>
-                              {formatDate(
-                                lead.followUpAt
-                              )}{" "}
-                              ·{" "}
-                              {lead.stageAgeDays ||
-                                0}
-                              d
-                            </small>
-                          </footer>
-                        </article>
-                      )
-                    )}
-                  </section>
-                );
-              }
-            )}
-          </article>
-        )}
+                      <small>
+                        {formatDate(lead.followUpAt)} · {lead.stageAgeDays || 0}
+                        d
+                      </small>
+                    </footer>
+                  </article>
+                ))}
+              </section>
+            );
+          })}
+        </article>
+      )}
 
       {/* Modals */}
 
-      <LeadFormModal
-        open={
-          addOpen
-        }
-        onClose={() =>
-          setAddOpen(
-            false
-          )
-        }
-      />
+      <LeadFormModal open={addOpen} onClose={() => setAddOpen(false)} />
 
       <AssignOwnerModal
-        open={
-          ownerOpen
-        }
-        leadIds={
-          selected
-        }
+        open={ownerOpen}
+        leadIds={selected}
+        branchId={sharedBranchId}
         onClose={() => {
-          setOwnerOpen(
-            false
-          );
+          setOwnerOpen(false);
 
           setSelected([]);
         }}
       />
 
       <ChangeStageModal
-        open={
-          stageOpen
+        open={stageOpen}
+        onPartialSuccess={(doneIds) =>
+          setSelected((current) =>
+            current.filter((id) => !doneIds.includes(id)),
+          )
         }
-        leadIds={
-          selected
-        }
-        initialStage={
-          droppedStage
-        }
+        leadIds={selected}
+        initialStage={droppedStage}
         onClose={() => {
-          setStageOpen(
-            false
-          );
+          setStageOpen(false);
 
           setSelected([]);
         }}

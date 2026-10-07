@@ -904,6 +904,7 @@ a {
 }
 .error-box {
   padding: 9px 10px;
+  margin-bottom: 10px;
   background:
     var(
       --crm-danger-soft

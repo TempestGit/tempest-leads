@@ -43,7 +43,6 @@ export const getFollowupsService =
     } =
       await listFollowups({
         ...filters,
-
         currentUser,
       });
 
@@ -276,6 +275,23 @@ export const createFollowupService =
 |--------------------------------------------------------------------------
 | Complete Follow-up
 |--------------------------------------------------------------------------
+|
+| Completion can now work in two ways:
+|
+| 1. Complete only
+|    - outcome required
+|    - notes required
+|    - no successor follow-up is created
+|    - lead next action is cleared
+|
+| 2. Complete + next follow-up
+|    - outcome required
+|    - notes required
+|    - nextAction supplied
+|    - nextFollowUpAt supplied
+|    - successor follow-up is created
+|    - lead points to the successor action/date
+|
 */
 
 export const completeFollowupService =
@@ -325,6 +341,22 @@ export const completeFollowupService =
           "FOLLOWUP_NOT_PENDING"
         );
       }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Determine Whether Another Follow-up Was Requested
+      |--------------------------------------------------------------------------
+      |
+      | Schema validation already guarantees that nextAction and
+      | nextFollowUpAt are supplied together.
+      |
+      */
+
+      const hasNextFollowup =
+        Boolean(
+          data.nextAction &&
+            data.nextFollowUpAt
+        );
 
       /*
       |--------------------------------------------------------------------------
@@ -388,69 +420,42 @@ export const completeFollowupService =
 
       /*
       |--------------------------------------------------------------------------
-      | Update Lead
+      | Successor Details
       |--------------------------------------------------------------------------
+      |
+      | These remain null when the follow-up is simply completed.
+      |
       */
 
-      await updateLeadFromActivity(
-        {
-          leadId:
-            existing.leadId,
+      let successorId =
+        null;
 
-          nextAction:
-            data.nextAction,
-
-          nextFollowUpAt:
-            data.nextFollowUpAt,
-
-          userId:
-            currentUser.id,
-        },
-
-        connection
-      );
+      let nextCode =
+        null;
 
       /*
       |--------------------------------------------------------------------------
-      | Create Next Follow-up
+      | Complete + Schedule Next Follow-up
       |--------------------------------------------------------------------------
-      |
-      | Critical CRM rule:
-      |
-      | Do not replace/delete the completed record.
-      | Preserve it and create a new pending record.
-      |
       */
 
-      const nextCode =
-        generatePublicId(
-          "FUP"
-        );
+      if (hasNextFollowup) {
+        /*
+        |--------------------------------------------------------------------------
+        | Update Lead With Next Action
+        |--------------------------------------------------------------------------
+        */
 
-      const successorId =
-        await insertFollowup(
+        await updateLeadFromActivity(
           {
-            followupCode:
-              nextCode,
-
             leadId:
               existing.leadId,
 
-            assignedTo:
-              existing.ownerId,
-
-            action:
+            nextAction:
               data.nextAction,
 
-            dueAt:
+            nextFollowUpAt:
               data.nextFollowUpAt,
-
-            priority:
-              data.nextPriority ||
-              existing.priority,
-
-            notes:
-              null,
 
             userId:
               currentUser.id,
@@ -459,25 +464,101 @@ export const completeFollowupService =
           connection
         );
 
-      /*
-      |--------------------------------------------------------------------------
-      | Link Old -> New
-      |--------------------------------------------------------------------------
-      */
+        /*
+        |--------------------------------------------------------------------------
+        | Create Successor Follow-up
+        |--------------------------------------------------------------------------
+        |
+        | Preserve the completed record and create a new pending record.
+        |
+        */
 
-      await linkSuccessorFollowup(
-        {
-          followupId,
+        nextCode =
+          generatePublicId(
+            "FUP"
+          );
 
-          successorFollowupId:
-            successorId,
+        successorId =
+          await insertFollowup(
+            {
+              followupCode:
+                nextCode,
 
-          userId:
-            currentUser.id,
-        },
+              leadId:
+                existing.leadId,
 
-        connection
-      );
+              assignedTo:
+                existing.ownerId,
+
+              action:
+                data.nextAction,
+
+              dueAt:
+                data.nextFollowUpAt,
+
+              priority:
+                data.nextPriority ||
+                existing.priority,
+
+              notes:
+                null,
+
+              userId:
+                currentUser.id,
+            },
+
+            connection
+          );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Link Old -> New
+        |--------------------------------------------------------------------------
+        */
+
+        await linkSuccessorFollowup(
+          {
+            followupId,
+
+            successorFollowupId:
+              successorId,
+
+            userId:
+              currentUser.id,
+          },
+
+          connection
+        );
+      } else {
+        /*
+        |--------------------------------------------------------------------------
+        | Complete Without Another Follow-up
+        |--------------------------------------------------------------------------
+        |
+        | There is no next scheduled action, so clear the lead's
+        | next-action fields instead of leaving the completed follow-up
+        | displayed as the lead's upcoming action.
+        |
+        */
+
+        await updateLeadFromActivity(
+          {
+            leadId:
+              existing.leadId,
+
+            nextAction:
+              null,
+
+            nextFollowUpAt:
+              null,
+
+            userId:
+              currentUser.id,
+          },
+
+          connection
+        );
+      }
 
       /*
       |--------------------------------------------------------------------------
@@ -525,7 +606,9 @@ export const completeFollowupService =
             nextCode,
 
           nextAction:
-            data.nextAction,
+            hasNextFollowup
+              ? data.nextAction
+              : null,
         },
 
         ipAddress,
@@ -533,7 +616,19 @@ export const completeFollowupService =
         connection,
       });
 
+      /*
+      |--------------------------------------------------------------------------
+      | Commit
+      |--------------------------------------------------------------------------
+      */
+
       await connection.commit();
+
+      /*
+      |--------------------------------------------------------------------------
+      | Response
+      |--------------------------------------------------------------------------
+      */
 
       return {
         completedFollowup:
@@ -686,6 +781,12 @@ export const rescheduleFollowupService =
           connection
         );
 
+      /*
+      |--------------------------------------------------------------------------
+      | Link Original -> Successor
+      |--------------------------------------------------------------------------
+      */
+
       await linkSuccessorFollowup(
         {
           followupId,
@@ -750,6 +851,12 @@ export const rescheduleFollowupService =
 
         connection
       );
+
+      /*
+      |--------------------------------------------------------------------------
+      | Reload Original
+      |--------------------------------------------------------------------------
+      */
 
       const updated =
         await findFollowupById(

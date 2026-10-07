@@ -18,7 +18,43 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| Date Input
+| Local Date Helpers
+|--------------------------------------------------------------------------
+*/
+
+const pad2 = (value) =>
+  String(value).padStart(
+    2,
+    "0"
+  );
+
+const getLocalDate = (
+  date = new Date()
+) => {
+  return [
+    date.getFullYear(),
+    pad2(
+      date.getMonth() + 1
+    ),
+    pad2(
+      date.getDate()
+    ),
+  ].join("-");
+};
+
+const getLocalTime = (
+  date = new Date()
+) => {
+  return `${pad2(
+    date.getHours()
+  )}:${pad2(
+    date.getMinutes()
+  )}`;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Existing Date/Time Helpers
 |--------------------------------------------------------------------------
 */
 
@@ -40,67 +76,76 @@ const toDateInput = (
     return "";
   }
 
-  const year =
-    date.getFullYear();
+  return getLocalDate(
+    date
+  );
+};
 
-  const month =
-    String(
-      date.getMonth() +
-        1
-    ).padStart(
-      2,
-      "0"
-    );
+const toTimeInput = (
+  value
+) => {
+  if (!value) {
+    return "";
+  }
 
-  const day =
-    String(
-      date.getDate()
-    ).padStart(
-      2,
-      "0"
-    );
+  const date =
+    new Date(value);
 
-  return `${year}-${month}-${day}`;
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "";
+  }
+
+  return getLocalTime(
+    date
+  );
 };
 
 /*
 |--------------------------------------------------------------------------
-| Local Date
+| Future Timestamp Check
 |--------------------------------------------------------------------------
-|
-| Returns today's date using the browser's local timezone.
-|
-| Example:
-| 2026-10-01
-|
 */
 
-const getLocalDate =
-  () => {
+const getFutureFollowUp =
+  (value) => {
+    if (!value) {
+      return {
+        date: "",
+        time: "",
+      };
+    }
+
     const date =
-      new Date();
+      new Date(value);
 
-    const year =
-      date.getFullYear();
+    if (
+      Number.isNaN(
+        date.getTime()
+      ) ||
+      date.getTime() <=
+        Date.now()
+    ) {
+      return {
+        date: "",
+        time: "",
+      };
+    }
 
-    const month =
-      String(
-        date.getMonth() +
-          1
-      ).padStart(
-        2,
-        "0"
-      );
+    return {
+      date:
+        toDateInput(
+          value
+        ),
 
-    const day =
-      String(
-        date.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${year}-${month}-${day}`;
+      time:
+        toTimeInput(
+          value
+        ),
+    };
   };
 
 /*
@@ -121,9 +166,6 @@ const AddActivityModal = ({
   |--------------------------------------------------------------------------
   | Load Available Leads
   |--------------------------------------------------------------------------
-  |
-  | Needed for the global Activities page.
-  |
   */
 
   const leadParams =
@@ -179,8 +221,13 @@ const AddActivityModal = ({
   ] = useState("");
 
   const [
-    nextFollowUp,
-    setNextFollowUp,
+    nextFollowUpDate,
+    setNextFollowUpDate,
+  ] = useState("");
+
+  const [
+    nextFollowUpTime,
+    setNextFollowUpTime,
   ] = useState("");
 
   const [
@@ -197,9 +244,7 @@ const AddActivityModal = ({
   const resolvedLead =
     lead ||
     leads.find(
-      (
-        item
-      ) =>
+      (item) =>
         Number(
           item.id
         ) ===
@@ -208,6 +253,37 @@ const AddActivityModal = ({
         )
     ) ||
     null;
+
+  /*
+  |--------------------------------------------------------------------------
+  | Load Lead Defaults
+  |--------------------------------------------------------------------------
+  */
+
+  const applyLeadDefaults =
+    (
+      targetLead
+    ) => {
+      setNextAction(
+        targetLead
+          ?.nextAction ||
+          ""
+      );
+
+      const followUp =
+        getFutureFollowUp(
+          targetLead
+            ?.followUpAt
+        );
+
+      setNextFollowUpDate(
+        followUp.date
+      );
+
+      setNextFollowUpTime(
+        followUp.time
+      );
+    };
 
   /*
   |--------------------------------------------------------------------------
@@ -232,31 +308,8 @@ const AddActivityModal = ({
 
     setNotes("");
 
-    setNextAction(
-      lead?.nextAction ||
-        ""
-    );
-
-    /*
-     * Only use the existing follow-up
-     * when it is today or in the future.
-     *
-     * If the lead contains an old/past
-     * follow-up date, do not put that
-     * past date back into the field.
-     */
-
-    const existingFollowUp =
-      toDateInput(
-        lead?.followUpAt
-      );
-
-    setNextFollowUp(
-      existingFollowUp &&
-        existingFollowUp >=
-          getLocalDate()
-        ? existingFollowUp
-        : ""
+    applyLeadDefaults(
+      lead
     );
 
     setError("");
@@ -267,7 +320,7 @@ const AddActivityModal = ({
 
   /*
   |--------------------------------------------------------------------------
-  | Update Defaults When Global Lead Changes
+  | Global Lead Selection Defaults
   |--------------------------------------------------------------------------
   */
 
@@ -280,28 +333,11 @@ const AddActivityModal = ({
       return;
     }
 
-    setNextAction(
-      resolvedLead.nextAction ||
-        ""
+    applyLeadDefaults(
+      resolvedLead
     );
 
-    /*
-     * Do not load an old follow-up
-     * date into the date input.
-     */
-
-    const existingFollowUp =
-      toDateInput(
-        resolvedLead.followUpAt
-      );
-
-    setNextFollowUp(
-      existingFollowUp &&
-        existingFollowUp >=
-          getLocalDate()
-        ? existingFollowUp
-        : ""
-    );
+    setError("");
   }, [
     open,
     lead,
@@ -320,9 +356,7 @@ const AddActivityModal = ({
     }
 
     const handler =
-      (
-        event
-      ) => {
+      (event) => {
         if (
           event.key ===
             "Escape" &&
@@ -337,11 +371,12 @@ const AddActivityModal = ({
       handler
     );
 
-    return () =>
+    return () => {
       window.removeEventListener(
         "keydown",
         handler
       );
+    };
   }, [
     open,
     onClose,
@@ -358,53 +393,37 @@ const AddActivityModal = ({
     return null;
   }
 
-  /*
-  |--------------------------------------------------------------------------
-  | Current Date
-  |--------------------------------------------------------------------------
-  */
-
   const today =
     getLocalDate();
 
   /*
   |--------------------------------------------------------------------------
-  | Next Follow-up Change
+  | Follow-up Date Change
   |--------------------------------------------------------------------------
   */
 
-  const handleNextFollowUpChange =
-    (
-      event
-    ) => {
-      const selectedDate =
+  const handleDateChange =
+    (event) => {
+      const value =
         event.target.value;
 
-      const currentDate =
-        getLocalDate();
+      if (!value) {
+        setNextFollowUpDate(
+          ""
+        );
 
-      /*
-       * Empty value is allowed because
-       * Next follow-up itself is optional.
-       */
-
-      if (!selectedDate) {
-        setNextFollowUp("");
+        setNextFollowUpTime(
+          ""
+        );
 
         setError("");
 
         return;
       }
 
-      /*
-       * Browser min normally prevents
-       * this, but keep a JavaScript
-       * check as additional protection.
-       */
-
       if (
-        selectedDate <
-        currentDate
+        value <
+        getLocalDate()
       ) {
         setError(
           "Next follow-up date cannot be in the past."
@@ -413,8 +432,23 @@ const AddActivityModal = ({
         return;
       }
 
-      setNextFollowUp(
-        selectedDate
+      setNextFollowUpDate(
+        value
+      );
+
+      setError("");
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Follow-up Time Change
+  |--------------------------------------------------------------------------
+  */
+
+  const handleTimeChange =
+    (event) => {
+      setNextFollowUpTime(
+        event.target.value
       );
 
       setError("");
@@ -464,8 +498,18 @@ const AddActivityModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Next Action / Follow-up Must Be Together
+      | Follow-up Pair Validation
       |--------------------------------------------------------------------------
+      |
+      | Next action is optional.
+      |
+      | But if a next action is supplied,
+      | both follow-up date and time must
+      | also be supplied.
+      |
+      | Likewise, a follow-up date/time
+      | cannot exist without a next action.
+      |
       */
 
       const hasAction =
@@ -475,38 +519,35 @@ const AddActivityModal = ({
 
       const hasDate =
         Boolean(
-          nextFollowUp
+          nextFollowUpDate
         );
 
+      const hasTime =
+        Boolean(
+          nextFollowUpTime
+        );
+
+      const hasAnyFollowUp =
+        hasDate ||
+        hasTime;
+
       if (
-        hasAction !==
-        hasDate
+        hasDate !==
+        hasTime
       ) {
         setError(
-          "Next action and next follow-up must be provided together."
+          "Next follow-up date and time must both be provided."
         );
 
         return;
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Prevent Past Follow-up Date
-      |--------------------------------------------------------------------------
-      |
-      | Do not rely only on min={today}.
-      | Browser validation can be bypassed,
-      | so validate again before API request.
-      |
-      */
-
       if (
-        hasDate &&
-        nextFollowUp <
-          getLocalDate()
+        hasAction !==
+        hasAnyFollowUp
       ) {
         setError(
-          "Next follow-up date cannot be in the past."
+          "Next action and next follow-up must be provided together."
         );
 
         return;
@@ -517,22 +558,19 @@ const AddActivityModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Prototype Follow-up Time
+      | Exact Future Timestamp Validation
       |--------------------------------------------------------------------------
       */
 
       if (
         hasAction &&
-        hasDate
+        hasDate &&
+        hasTime
       ) {
         const followUpDate =
           new Date(
-            `${nextFollowUp}T10:00:00`
+            `${nextFollowUpDate}T${nextFollowUpTime}:00`
           );
-
-        /*
-         * Validate generated date.
-         */
 
         if (
           Number.isNaN(
@@ -540,33 +578,18 @@ const AddActivityModal = ({
           )
         ) {
           setError(
-            "Enter a valid next follow-up date."
+            "Enter a valid next follow-up date and time."
           );
 
           return;
         }
 
-        /*
-         * Final date protection.
-         *
-         * Since this modal only asks for
-         * a date and not a time, today's
-         * date is valid regardless of
-         * whether 10:00 AM has passed.
-         */
-
-        const selectedDateOnly =
-          nextFollowUp;
-
-        const todayDateOnly =
-          getLocalDate();
-
         if (
-          selectedDateOnly <
-          todayDateOnly
+          followUpDate.getTime() <=
+          Date.now()
         ) {
           setError(
-            "Next follow-up date cannot be in the past."
+            "Next follow-up must be in the future."
           );
 
           return;
@@ -637,10 +660,6 @@ const AddActivityModal = ({
         aria-modal="true"
         aria-labelledby="add-activity-title"
       >
-        {/* ------------------------------------------------------------- */}
-        {/* Header */}
-        {/* ------------------------------------------------------------- */}
-
         <header className="modal-head">
           <div>
             <h2 id="add-activity-title">
@@ -667,16 +686,10 @@ const AddActivityModal = ({
             aria-label="Close"
           >
             <X
-              size={
-                15
-              }
+              size={15}
             />
           </button>
         </header>
-
-        {/* ------------------------------------------------------------- */}
-        {/* Body */}
-        {/* ------------------------------------------------------------- */}
 
         <div className="modal-body">
           {error && (
@@ -687,9 +700,8 @@ const AddActivityModal = ({
 
           <div className="form-section">
             <div className="form-grid2">
-              {/* ------------------------------------------------------- */}
-              {/* Related Lead - Global Page Only */}
-              {/* ------------------------------------------------------- */}
+
+              {/* Related Lead */}
 
               {!lead && (
                 <label className="full">
@@ -700,7 +712,8 @@ const AddActivityModal = ({
                       selectedLeadId
                     }
                     disabled={
-                      leadsQuery.isLoading
+                      leadsQuery.isLoading ||
+                      mutation.isPending
                     }
                     onChange={(
                       event
@@ -722,9 +735,7 @@ const AddActivityModal = ({
                     </option>
 
                     {leads.map(
-                      (
-                        item
-                      ) => (
+                      (item) => (
                         <option
                           key={
                             item.id
@@ -751,9 +762,7 @@ const AddActivityModal = ({
                 </label>
               )}
 
-              {/* ------------------------------------------------------- */}
-              {/* Current Lead Context */}
-              {/* ------------------------------------------------------- */}
+              {/* Fixed Lead Context */}
 
               {lead && (
                 <div className="activity-context full">
@@ -782,6 +791,9 @@ const AddActivityModal = ({
                   type="text"
                   value={
                     outcome
+                  }
+                  disabled={
+                    mutation.isPending
                   }
                   onChange={(
                     event
@@ -813,6 +825,9 @@ const AddActivityModal = ({
                   value={
                     nextAction
                   }
+                  disabled={
+                    mutation.isPending
+                  }
                   onChange={(
                     event
                   ) => {
@@ -821,7 +836,9 @@ const AddActivityModal = ({
                         .value
                     );
 
-                    setError("");
+                    setError(
+                      ""
+                    );
                   }}
                 />
               </label>
@@ -836,21 +853,28 @@ const AddActivityModal = ({
                   value={
                     notes
                   }
+                  disabled={
+                    mutation.isPending
+                  }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setNotes(
                       event.target
                         .value
-                    )
-                  }
+                    );
+
+                    setError(
+                      ""
+                    );
+                  }}
                 />
               </label>
 
-              {/* Follow-up */}
+              {/* Follow-up Date */}
 
               <label>
-                Next follow-up
+                Next follow-up date
 
                 <input
                   type="date"
@@ -858,20 +882,39 @@ const AddActivityModal = ({
                     today
                   }
                   value={
-                    nextFollowUp
+                    nextFollowUpDate
+                  }
+                  disabled={
+                    mutation.isPending
                   }
                   onChange={
-                    handleNextFollowUpChange
+                    handleDateChange
+                  }
+                />
+              </label>
+
+              {/* Follow-up Time */}
+
+              <label>
+                Next follow-up time
+
+                <input
+                  type="time"
+                  value={
+                    nextFollowUpTime
+                  }
+                  disabled={
+                    mutation.isPending ||
+                    !nextFollowUpDate
+                  }
+                  onChange={
+                    handleTimeChange
                   }
                 />
               </label>
             </div>
           </div>
         </div>
-
-        {/* ------------------------------------------------------------- */}
-        {/* Footer */}
-        {/* ------------------------------------------------------------- */}
 
         <footer className="modal-foot">
           <button

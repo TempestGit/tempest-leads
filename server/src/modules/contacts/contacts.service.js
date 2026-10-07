@@ -9,10 +9,12 @@ import {
 } from "../../services/audit.service.js";
 
 import {
+  canUserAccessCompany,
   findCompanyById,
 } from "../companies/companies.repository.js";
 
 import {
+  canUserAccessContact,
   createContact,
   findContactById,
   listContacts,
@@ -77,13 +79,21 @@ export const getContactsService =
 */
 
 export const getContactService =
-  async (contactId) => {
+  async (contactId, currentUser) => {
     const contact =
       await findContactById(
         contactId
       );
 
-    if (!contact) {
+    const allowed =
+      contact &&
+      (await canUserAccessContact({
+        contactId,
+        userId: currentUser?.id,
+        role: currentUser?.role,
+      }));
+
+    if (!contact || !allowed) {
       throw new ApiError(
         404,
         "Contact not found.",
@@ -105,6 +115,7 @@ export const createContactService =
   async ({
     data,
     userId,
+    currentUser,
     ipAddress,
     userAgent,
   }) => {
@@ -126,7 +137,17 @@ export const createContactService =
           connection
         );
 
-      if (!company) {
+      if (
+        !company ||
+        !(await canUserAccessCompany(
+          {
+            companyId: data.companyId,
+            userId,
+            role: currentUser?.role,
+          },
+          connection
+        ))
+      ) {
         throw new ApiError(
           404,
           "Selected company was not found.",
@@ -265,6 +286,7 @@ export const updateContactService =
     contactId,
     data,
     userId,
+    currentUser,
     ipAddress,
     userAgent,
   }) => {
@@ -286,7 +308,17 @@ export const updateContactService =
           connection
         );
 
-      if (!existing) {
+      if (
+        !existing ||
+        !(await canUserAccessContact(
+          {
+            contactId,
+            userId,
+            role: currentUser?.role,
+          },
+          connection
+        ))
+      ) {
         throw new ApiError(
           404,
           "Contact not found.",
@@ -311,7 +343,17 @@ export const updateContactService =
             connection
           );
 
-        if (!company) {
+        if (
+          !company ||
+          !(await canUserAccessCompany(
+            {
+              companyId: data.companyId,
+              userId,
+              role: currentUser?.role,
+            },
+            connection
+          ))
+        ) {
           throw new ApiError(
             404,
             "Selected company was not found.",

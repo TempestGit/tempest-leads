@@ -2,15 +2,7 @@ import crypto from "node:crypto";
 
 import pool from "../../config/db.js";
 
-/*
-|--------------------------------------------------------------------------
-| Contact Mapper
-|--------------------------------------------------------------------------
-*/
-
-const mapContact = (
-  row
-) => {
+const mapContact = (row) => {
   if (!row) {
     return null;
   }
@@ -18,18 +10,9 @@ const mapContact = (
   return {
     ...row,
 
-    isDecisionMaker:
-      Boolean(
-        row.isDecisionMaker
-      ),
+    isDecisionMaker: Boolean(row.isDecisionMaker),
   };
 };
-
-/*
-|--------------------------------------------------------------------------
-| Contact SELECT
-|--------------------------------------------------------------------------
-*/
 
 const CONTACT_SELECT = `
   SELECT
@@ -82,20 +65,9 @@ const CONTACT_SELECT = `
     AND c.deleted_at IS NULL
 `;
 
-/*
-|--------------------------------------------------------------------------
-| Find Contact By ID
-|--------------------------------------------------------------------------
-*/
-
-export const findContactById =
-  async (
-    contactId,
-    connection = pool
-  ) => {
-    const [rows] =
-      await connection.query(
-        `
+export const findContactById = async (contactId, connection = pool) => {
+  const [rows] = await connection.query(
+    `
           ${CONTACT_SELECT}
 
           WHERE ct.id = ?
@@ -103,41 +75,19 @@ export const findContactById =
 
           LIMIT 1
         `,
-        [contactId]
-      );
+    [contactId],
+  );
 
-    return mapContact(
-      rows[0] || null
-    );
-  };
+  return mapContact(rows[0] || null);
+};
 
-/*
-|--------------------------------------------------------------------------
-| Find Matching Contact For Company
-|--------------------------------------------------------------------------
-|
-| Reuse a contact when the same email or phone already exists under the same
-| company. This prevents duplicate contacts when Add Lead is submitted twice.
-|
-*/
-
-export const findMatchingContact =
-  async (
-    {
-      companyId,
-      email,
-      phone,
-    },
-    connection = pool
-  ) => {
-    if (
-      email
-    ) {
-      const [
-        rows,
-      ] =
-        await connection.query(
-          `
+export const findMatchingContact = async (
+  { companyId, email, phone },
+  connection = pool,
+) => {
+  if (email) {
+    const [rows] = await connection.query(
+      `
             ${CONTACT_SELECT}
 
             WHERE
@@ -151,29 +101,17 @@ export const findMatchingContact =
 
             LIMIT 1
           `,
-          [
-            companyId,
-            email,
-          ]
-        );
+      [companyId, email],
+    );
 
-      if (
-        rows[0]
-      ) {
-        return mapContact(
-          rows[0]
-        );
-      }
+    if (rows[0]) {
+      return mapContact(rows[0]);
     }
+  }
 
-    if (
-      phone
-    ) {
-      const [
-        rows,
-      ] =
-        await connection.query(
-          `
+  if (phone) {
+    const [rows] = await connection.query(
+      `
             ${CONTACT_SELECT}
 
             WHERE
@@ -186,97 +124,65 @@ export const findMatchingContact =
 
             LIMIT 1
           `,
-          [
-            companyId,
-            phone,
-          ]
-        );
+      [companyId, phone],
+    );
 
-      if (
-        rows[0]
-      ) {
-        return mapContact(
-          rows[0]
-        );
-      }
+    if (rows[0]) {
+      return mapContact(rows[0]);
     }
+  }
 
-    return null;
-  };
+  return null;
+};
 
-/*
-|--------------------------------------------------------------------------
-| List Contacts
-|--------------------------------------------------------------------------
-*/
+export const listContacts = async ({
+  search = "",
+  companyId,
+  isDecisionMaker,
+  status,
+  page = 1,
+  limit = 20,
+  sort = "createdAt",
+  direction = "asc",
+  userId,
+  role,
+}) => {
+  const conditions = ["ct.deleted_at IS NULL", "c.deleted_at IS NULL"];
 
-export const listContacts =
-  async ({
-    search = "",
-    companyId,
-    isDecisionMaker,
-    status,
-    page = 1,
-    limit = 20,
-    sort = "createdAt",
-    direction = "asc",
-    userId,
-    role,
-  }) => {
-    const conditions = [
-      "ct.deleted_at IS NULL",
-      "c.deleted_at IS NULL",
-    ];
+  const values = [];
 
-    const values = [];
+  if (role !== "SUPER_ADMIN") {
+    conditions.push(`
+        (
+          ct.created_by = ?
+          OR EXISTS (
+            SELECT 1
 
-    /*
-    |--------------------------------------------------------------------------
-    | Owner Record Scope
-    |--------------------------------------------------------------------------
-    |
-    | SUPER_ADMIN:
-    | sees all contacts.
-    |
-    | OWNER:
-    | sees contacts belonging to companies attached to their leads.
-    |
-    */
+            FROM companies cc
 
-    if (
-      role !==
-      "SUPER_ADMIN"
-    ) {
-      conditions.push(`
-        EXISTS (
-          SELECT 1
+            WHERE cc.id = ct.company_id
+              AND cc.created_by = ?
+              AND cc.deleted_at IS NULL
+          )
+          OR EXISTS (
+            SELECT 1
 
-          FROM leads l
+            FROM leads l
 
-          WHERE l.company_id = ct.company_id
-
-            AND l.owner_id = ?
-
-            AND l.deleted_at IS NULL
+            WHERE l.company_id = ct.company_id
+              AND l.owner_id = ?
+              AND l.deleted_at IS NULL
+          )
         )
       `);
 
-      values.push(
-        userId
-      );
-    }
+    values.push(userId, userId, userId);
+  }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Search
-    |--------------------------------------------------------------------------
-    */
+  if (search) {
+    const term = `%${search}%`;
 
-    if (search) {
-      const term =
-        `%${search}%`;
-
-      conditions.push(`
+    conditions.push(`
         (
           ct.contact_code LIKE ?
 
@@ -294,84 +200,31 @@ export const listContacts =
         )
       `);
 
-      values.push(
-        term,
-        term,
-        term,
-        term,
-        term,
-        term,
-        term
-      );
-    }
+    values.push(term, term, term, term, term, term, term);
+  }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Company Filter
-    |--------------------------------------------------------------------------
-    */
+  if (companyId) {
+    conditions.push("ct.company_id = ?");
 
-    if (companyId) {
-      conditions.push(
-        "ct.company_id = ?"
-      );
+    values.push(companyId);
+  }
 
-      values.push(
-        companyId
-      );
-    }
+  if (typeof isDecisionMaker === "boolean") {
+    conditions.push("ct.is_decision_maker = ?");
 
-    /*
-    |--------------------------------------------------------------------------
-    | Decision Maker Filter
-    |--------------------------------------------------------------------------
-    */
+    values.push(isDecisionMaker ? 1 : 0);
+  }
 
-    if (
-      typeof isDecisionMaker ===
-      "boolean"
-    ) {
-      conditions.push(
-        "ct.is_decision_maker = ?"
-      );
+  if (status) {
+    conditions.push("ct.status = ?");
 
-      values.push(
-        isDecisionMaker
-          ? 1
-          : 0
-      );
-    }
+    values.push(status);
+  }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Status
-    |--------------------------------------------------------------------------
-    */
+  const whereClause = conditions.join(" AND ");
 
-    if (status) {
-      conditions.push(
-        "ct.status = ?"
-      );
-
-      values.push(
-        status
-      );
-    }
-
-    const whereClause =
-      conditions.join(
-        " AND "
-      );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Total Count
-    |--------------------------------------------------------------------------
-    */
-
-    const [countRows] =
-      await pool.query(
-        `
+  const [countRows] = await pool.query(
+    `
           SELECT
             COUNT(*) AS total
 
@@ -383,57 +236,29 @@ export const listContacts =
 
           WHERE ${whereClause}
         `,
-        values
-      );
+    values,
+  );
 
-    const total =
-      Number(
-        countRows[0]
-          ?.total || 0
-      );
+  const total = Number(countRows[0]?.total || 0);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Sorting
-    |--------------------------------------------------------------------------
-    */
+  const sortColumns = {
+    name: "ct.full_name",
 
-    const sortColumns = {
-      name:
-        "ct.full_name",
+    companyName: "c.name",
 
-      companyName:
-        "c.name",
+    createdAt: "ct.created_at",
 
-      createdAt:
-        "ct.created_at",
+    updatedAt: "ct.updated_at",
+  };
 
-      updatedAt:
-        "ct.updated_at",
-    };
+  const orderColumn = sortColumns[sort] || "ct.created_at";
 
-    const orderColumn =
-      sortColumns[sort] ||
-      "ct.created_at";
+  const orderDirection = direction === "desc" ? "DESC" : "ASC";
 
-    const orderDirection =
-      direction === "desc"
-        ? "DESC"
-        : "ASC";
+  const offset = (Number(page) - 1) * Number(limit);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Pagination
-    |--------------------------------------------------------------------------
-    */
-
-    const offset =
-      (Number(page) - 1) *
-      Number(limit);
-
-    const [rows] =
-      await pool.query(
-        `
+  const [rows] = await pool.query(
+    `
           ${CONTACT_SELECT}
 
           WHERE ${whereClause}
@@ -446,53 +271,24 @@ export const listContacts =
           LIMIT ?
           OFFSET ?
         `,
-        [
-          ...values,
-          Number(limit),
-          Number(offset),
-        ]
-      );
+    [...values, Number(limit), Number(offset)],
+  );
 
-    return {
-      rows:
-        rows.map(
-          mapContact
-        ),
+  return {
+    rows: rows.map(mapContact),
 
-      total,
-    };
+    total,
   };
+};
 
-/*
-|--------------------------------------------------------------------------
-| Create Contact
-|--------------------------------------------------------------------------
-|
-| contact_code is generated after MySQL gives us the AUTO_INCREMENT id.
-|
-*/
+export const createContact = async (
+  { companyId, name, designation, phone, email, isDecisionMaker, userId },
+  connection = pool,
+) => {
+  const temporaryCode = `TEMP-${crypto.randomBytes(12).toString("hex")}`;
 
-export const createContact =
-  async (
-    {
-      companyId,
-      name,
-      designation,
-      phone,
-      email,
-      isDecisionMaker,
-      userId,
-    },
-    connection = pool
-  ) => {
-    const temporaryCode =
-    `TEMP-${crypto
-      .randomBytes(12)
-      .toString("hex")}`;
-
-    const [result] =
-      await connection.query(
-        `
+  const [result] = await connection.query(
+    `
           INSERT INTO contacts (
             contact_code,
             company_id,
@@ -520,39 +316,29 @@ export const createContact =
             ?
           )
         `,
-        [
-          temporaryCode,
-          companyId,
-          name,
-          designation,
-          phone,
-          email,
-          isDecisionMaker
-            ? 1
-            : 0,
-          userId,
-          userId,
-        ]
-      );
+    [
+      temporaryCode,
+      companyId,
+      name,
+      designation,
+      phone,
+      email,
+      isDecisionMaker ? 1 : 0,
+      userId,
+      userId,
+    ],
+  );
 
-    return result.insertId;
-  };
+  return result.insertId;
+};
 
-/*
-|--------------------------------------------------------------------------
-| Update Contact Code
-|--------------------------------------------------------------------------
-*/
-
-export const updateContactCode =
-  async (
-    contactId,
-    contactCode,
-    connection = pool
-  ) => {
-    const [result] =
-      await connection.query(
-        `
+export const updateContactCode = async (
+  contactId,
+  contactCode,
+  connection = pool,
+) => {
+  const [result] = await connection.query(
+    `
           UPDATE contacts
 
           SET contact_code = ?
@@ -560,125 +346,111 @@ export const updateContactCode =
           WHERE id = ?
             AND deleted_at IS NULL
         `,
-        [
-          contactCode,
-          contactId,
-        ]
-      );
+    [contactCode, contactId],
+  );
 
-    return (
-      result.affectedRows >
-      0
-    );
+  return result.affectedRows > 0;
+};
+
+export const updateContact = async (
+  contactId,
+  data,
+  userId,
+  connection = pool,
+) => {
+  const columnMap = {
+    companyId: "company_id",
+
+    name: "full_name",
+
+    designation: "designation",
+
+    phone: "phone",
+
+    email: "email",
+
+    isDecisionMaker: "is_decision_maker",
+
+    status: "status",
+
+    notes: "notes",
   };
 
-/*
-|--------------------------------------------------------------------------
-| Update Contact
-|--------------------------------------------------------------------------
-*/
+  const assignments = [];
+  const values = [];
 
-export const updateContact =
-  async (
-    contactId,
-    data,
-    userId,
-    connection = pool
-  ) => {
-    const columnMap = {
-      companyId:
-        "company_id",
+  for (const [key, value] of Object.entries(data)) {
+    const column = columnMap[key];
 
-      name:
-        "full_name",
-
-      designation:
-        "designation",
-
-      phone:
-        "phone",
-
-      email:
-        "email",
-
-      isDecisionMaker:
-        "is_decision_maker",
-
-      status:
-        "status",
-
-      notes:
-        "notes",
-    };
-
-    const assignments = [];
-    const values = [];
-
-    for (
-      const [
-        key,
-        value,
-      ] of Object.entries(
-        data
-      )
-    ) {
-      const column =
-        columnMap[key];
-
-      if (!column) {
-        continue;
-      }
-
-      assignments.push(
-        `${column} = ?`
-      );
-
-      if (
-        key ===
-        "isDecisionMaker"
-      ) {
-        values.push(
-          value
-            ? 1
-            : 0
-        );
-      } else {
-        values.push(
-          value
-        );
-      }
+    if (!column) {
+      continue;
     }
 
-    assignments.push(
-      "updated_by = ?"
-    );
+    assignments.push(`${column} = ?`);
 
-    values.push(
-      userId
-    );
+    if (key === "isDecisionMaker") {
+      values.push(value ? 1 : 0);
+    } else {
+      values.push(value);
+    }
+  }
 
-    values.push(
-      contactId
-    );
+  assignments.push("updated_by = ?");
 
-    const [result] =
-      await connection.query(
-        `
+  values.push(userId);
+
+  values.push(contactId);
+
+  const [result] = await connection.query(
+    `
           UPDATE contacts
 
           SET
-            ${assignments.join(
-              ", "
-            )}
+            ${assignments.join(", ")}
 
           WHERE id = ?
             AND deleted_at IS NULL
         `,
-        values
-      );
+    values,
+  );
 
-    return (
-      result.affectedRows >
-      0
-    );
-  };
+  return result.affectedRows > 0;
+};
+
+export const canUserAccessContact = async (
+  { contactId, userId, role },
+  connection = pool,
+) => {
+  if (role === "SUPER_ADMIN") {
+    return true;
+  }
+
+  const [rows] = await connection.query(
+    `
+        SELECT 1
+        FROM contacts ct
+        WHERE ct.id = ?
+          AND (
+            ct.created_by = ?
+            OR EXISTS (
+              SELECT 1
+              FROM companies cc
+              WHERE cc.id = ct.company_id
+                AND cc.created_by = ?
+                AND cc.deleted_at IS NULL
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM leads l
+              WHERE l.company_id = ct.company_id
+                AND l.owner_id = ?
+                AND l.deleted_at IS NULL
+            )
+          )
+        LIMIT 1
+      `,
+    [contactId, userId, userId, userId],
+  );
+
+  return rows.length > 0;
+};

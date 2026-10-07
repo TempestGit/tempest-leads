@@ -1,25 +1,6 @@
-import {
-  useEffect,
-  useState,
-} from "react";
-
-import {
-  X,
-} from "lucide-react";
-
-import {
-  useChangeLeadStageMutation,
-} from "./leads.queries.js";
-
-/*
-|--------------------------------------------------------------------------
-| Generic Stage Options
-|--------------------------------------------------------------------------
-|
-| Lost is intentionally excluded.
-| Mark Lost has its own mandatory close workflow.
-|
-*/
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
+import { useChangeLeadStageMutation } from "./leads.queries.js";
 
 const STAGES = [
   "New",
@@ -35,226 +16,129 @@ const STAGES = [
   "Nurture",
 ];
 
-/*
-|--------------------------------------------------------------------------
-| Change Stage Modal
-|--------------------------------------------------------------------------
-*/
-
 const ChangeStageModal = ({
+  onPartialSuccess,
   open,
   leadIds = [],
   initialStage = "New",
   onClose,
 }) => {
-  const mutation =
-    useChangeLeadStageMutation();
+  const mutation = useChangeLeadStageMutation();
 
-  const [
-    stage,
-    setStage,
-  ] = useState(
-    "New"
-  );
-
-  const [
-    reason,
-    setReason,
-  ] = useState("");
-
-  const [
-    error,
-    setError,
-  ] = useState("");
-
-  /*
-  |--------------------------------------------------------------------------
-  | Reset
-  |--------------------------------------------------------------------------
-  */
+  const [stage, setStage] = useState("New");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    const safeStage =
-      STAGES.includes(
-        initialStage
-      )
-        ? initialStage
-        : "New";
-
-    setStage(
-      safeStage
-    );
-
+    setStage(STAGES.includes(initialStage) ? initialStage : "New");
     setReason("");
-
     setError("");
-  }, [
-    open,
-    initialStage,
-  ]);
+  }, [open, initialStage]);
 
   if (!open) {
     return null;
   }
 
-  /*
-  |--------------------------------------------------------------------------
-  | Submit
-  |--------------------------------------------------------------------------
-  */
+  const submit = async () => {
+    setError("");
 
-  const submit =
-    async () => {
-      setError("");
+    if (!leadIds.length) {
+      setError("No lead selected.");
+      return;
+    }
 
-      if (
-        !leadIds.length
-      ) {
-        setError(
-          "No lead selected."
-        );
+    if (!reason.trim()) {
+      setError("Reason or comment is required.");
+      return;
+    }
 
-        return;
-      }
+    const succeeded = [];
+    const skipped = [];
+    const failed = [];
 
-      if (
-        !reason.trim()
-      ) {
-        setError(
-          "Reason or comment is required."
-        );
-
-        return;
-      }
-
+    for (const leadId of leadIds) {
       try {
-        for (
-          const leadId
-          of leadIds
-        ) {
-          await mutation.mutateAsync({
-            leadId:
-              Number(
-                leadId
-              ),
+        await mutation.mutateAsync({
+          leadId: Number(leadId),
+          data: { stage, reason: reason.trim() },
+        });
+        succeeded.push(leadId);
+      } catch (requestError) {
+        const status = requestError?.response?.status;
+        const message =
+          requestError?.response?.data?.message || "Unable to change stage.";
 
-            data: {
-              stage,
-
-              reason:
-                reason.trim(),
-            },
-          });
+        // Lead is already in the target stage: nothing to do.
+        if (status === 409 && /already in this stage/i.test(message)) {
+          skipped.push(leadId);
+        } else {
+          failed.push({ leadId, message });
         }
-
-        onClose();
-      } catch (
-        requestError
-      ) {
-        setError(
-          requestError
-            ?.response
-            ?.data
-            ?.message ||
-            "Unable to change stage."
-        );
       }
-    };
+    }
+
+    if (succeeded.length && onPartialSuccess) {
+      onPartialSuccess([...succeeded, ...skipped]);
+    }
+
+    if (!failed.length) {
+      onClose();
+      return;
+    }
+
+    setError(
+      `${succeeded.length} lead(s) updated, ${skipped.length} already in "${stage}", ` +
+        `${failed.length} failed. First error: ${failed[0].message}`,
+    );
+  };
 
   return (
     <div className="modal-backdrop">
       <section className="tl-modal">
         <header className="modal-head">
           <div>
-            <h2>
-              Change stage
-            </h2>
-
-            <p>
-              Every change
-              creates a history
-              and audit entry.
-            </p>
+            <h2>Change stage</h2>
+            <p>Every change creates a history and audit entry.</p>
           </div>
-
           <button
             type="button"
             className="icon-control"
-            onClick={
-              onClose
-            }
-            disabled={
-              mutation.isPending
-            }
+            onClick={onClose}
+            disabled={mutation.isPending}
           >
             <X size={15} />
           </button>
         </header>
 
         <div className="modal-body">
-          {error && (
-            <div className="error-box">
-              {error}
-            </div>
-          )}
+          {error && <div className="error-box">{error}</div>}
 
           <div className="form-section">
             <div className="form-grid2">
               <label>
                 New stage
-
                 <select
-                  value={
-                    stage
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    setStage(
-                      event.target
-                        .value
-                    )
-                  }
+                  value={stage}
+                  onChange={(event) => setStage(event.target.value)}
                 >
-                  {STAGES.map(
-                    (
-                      item
-                    ) => (
-                      <option
-                        key={
-                          item
-                        }
-                        value={
-                          item
-                        }
-                      >
-                        {item}
-                      </option>
-                    )
-                  )}
+                  {STAGES.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </select>
               </label>
 
               <label className="full">
                 Reason / comment *
-
                 <textarea
                   rows="4"
-                  value={
-                    reason
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    setReason(
-                      event.target
-                        .value
-                    )
-                  }
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
                 />
               </label>
             </div>
@@ -265,29 +149,18 @@ const ChangeStageModal = ({
           <button
             type="button"
             className="tl-secondary"
-            onClick={
-              onClose
-            }
-            disabled={
-              mutation.isPending
-            }
+            onClick={onClose}
+            disabled={mutation.isPending}
           >
             Cancel
           </button>
-
           <button
             type="button"
             className="tl-primary"
-            onClick={
-              submit
-            }
-            disabled={
-              mutation.isPending
-            }
+            onClick={submit}
+            disabled={mutation.isPending}
           >
-            {mutation.isPending
-              ? "Changing..."
-              : "Change stage"}
+            {mutation.isPending ? "Changing..." : "Change stage"}
           </button>
         </footer>
       </section>

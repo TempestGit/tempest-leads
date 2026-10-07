@@ -2,18 +2,6 @@ import crypto from "node:crypto";
 
 import pool from "../../config/db.js";
 
-/*
-|--------------------------------------------------------------------------
-| Company SELECT
-|--------------------------------------------------------------------------
-|
-| currentStage:
-|   The stage of the company's most recently updated lead.
-|
-| If the company has no leads, currentStage will be NULL.
-|
-*/
-
 const COMPANY_SELECT = `
   SELECT
     c.id,
@@ -77,19 +65,9 @@ const COMPANY_SELECT = `
   FROM companies c
 `;
 
-/*
-|--------------------------------------------------------------------------
-| Find Company By ID
-|--------------------------------------------------------------------------
-*/
-
-export const findCompanyById = async (
-  companyId,
-  connection = pool
-) => {
-  const [rows] =
-    await connection.query(
-      `
+export const findCompanyById = async (companyId, connection = pool) => {
+  const [rows] = await connection.query(
+    `
         ${COMPANY_SELECT}
 
         WHERE c.id = ?
@@ -97,10 +75,8 @@ export const findCompanyById = async (
 
         LIMIT 1
       `,
-      [
-        companyId,
-      ]
-    );
+    [companyId],
+  );
 
   if (!rows[0]) {
     return null;
@@ -109,134 +85,82 @@ export const findCompanyById = async (
   return {
     ...rows[0],
 
-    contactsCount:
-      Number(
-        rows[0]
-          .contactsCount ||
-          0
-      ),
+    contactsCount: Number(rows[0].contactsCount || 0),
   };
 };
 
-/*
-|--------------------------------------------------------------------------
-| Find Company By Name
-|--------------------------------------------------------------------------
-*/
+export const findCompanyByName = async (
+  name,
+  excludeId = null,
+  connection = pool,
+) => {
+  const values = [name];
 
-export const findCompanyByName =
-  async (
-    name,
-    excludeId = null,
-    connection = pool
-  ) => {
-    const values = [
-      name,
-    ];
-
-    let sql = `
+  let sql = `
       ${COMPANY_SELECT}
 
       WHERE LOWER(c.name) = LOWER(?)
         AND c.deleted_at IS NULL
     `;
 
-    if (excludeId) {
-      sql += `
+  if (excludeId) {
+    sql += `
         AND c.id <> ?
       `;
 
-      values.push(
-        excludeId
-      );
-    }
+    values.push(excludeId);
+  }
 
-    sql += `
+  sql += `
       LIMIT 1
     `;
 
-    const [rows] =
-      await connection.query(
-        sql,
-        values
-      );
+  const [rows] = await connection.query(sql, values);
 
-    return (
-      rows[0] ||
-      null
-    );
-  };
+  return rows[0] || null;
+};
 
-/*
-|--------------------------------------------------------------------------
-| List Companies
-|--------------------------------------------------------------------------
-|
-| SUPER_ADMIN:
-|   sees every company.
-|
-| OWNER:
-|   sees companies connected to leads owned by them.
-|
-*/
+export const listCompanies = async ({
+  search = "",
+  status,
+  industry,
+  city,
+  page = 1,
+  limit = 20,
+  sort = "createdAt",
+  direction = "asc",
+  userId,
+  role,
+}) => {
+  const conditions = ["c.deleted_at IS NULL"];
 
-export const listCompanies =
-  async ({
-    search = "",
-    status,
-    industry,
-    city,
-    page = 1,
-    limit = 20,
-    sort = "createdAt",
-    direction = "asc",
-    userId,
-    role,
-  }) => {
-    const conditions = [
-      "c.deleted_at IS NULL",
-    ];
+  const values = [];
 
-    const values = [];
+  if (role !== "SUPER_ADMIN") {
+    conditions.push(`
+        (
+          c.created_by = ?
+          OR EXISTS (
+            SELECT 1
 
-    /*
-    |--------------------------------------------------------------------------
-    | Ownership Scope
-    |--------------------------------------------------------------------------
-    */
+            FROM leads l
 
-    if (
-      role !==
-      "SUPER_ADMIN"
-    ) {
-      conditions.push(`
-        EXISTS (
-          SELECT 1
-
-          FROM leads l
-
-          WHERE l.company_id = c.id
-            AND l.owner_id = ?
-            AND l.deleted_at IS NULL
+            WHERE l.company_id = c.id
+              AND l.owner_id = ?
+              AND l.deleted_at IS NULL
+          )
         )
       `);
 
-      values.push(
-        userId
-      );
-    }
+    // A company the user created stays visible to them even before
+    // they own a lead on it.
+    values.push(userId, userId);
+  }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Search
-    |--------------------------------------------------------------------------
-    */
+  if (search) {
+    const term = `%${search}%`;
 
-    if (search) {
-      const term =
-        `%${search}%`;
-
-      conditions.push(`
+    conditions.push(`
         (
           c.company_code LIKE ?
           OR c.name LIKE ?
@@ -248,67 +172,31 @@ export const listCompanies =
         )
       `);
 
-      values.push(
-        term,
-        term,
-        term,
-        term,
-        term,
-        term,
-        term
-      );
-    }
+    values.push(term, term, term, term, term, term, term);
+  }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Filters
-    |--------------------------------------------------------------------------
-    */
+  if (status) {
+    conditions.push("c.status = ?");
 
-    if (status) {
-      conditions.push(
-        "c.status = ?"
-      );
+    values.push(status);
+  }
 
-      values.push(
-        status
-      );
-    }
+  if (industry) {
+    conditions.push("c.industry = ?");
 
-    if (industry) {
-      conditions.push(
-        "c.industry = ?"
-      );
+    values.push(industry);
+  }
 
-      values.push(
-        industry
-      );
-    }
+  if (city) {
+    conditions.push("c.city = ?");
 
-    if (city) {
-      conditions.push(
-        "c.city = ?"
-      );
+    values.push(city);
+  }
 
-      values.push(
-        city
-      );
-    }
+  const whereClause = conditions.join(" AND ");
 
-    const whereClause =
-      conditions.join(
-        " AND "
-      );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Count
-    |--------------------------------------------------------------------------
-    */
-
-    const [countRows] =
-      await pool.query(
-        `
+  const [countRows] = await pool.query(
+    `
           SELECT
             COUNT(*) AS total
 
@@ -316,67 +204,31 @@ export const listCompanies =
 
           WHERE ${whereClause}
         `,
-        values
-      );
+    values,
+  );
 
-    const total =
-      Number(
-        countRows[0]
-          ?.total ||
-          0
-      );
+  const total = Number(countRows[0]?.total || 0);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Sorting
-    |--------------------------------------------------------------------------
-    */
+  const sortColumns = {
+    name: "c.name",
 
-    const sortColumns = {
-      name:
-        "c.name",
+    createdAt: "c.created_at",
 
-      createdAt:
-        "c.created_at",
+    updatedAt: "c.updated_at",
 
-      updatedAt:
-        "c.updated_at",
+    city: "c.city",
 
-      city:
-        "c.city",
+    industry: "c.industry",
+  };
 
-      industry:
-        "c.industry",
-    };
+  const orderColumn = sortColumns[sort] || "c.created_at";
 
-    const orderColumn =
-      sortColumns[
-        sort
-      ] ||
-      "c.created_at";
+  const orderDirection = direction === "desc" ? "DESC" : "ASC";
 
-    const orderDirection =
-      direction ===
-      "desc"
-        ? "DESC"
-        : "ASC";
+  const offset = (Number(page) - 1) * Number(limit);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Pagination
-    |--------------------------------------------------------------------------
-    */
-
-    const offset =
-      (
-        Number(page) -
-        1
-      ) *
-      Number(limit);
-
-    const [rows] =
-      await pool.query(
-        `
+  const [rows] = await pool.query(
+    `
           ${COMPANY_SELECT}
 
           WHERE ${whereClause}
@@ -389,97 +241,43 @@ export const listCompanies =
           LIMIT ?
           OFFSET ?
         `,
-        [
-          ...values,
+    [...values, Number(limit), Number(offset)],
+  );
 
-          Number(
-            limit
-          ),
+  return {
+    rows: rows.map((company) => ({
+      ...company,
 
-          Number(
-            offset
-          ),
-        ]
-      );
+      contactsCount: Number(company.contactsCount || 0),
+    })),
 
-    return {
-      rows:
-        rows.map(
-          (
-            company
-          ) => ({
-            ...company,
-
-            contactsCount:
-              Number(
-                company
-                  .contactsCount ||
-                  0
-              ),
-          })
-        ),
-
-      total,
-    };
+    total,
   };
+};
 
-/*
-|--------------------------------------------------------------------------
-| Create Company
-|--------------------------------------------------------------------------
-|
-| company_code is UNIQUE + NOT NULL.
-|
-| We first create a temporary value so MySQL can generate the
-| AUTO_INCREMENT id.
-|
-| The service then changes:
-|
-| TEMP-...
-|
-| into:
-|
-| CMP-1001
-| CMP-1002
-| CMP-1003
-|
-*/
+export const createCompany = async (
+  {
+    name,
+    industry,
+    city,
+    website,
+    agencyRelationship,
+    notes = null,
 
-export const createCompany =
-  async (
-    {
-      name,
-      industry,
-      city,
-      website,
-      agencyRelationship,
-      notes = null,
+    country = "India",
 
-      country =
-        "India",
+    source = "Other",
 
-      source =
-        "Other",
+    status = "ACTIVE",
 
-      status =
-        "ACTIVE",
+    userId,
+  },
+  connection = pool,
+) => {
+  const temporaryCode = `TEMP-${crypto.randomBytes(12).toString("hex")}`;
 
-      userId,
-    },
-    connection = pool
-  ) => {
-    const temporaryCode =
-      `TEMP-${crypto
-        .randomBytes(
-          12
-        )
-        .toString(
-          "hex"
-        )}`;
-
-    const [result] =
-      await connection.query(
-        `
+  const [result] = await connection.query(
+    `
           INSERT INTO companies (
             company_code,
             name,
@@ -512,42 +310,32 @@ export const createCompany =
             ?
           )
         `,
-        [
-          temporaryCode,
-          name,
-          industry,
-          city,
-          country,
-          website,
-          agencyRelationship,
-          source,
-          status,
-          notes,
-          userId,
-          userId,
-        ]
-      );
+    [
+      temporaryCode,
+      name,
+      industry,
+      city,
+      country,
+      website,
+      agencyRelationship,
+      source,
+      status,
+      notes,
+      userId,
+      userId,
+    ],
+  );
 
-    return (
-      result.insertId
-    );
-  };
+  return result.insertId;
+};
 
-/*
-|--------------------------------------------------------------------------
-| Update Company Code
-|--------------------------------------------------------------------------
-*/
-
-export const updateCompanyCode =
-  async (
-    companyId,
-    companyCode,
-    connection = pool
-  ) => {
-    const [result] =
-      await connection.query(
-        `
+export const updateCompanyCode = async (
+  companyId,
+  companyCode,
+  connection = pool,
+) => {
+  const [result] = await connection.query(
+    `
           UPDATE companies
 
           SET
@@ -556,144 +344,81 @@ export const updateCompanyCode =
           WHERE id = ?
             AND deleted_at IS NULL
         `,
-        [
-          companyCode,
-          companyId,
-        ]
-      );
+    [companyCode, companyId],
+  );
 
-    return (
-      result
-        .affectedRows >
-      0
-    );
+  return result.affectedRows > 0;
+};
+
+export const updateCompany = async (
+  companyId,
+  data,
+  userId,
+  connection = pool,
+) => {
+  const columnMap = {
+    name: "name",
+
+    industry: "industry",
+
+    city: "city",
+
+    state: "state",
+
+    country: "country",
+
+    website: "website",
+
+    agencyRelationship: "agency_relationship",
+
+    source: "source",
+
+    status: "status",
+
+    notes: "notes",
   };
 
-/*
-|--------------------------------------------------------------------------
-| Update Company
-|--------------------------------------------------------------------------
-*/
+  const assignments = [];
 
-export const updateCompany =
-  async (
-    companyId,
-    data,
-    userId,
-    connection = pool
-  ) => {
-    const columnMap = {
-      name:
-        "name",
+  const values = [];
 
-      industry:
-        "industry",
+  for (const [key, value] of Object.entries(data)) {
+    const column = columnMap[key];
 
-      city:
-        "city",
-
-      state:
-        "state",
-
-      country:
-        "country",
-
-      website:
-        "website",
-
-      agencyRelationship:
-        "agency_relationship",
-
-      source:
-        "source",
-
-      status:
-        "status",
-
-      notes:
-        "notes",
-    };
-
-    const assignments =
-      [];
-
-    const values = [];
-
-    for (
-      const [
-        key,
-        value,
-      ] of Object.entries(
-        data
-      )
-    ) {
-      const column =
-        columnMap[
-          key
-        ];
-
-      if (!column) {
-        continue;
-      }
-
-      assignments.push(
-        `${column} = ?`
-      );
-
-      values.push(
-        value
-      );
+    if (!column) {
+      continue;
     }
 
-    assignments.push(
-      "updated_by = ?"
-    );
+    assignments.push(`${column} = ?`);
 
-    values.push(
-      userId
-    );
+    values.push(value);
+  }
 
-    values.push(
-      companyId
-    );
+  assignments.push("updated_by = ?");
 
-    const [result] =
-      await connection.query(
-        `
+  values.push(userId);
+
+  values.push(companyId);
+
+  const [result] = await connection.query(
+    `
           UPDATE companies
 
           SET
-            ${assignments.join(
-              ", "
-            )}
+            ${assignments.join(", ")}
 
           WHERE id = ?
             AND deleted_at IS NULL
         `,
-        values
-      );
+    values,
+  );
 
-    return (
-      result
-        .affectedRows >
-      0
-    );
-  };
+  return result.affectedRows > 0;
+};
 
-/*
-|--------------------------------------------------------------------------
-| Company Dependencies
-|--------------------------------------------------------------------------
-*/
-
-export const getCompanyDependencies =
-  async (
-    companyId,
-    connection = pool
-  ) => {
-    const [contactRows] =
-      await connection.query(
-        `
+export const getCompanyDependencies = async (companyId, connection = pool) => {
+  const [contactRows] = await connection.query(
+    `
           SELECT
             COUNT(*) AS total
 
@@ -702,14 +427,11 @@ export const getCompanyDependencies =
           WHERE company_id = ?
             AND deleted_at IS NULL
         `,
-        [
-          companyId,
-        ]
-      );
+    [companyId],
+  );
 
-    const [leadRows] =
-      await connection.query(
-        `
+  const [leadRows] = await connection.query(
+    `
           SELECT
             COUNT(*) AS total
 
@@ -718,43 +440,23 @@ export const getCompanyDependencies =
           WHERE company_id = ?
             AND deleted_at IS NULL
         `,
-        [
-          companyId,
-        ]
-      );
+    [companyId],
+  );
 
-    return {
-      contacts:
-        Number(
-          contactRows[0]
-            ?.total ||
-            0
-        ),
+  return {
+    contacts: Number(contactRows[0]?.total || 0),
 
-      leads:
-        Number(
-          leadRows[0]
-            ?.total ||
-            0
-        ),
-    };
+    leads: Number(leadRows[0]?.total || 0),
   };
+};
 
-/*
-|--------------------------------------------------------------------------
-| Soft Delete Company
-|--------------------------------------------------------------------------
-*/
-
-export const softDeleteCompany =
-  async (
-    companyId,
-    userId,
-    connection = pool
-  ) => {
-    const [result] =
-      await connection.query(
-        `
+export const softDeleteCompany = async (
+  companyId,
+  userId,
+  connection = pool,
+) => {
+  const [result] = await connection.query(
+    `
           UPDATE companies
 
           SET
@@ -766,15 +468,40 @@ export const softDeleteCompany =
           WHERE id = ?
             AND deleted_at IS NULL
         `,
-        [
-          userId,
-          companyId,
-        ]
-      );
+    [userId, companyId],
+  );
 
-    return (
-      result
-        .affectedRows >
-      0
-    );
-  };
+  return result.affectedRows > 0;
+};
+
+export const canUserAccessCompany = async (
+  { companyId, userId, role },
+  connection = pool,
+) => {
+  if (role === "SUPER_ADMIN") {
+    return true;
+  }
+
+  const [rows] = await connection.query(
+    `
+        SELECT 1
+        FROM companies c
+        WHERE c.id = ?
+          AND c.deleted_at IS NULL
+          AND (
+            c.created_by = ?
+            OR EXISTS (
+              SELECT 1
+              FROM leads l
+              WHERE l.company_id = c.id
+                AND l.owner_id = ?
+                AND l.deleted_at IS NULL
+            )
+          )
+        LIMIT 1
+      `,
+    [companyId, userId, userId],
+  );
+
+  return rows.length > 0;
+};

@@ -1,175 +1,88 @@
-import {
-  useMemo,
-  useState,
-} from "react";
+import { useMemo, useState } from "react";
 
-import {
-  useContactsQuery,
-} from "./contacts.queries.js";
+import { useContactsQuery } from "./contacts.queries.js";
 
 import ContactFormModal from "./ContactFormModal.jsx";
 
-/*
-|--------------------------------------------------------------------------
-| CSV Helper
-|--------------------------------------------------------------------------
-*/
+const csvValue = (value) => {
+  const text = String(value ?? "");
 
-const csvValue = (
-  value
-) => {
-  const text =
-    String(
-      value ?? ""
-    );
-
-  return `"${text.replaceAll(
-    '"',
-    '""'
-  )}"`;
+  return `"${text.replaceAll('"', '""')}"`;
 };
 
-/*
-|--------------------------------------------------------------------------
-| Contacts Page
-|--------------------------------------------------------------------------
-*/
-
 const ContactsPage = () => {
-  const [
-    modalOpen,
-    setModalOpen,
-  ] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Prototype does not show filters/pagination controls.
-  |--------------------------------------------------------------------------
-  */
+  const params = useMemo(
+    () => ({
+      page: 1,
 
-  const params =
-    useMemo(
-      () => ({
-        page: 1,
+      limit: 100,
 
-        limit: 100,
+      sort: "createdAt",
 
-        sort: "createdAt",
+      direction: "desc",
+    }),
+    [],
+  );
 
-        direction: "asc",
-      }),
-      []
-    );
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    useContactsQuery(params);
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-    refetch,
-  } =
-    useContactsQuery(
-      params
-    );
+  const contacts = data?.data?.contacts || [];
 
-  const contacts =
-    data?.data
-      ?.contacts || [];
+  const handleExport = () => {
+    if (contacts.length === 0) {
+      return;
+    }
 
-  /*
-  |--------------------------------------------------------------------------
-  | Export
-  |--------------------------------------------------------------------------
-  */
+    const headers = [
+      "Contact ID",
+      "Name",
+      "Company",
+      "Designation",
+      "Phone",
+      "Email",
+      "Decision maker",
+    ];
 
-  const handleExport =
-    () => {
-      if (
-        contacts.length ===
-        0
-      ) {
-        return;
-      }
+    const rows = contacts.map((contact) => [
+      contact.contactCode,
+      contact.name,
+      contact.companyName,
+      contact.designation,
+      contact.phone,
+      contact.email,
 
-      const headers = [
-        "Contact ID",
-        "Name",
-        "Company",
-        "Designation",
-        "Phone",
-        "Email",
-        "Decision maker",
-      ];
+      contact.isDecisionMaker ? "Yes" : "No",
+    ]);
 
-      const rows =
-        contacts.map(
-          (contact) => [
-            contact.contactCode,
-            contact.name,
-            contact.companyName,
-            contact.designation,
-            contact.phone,
-            contact.email,
+    const csv = [
+      headers.map(csvValue).join(","),
 
-            contact.isDecisionMaker
-              ? "Yes"
-              : "No",
-          ]
-        );
+      ...rows.map((row) => row.map(csvValue).join(",")),
+    ].join("\n");
 
-      const csv = [
-        headers
-          .map(csvValue)
-          .join(","),
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;",
+    });
 
-        ...rows.map(
-          (row) =>
-            row
-              .map(
-                csvValue
-              )
-              .join(",")
-        ),
-      ].join("\n");
+    const url = URL.createObjectURL(blob);
 
-      const blob =
-        new Blob(
-          [csv],
-          {
-            type:
-              "text/csv;charset=utf-8;",
-          }
-        );
+    const anchor = document.createElement("a");
 
-      const url =
-        URL.createObjectURL(
-          blob
-        );
+    anchor.href = url;
 
-      const anchor =
-        document.createElement(
-          "a"
-        );
+    anchor.download = "tempest-contacts.csv";
 
-      anchor.href =
-        url;
+    document.body.appendChild(anchor);
 
-      anchor.download =
-        "tempest-contacts.csv";
+    anchor.click();
 
-      document.body.appendChild(
-        anchor
-      );
+    anchor.remove();
 
-      anchor.click();
-
-      anchor.remove();
-
-      URL.revokeObjectURL(
-        url
-      );
-    };
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <>
@@ -179,16 +92,11 @@ const ContactsPage = () => {
 
       <div className="tl-title-row">
         <div>
-          <h1>
-            Contact Master
-          </h1>
+          <h1>Contact Master</h1>
 
           <p>
-            Contacts are
-            independent records.
-            A company can have
-            many decision-makers
-            and stakeholders.
+            Contacts are independent records. A company can have many
+            decision-makers and stakeholders.
           </p>
         </div>
 
@@ -196,13 +104,8 @@ const ContactsPage = () => {
           <button
             type="button"
             className="tl-secondary"
-            onClick={
-              handleExport
-            }
-            disabled={
-              contacts.length ===
-              0
-            }
+            onClick={handleExport}
+            disabled={contacts.length === 0}
           >
             Export
           </button>
@@ -210,11 +113,7 @@ const ContactsPage = () => {
           <button
             type="button"
             className="tl-primary"
-            onClick={() =>
-              setModalOpen(
-                true
-              )
-            }
+            onClick={() => setModalOpen(true)}
           >
             + Add contact
           </button>
@@ -228,36 +127,23 @@ const ContactsPage = () => {
       <article className="tl-card no-pad">
         {isLoading ? (
           <div className="empty-state">
-            <h2>
-              Loading contacts
-            </h2>
+            <h2>Loading contacts</h2>
 
-            <p>
-              Loading contact
-              records...
-            </p>
+            <p>Loading contact records...</p>
           </div>
         ) : isError ? (
           <div className="empty-state">
-            <h2>
-              Unable to load
-              contacts
-            </h2>
+            <h2>Unable to load contacts</h2>
 
             <p>
-              {error
-                ?.response
-                ?.data
-                ?.message ||
+              {error?.response?.data?.message ||
                 "Something went wrong while loading contacts."}
             </p>
 
             <button
               type="button"
               className="tl-primary"
-              onClick={() =>
-                refetch()
-              }
+              onClick={() => refetch()}
             >
               Try again
             </button>
@@ -267,65 +153,35 @@ const ContactsPage = () => {
             <table className="tl-table">
               <thead>
                 <tr>
-                  <th>
-                    Contact ID
-                  </th>
+                  <th>Contact ID</th>
 
-                  <th>
-                    Name
-                  </th>
+                  <th>Name</th>
 
-                  <th>
-                    Company
-                  </th>
+                  <th>Company</th>
 
-                  <th>
-                    Designation
-                  </th>
+                  <th>Designation</th>
 
-                  <th>
-                    Phone
-                  </th>
+                  <th>Phone</th>
 
-                  <th>
-                    Email
-                  </th>
+                  <th>Email</th>
 
-                  <th>
-                    Decision maker
-                  </th>
+                  <th>Decision maker</th>
                 </tr>
               </thead>
 
               <tbody>
-                {contacts.length ===
-                0 ? (
+                {contacts.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={
-                        7
-                      }
-                    >
+                    <td colSpan={7}>
                       <div className="empty-state">
-                        <h2>
-                          No contacts
-                          found
-                        </h2>
+                        <h2>No contacts found</h2>
 
-                        <p>
-                          Add the first
-                          contact for a
-                          company.
-                        </p>
+                        <p>Add the first contact for a company.</p>
 
                         <button
                           type="button"
                           className="tl-primary"
-                          onClick={() =>
-                            setModalOpen(
-                              true
-                            )
-                          }
+                          onClick={() => setModalOpen(true)}
                         >
                           + Add contact
                         </button>
@@ -333,81 +189,47 @@ const ContactsPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  contacts.map(
-                    (
-                      contact
-                    ) => (
-                      <tr
-                        key={
-                          contact.id
-                        }
-                      >
-                        {/* Contact ID */}
+                  contacts.map((contact) => (
+                    <tr key={contact.id}>
+                      {/* Contact ID */}
 
-                        <td>
-                          {
-                            contact.contactCode
-                          }
-                        </td>
+                      <td>{contact.contactCode}</td>
 
-                        {/* Name */}
+                      {/* Name */}
 
-                        <td>
-                          <b>
-                            {
-                              contact.name
-                            }
-                          </b>
-                        </td>
+                      <td>
+                        <b>{contact.name}</b>
+                      </td>
 
-                        {/* Company */}
+                      {/* Company */}
 
-                        <td>
-                          {
-                            contact.companyName
-                          }
-                        </td>
+                      <td>{contact.companyName}</td>
 
-                        {/* Designation */}
+                      {/* Designation */}
 
-                        <td>
-                          {contact.designation ||
-                            "—"}
-                        </td>
+                      <td>{contact.designation || "—"}</td>
 
-                        {/* Phone */}
+                      {/* Phone */}
 
-                        <td>
-                          {contact.phone ||
-                            "—"}
-                        </td>
+                      <td>{contact.phone || "—"}</td>
 
-                        {/* Email */}
+                      {/* Email */}
 
-                        <td>
-                          {contact.email ? (
-                            <a
-                              href={`mailto:${contact.email}`}
-                            >
-                              {
-                                contact.email
-                              }
-                            </a>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
+                      <td>
+                        {contact.email ? (
+                          <a href={`mailto:${contact.email}`}>
+                            {contact.email}
+                          </a>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
 
-                        {/* Decision Maker */}
+                      {/* Decision Maker */}
 
-                        <td>
-                          {contact.isDecisionMaker
-                            ? "Yes"
-                            : "No"}
-                        </td>
-                      </tr>
-                    )
-                  )
+                      <td>{contact.isDecisionMaker ? "Yes" : "No"}</td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -415,38 +237,25 @@ const ContactsPage = () => {
         )}
       </article>
 
-      {isFetching &&
-        !isLoading && (
-          <div
-            style={{
-              marginTop:
-                "8px",
+      {isFetching && !isLoading && (
+        <div
+          style={{
+            marginTop: "8px",
 
-              color:
-                "var(--muted)",
+            color: "var(--muted)",
 
-              fontSize:
-                "10px",
-            }}
-          >
-            Refreshing...
-          </div>
-        )}
+            fontSize: "10px",
+          }}
+        >
+          Refreshing...
+        </div>
+      )}
 
       {/* --------------------------------------------------------------- */}
       {/* Add Contact */}
       {/* --------------------------------------------------------------- */}
 
-      <ContactFormModal
-        open={
-          modalOpen
-        }
-        onClose={() =>
-          setModalOpen(
-            false
-          )
-        }
-      />
+      <ContactFormModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </>
   );
 };

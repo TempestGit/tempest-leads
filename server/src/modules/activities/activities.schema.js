@@ -1,4 +1,6 @@
-import { z } from "zod";
+import {
+  z,
+} from "zod";
 
 /*
 |--------------------------------------------------------------------------
@@ -30,89 +32,148 @@ export const ACTIVITY_TYPES = [
 |--------------------------------------------------------------------------
 */
 
-export const createActivitySchema = z
-  .object({
-    leadId: z.coerce
-      .number()
-      .int()
-      .positive(
-        "Lead is required."
-      ),
+export const createActivitySchema =
+  z
+    .object({
+      leadId:
+        z.coerce
+          .number()
+          .int()
+          .positive(
+            "Lead is required."
+          ),
 
-    activityType: z
-      .enum(
-        ACTIVITY_TYPES
-      )
-      .default(
-        "Activity"
-      ),
+      activityType:
+        z
+          .enum(
+            ACTIVITY_TYPES
+          )
+          .default(
+            "Activity"
+          ),
 
-    outcome: z
-      .string()
-      .trim()
-      .min(
-        2,
-        "Outcome is required."
-      )
-      .max(500),
+      outcome:
+        z
+          .string()
+          .trim()
+          .min(
+            2,
+            "Outcome is required."
+          )
+          .max(
+            500
+          ),
 
-    notes: z
-      .string()
-      .trim()
-      .max(5000)
-      .nullable()
-      .optional(),
+      notes:
+        z
+          .string()
+          .trim()
+          .max(
+            5000
+          )
+          .nullable()
+          .optional(),
 
-    nextAction: z
-      .string()
-      .trim()
-      .max(500)
-      .nullable()
-      .optional(),
+      nextAction:
+        z
+          .string()
+          .trim()
+          .max(
+            500
+          )
+          .nullable()
+          .optional(),
 
-    nextFollowUpAt: z
-      .coerce
-      .date()
-      .nullable()
-      .optional(),
-  })
-  .superRefine(
-    (
-      data,
-      ctx
-    ) => {
-      const hasNextAction =
-        Boolean(
-          data.nextAction
-        );
+      nextFollowUpAt:
+        z.coerce
+          .date()
+          .nullable()
+          .optional(),
+    })
 
-      const hasFollowUp =
-        Boolean(
-          data.nextFollowUpAt
-        );
+    /*
+    |--------------------------------------------------------------------------
+    | Cross-field Validation
+    |--------------------------------------------------------------------------
+    */
 
-      if (
-        hasNextAction !==
-        hasFollowUp
-      ) {
-        ctx.addIssue({
-          code:
-            "custom",
+    .superRefine(
+      (
+        data,
+        ctx
+      ) => {
+        const hasNextAction =
+          Boolean(
+            data.nextAction
+          );
 
-          path: hasNextAction
-            ? [
-                "nextFollowUpAt",
-              ]
-            : [
-                "nextAction",
-              ],
+        const hasFollowUp =
+          Boolean(
+            data.nextFollowUpAt
+          );
 
-          message:
-            "Next action and next follow-up must be provided together.",
-        });
+        /*
+        |--------------------------------------------------------------------------
+        | Next Action + Follow-up Must Exist Together
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+          hasNextAction !==
+          hasFollowUp
+        ) {
+          ctx.addIssue({
+            code:
+              "custom",
+
+            path:
+              hasNextAction
+                ? [
+                    "nextFollowUpAt",
+                  ]
+                : [
+                    "nextAction",
+                  ],
+
+            message:
+              "Next action and next follow-up must be provided together.",
+          });
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Follow-up Must Be In The Future
+        |--------------------------------------------------------------------------
+        |
+        | This is intentionally validated
+        | on the server as well as the UI.
+        |
+        | A user/API client must not be
+        | able to bypass the browser and
+        | create an already-overdue
+        | follow-up.
+        |
+        */
+
+        if (
+          data.nextFollowUpAt &&
+          data.nextFollowUpAt.getTime() <=
+            Date.now()
+        ) {
+          ctx.addIssue({
+            code:
+              "custom",
+
+            path: [
+              "nextFollowUpAt",
+            ],
+
+            message:
+              "Next follow-up must be in the future.",
+          });
+        }
       }
-    }
-  );
+    );
 
 /*
 |--------------------------------------------------------------------------
@@ -122,22 +183,25 @@ export const createActivitySchema = z
 
 export const activityListSchema =
   z.object({
-    leadId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional(),
+    leadId:
+      z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
 
-    page: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .default(1),
+    page:
+      z.coerce
+        .number()
+        .int()
+        .min(1)
+        .default(1),
 
-    limit: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .default(50),
+    limit:
+      z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .default(50),
   });

@@ -41,13 +41,6 @@ export const FOLLOWUP_VIEWS = [
 | - Network requests take some time.
 | - A user may select the current minute and submit several seconds later.
 |
-| Example:
-|
-| Selected: 11:58:00
-| Submitted: 11:58:35
-|
-| This should still be accepted.
-|
 */
 
 const isCurrentOrFutureDate = (
@@ -91,6 +84,49 @@ const futureDateSchema =
           "Date and time cannot be in the past.",
       }
     );
+
+/*
+|--------------------------------------------------------------------------
+| Optional Future Date Schema
+|--------------------------------------------------------------------------
+|
+| Used when the date itself is optional.
+|
+| Important:
+| - undefined is allowed
+| - null is allowed
+| - when a value exists it must still be current/future
+|
+*/
+
+const optionalFutureDateSchema =
+  z.preprocess(
+    (value) => {
+      if (
+        value === null ||
+        value === undefined ||
+        value === ""
+      ) {
+        return undefined;
+      }
+
+      return value;
+    },
+
+    z.coerce
+      .date({
+        error:
+          "Enter a valid date and time.",
+      })
+      .refine(
+        isCurrentOrFutureDate,
+        {
+          message:
+            "Date and time cannot be in the past.",
+        }
+      )
+      .optional()
+  );
 
 /*
 |--------------------------------------------------------------------------
@@ -151,12 +187,6 @@ export const followupListSchema =
 |--------------------------------------------------------------------------
 | Schedule Follow-up
 |--------------------------------------------------------------------------
-|
-| dueAt:
-| - Required
-| - Must be a valid date
-| - Cannot be in the past
-|
 */
 
 export const createFollowupSchema =
@@ -201,66 +231,134 @@ export const createFollowupSchema =
 | Complete Follow-up
 |--------------------------------------------------------------------------
 |
-| nextFollowUpAt:
-| - Required
-| - Must be valid
-| - Cannot be in the past
+| Required:
+| - outcome
+| - notes
+|
+| Optional next follow-up:
+| - nextAction
+| - nextFollowUpAt
+| - nextPriority
+|
+| nextAction and nextFollowUpAt must be supplied together.
 |
 */
 
 export const completeFollowupSchema =
-  z.object({
-    outcome:
-      z
-        .string()
-        .trim()
-        .min(
-          2,
-          "Outcome is required."
-        )
-        .max(500),
+  z
+    .object({
+      outcome:
+        z
+          .string()
+          .trim()
+          .min(
+            2,
+            "Outcome is required."
+          )
+          .max(500),
 
-    notes:
-      z
-        .string()
-        .trim()
-        .min(
-          2,
-          "Notes are required."
-        )
-        .max(5000),
+      notes:
+        z
+          .string()
+          .trim()
+          .min(
+            2,
+            "Notes are required."
+          )
+          .max(5000),
 
-    nextAction:
-      z
-        .string()
-        .trim()
-        .min(
-          2,
-          "Next action is required."
-        )
-        .max(500),
+      nextAction:
+        z
+          .string()
+          .trim()
+          .min(
+            2,
+            "Next action must be at least 2 characters."
+          )
+          .max(500)
+          .nullable()
+          .optional(),
 
-    nextFollowUpAt:
-      futureDateSchema,
+      nextFollowUpAt:
+        optionalFutureDateSchema,
 
-    nextPriority:
-      z
-        .enum(
-          FOLLOWUP_PRIORITIES
-        )
-        .optional(),
-  });
+      nextPriority:
+        z
+          .enum(
+            FOLLOWUP_PRIORITIES
+          )
+          .optional(),
+    })
+    .superRefine(
+      (data, ctx) => {
+        const hasAction =
+          Boolean(
+            data.nextAction
+          );
+
+        const hasDate =
+          Boolean(
+            data.nextFollowUpAt
+          );
+
+        /*
+         * Neither supplied:
+         * valid completion without another
+         * follow-up.
+         */
+        if (
+          !hasAction &&
+          !hasDate
+        ) {
+          return;
+        }
+
+        /*
+         * Action supplied without date.
+         */
+        if (
+          hasAction &&
+          !hasDate
+        ) {
+          ctx.addIssue({
+            code:
+              "custom",
+
+            path: [
+              "nextFollowUpAt",
+            ],
+
+            message:
+              "Next follow-up date and time are required when a next action is provided.",
+          });
+        }
+
+        /*
+         * Date supplied without action.
+         */
+        if (
+          hasDate &&
+          !hasAction
+        ) {
+          ctx.addIssue({
+            code:
+              "custom",
+
+            path: [
+              "nextAction",
+            ],
+
+            message:
+              "Next action is required when scheduling another follow-up.",
+          });
+        }
+      }
+    );
 
 /*
 |--------------------------------------------------------------------------
 | Reschedule Follow-up
 |--------------------------------------------------------------------------
-|
-| dueAt:
-| - Required
-| - Must be valid
-| - Cannot be in the past
-|
 */
 
 export const rescheduleFollowupSchema =

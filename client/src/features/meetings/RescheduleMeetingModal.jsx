@@ -1,166 +1,49 @@
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 
-import {
-  X,
-} from "lucide-react";
-
-import {
-  useRescheduleMeetingMutation,
-} from "./meetings.queries.js";
+import { useRescheduleMeetingMutation } from "./meetings.queries.js";
 
 /*
 |--------------------------------------------------------------------------
-| Local Date
+| Date / Time Helpers
 |--------------------------------------------------------------------------
 */
 
-const getLocalDate =
-  () => {
-    const date =
-      new Date();
+const pad2 = (value) =>
+  String(value).padStart(2, "0");
 
-    const year =
-      date.getFullYear();
+const getLocalDate = (value = new Date()) =>
+  `${value.getFullYear()}-${pad2(
+    value.getMonth() + 1
+  )}-${pad2(value.getDate())}`;
 
-    const month =
-      String(
-        date.getMonth() + 1
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const day =
-      String(
-        date.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${year}-${month}-${day}`;
-  };
+const getLocalTime = (value = new Date()) =>
+  `${pad2(value.getHours())}:${pad2(
+    value.getMinutes()
+  )}`;
 
 /*
 |--------------------------------------------------------------------------
-| Local Time
+| Safe Date
 |--------------------------------------------------------------------------
 */
 
-const getLocalTime =
-  () => {
-    const date =
-      new Date();
-
-    const hours =
-      String(
-        date.getHours()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const minutes =
-      String(
-        date.getMinutes()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${hours}:${minutes}`;
-  };
-
-/*
-|--------------------------------------------------------------------------
-| Date Input
-|--------------------------------------------------------------------------
-*/
-
-const getDateInput = (
-  value
-) => {
+const toValidDate = (value) => {
   if (!value) {
-    return "";
+    return null;
   }
 
-  const date =
-    new Date(value);
+  const date = new Date(value);
 
   if (
     Number.isNaN(
       date.getTime()
     )
   ) {
-    return "";
+    return null;
   }
 
-  const year =
-    date.getFullYear();
-
-  const month =
-    String(
-      date.getMonth() + 1
-    ).padStart(
-      2,
-      "0"
-    );
-
-  const day =
-    String(
-      date.getDate()
-    ).padStart(
-      2,
-      "0"
-    );
-
-  return `${year}-${month}-${day}`;
-};
-
-/*
-|--------------------------------------------------------------------------
-| Time Input
-|--------------------------------------------------------------------------
-*/
-
-const getTimeInput = (
-  value
-) => {
-  if (!value) {
-    return "";
-  }
-
-  const date =
-    new Date(value);
-
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-    return "";
-  }
-
-  const hours =
-    String(
-      date.getHours()
-    ).padStart(
-      2,
-      "0"
-    );
-
-  const minutes =
-    String(
-      date.getMinutes()
-    ).padStart(
-        2,
-        "0"
-      );
-
-  return `${hours}:${minutes}`;
+  return date;
 };
 
 /*
@@ -183,110 +66,101 @@ const RescheduleMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const [
-    date,
-    setDate,
-  ] = useState("");
+  const [date, setDate] =
+    useState("");
 
-  const [
-    time,
-    setTime,
-  ] = useState("");
+  const [time, setTime] =
+    useState("");
 
-  const [
-    reason,
-    setReason,
-  ] = useState("");
+  const [reason, setReason] =
+    useState("");
 
-  const [
-    error,
-    setError,
-  ] = useState("");
+  const [error, setError] =
+    useState("");
 
   /*
   |--------------------------------------------------------------------------
-  | Reset
+  | Reset Every Time Modal Opens
   |--------------------------------------------------------------------------
   */
 
   useEffect(() => {
-    if (
-      !open ||
-      !meeting
-    ) {
+    if (!open) {
       return;
     }
 
-    const now =
-      new Date();
-
-    const currentDate =
-      getLocalDate();
-
-    const currentTime =
-      getLocalTime();
+    /*
+     * Start with the meeting's existing
+     * scheduled date/time when available.
+     *
+     * We do not invent a hidden time.
+     */
 
     const existingStart =
-      meeting.startsAt
-        ? new Date(
-            meeting.startsAt
-          )
-        : null;
+      toValidDate(
+        meeting?.startsAt
+      );
 
-    /*
-    |--------------------------------------------------------------------------
-    | Existing Meeting Is Still Future
-    |--------------------------------------------------------------------------
-    |
-    | Keep the existing meeting date/time.
-    |
-    */
-
-    if (
-      existingStart &&
-      !Number.isNaN(
-        existingStart.getTime()
-      ) &&
-      existingStart.getTime() >=
-        now.getTime()
-    ) {
+    if (existingStart) {
       setDate(
-        getDateInput(
-          meeting.startsAt
+        getLocalDate(
+          existingStart
         )
       );
 
       setTime(
-        getTimeInput(
-          meeting.startsAt
+        getLocalTime(
+          existingStart
         )
       );
     } else {
-      /*
-      |--------------------------------------------------------------------------
-      | Existing Meeting Is Past
-      |--------------------------------------------------------------------------
-      |
-      | Do not preload an old meeting
-      | date/time into the reschedule form.
-      |
-      */
-
-      setDate(
-        currentDate
-      );
-
-      setTime(
-        currentTime
-      );
+      setDate("");
+      setTime("");
     }
 
     setReason("");
-
     setError("");
   }, [
     open,
-    meeting,
+    meeting?.id,
+    meeting?.startsAt,
+  ]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Escape
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handler = (event) => {
+      if (
+        event.key === "Escape" &&
+        !mutation.isPending
+      ) {
+        onClose();
+      }
+    };
+
+    window.addEventListener(
+      "keydown",
+      handler
+    );
+
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        handler
+      );
+    };
+  }, [
+    open,
+    onClose,
+    mutation.isPending,
   ]);
 
   /*
@@ -295,18 +169,9 @@ const RescheduleMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  if (
-    !open ||
-    !meeting
-  ) {
+  if (!open || !meeting) {
     return null;
   }
-
-  /*
-  |--------------------------------------------------------------------------
-  | Current Date / Time
-  |--------------------------------------------------------------------------
-  */
 
   const today =
     getLocalDate();
@@ -320,74 +185,57 @@ const RescheduleMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleDateChange =
-    (
-      event
-    ) => {
-      const selectedDate =
-        event.target.value;
+  const handleDateChange = (
+    event
+  ) => {
+    const selectedDate =
+      event.target.value;
 
-      const nowDate =
-        getLocalDate();
+    if (!selectedDate) {
+      setDate("");
+      setTime("");
+      setError("");
 
-      const nowTime =
-        getLocalTime();
+      return;
+    }
 
-      /*
-       * Allow clearing.
-       */
+    const nowDate =
+      getLocalDate();
 
-      if (!selectedDate) {
-        setDate("");
+    const nowTime =
+      getLocalTime();
 
-        setError("");
-
-        return;
-      }
-
-      /*
-       * Prevent past dates.
-       */
-
-      if (
-        selectedDate <
-        nowDate
-      ) {
-        setError(
-          "Meeting date cannot be in the past."
-        );
-
-        return;
-      }
-
-      setDate(
-        selectedDate
+    if (
+      selectedDate <
+      nowDate
+    ) {
+      setError(
+        "Meeting date cannot be in the past."
       );
 
-      /*
-       * If the user changes the date
-       * back to today and the selected
-       * time has already passed,
-       * automatically update it to
-       * current time.
-       */
+      return;
+    }
 
-      if (
-        selectedDate ===
-          nowDate &&
-        (
-          !time ||
-          time <
-            nowTime
-        )
-      ) {
-        setTime(
-          nowTime
-        );
-      }
+    setDate(
+      selectedDate
+    );
 
-      setError("");
-    };
+    /*
+     * If user changes the meeting back
+     * to today and the selected time has
+     * already passed, clear the time.
+     */
+    if (
+      selectedDate ===
+        nowDate &&
+      time &&
+      time < nowTime
+    ) {
+      setTime("");
+    }
+
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -395,55 +243,43 @@ const RescheduleMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleTimeChange =
-    (
-      event
-    ) => {
-      const selectedTime =
-        event.target.value;
+  const handleTimeChange = (
+    event
+  ) => {
+    const selectedTime =
+      event.target.value;
 
-      const nowDate =
-        getLocalDate();
+    if (!selectedTime) {
+      setTime("");
+      setError("");
 
-      const nowTime =
-        getLocalTime();
+      return;
+    }
 
-      /*
-       * Allow clearing.
-       */
+    const nowDate =
+      getLocalDate();
 
-      if (!selectedTime) {
-        setTime("");
+    const nowTime =
+      getLocalTime();
 
-        setError("");
-
-        return;
-      }
-
-      /*
-       * When today is selected,
-       * past time is not allowed.
-       */
-
-      if (
-        date ===
-          nowDate &&
-        selectedTime <
-          nowTime
-      ) {
-        setError(
-          "Meeting time cannot be in the past."
-        );
-
-        return;
-      }
-
-      setTime(
-        selectedTime
+    if (
+      date === nowDate &&
+      selectedTime <
+        nowTime
+    ) {
+      setError(
+        "Meeting time cannot be in the past."
       );
 
-      setError("");
-    };
+      return;
+    }
+
+    setTime(
+      selectedTime
+    );
+
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -451,192 +287,271 @@ const RescheduleMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const submit =
-    async () => {
-      setError("");
+  const submit = async () => {
+    setError("");
 
-      /*
-      |--------------------------------------------------------------------------
-      | Date / Time
-      |--------------------------------------------------------------------------
-      */
+    /*
+    |--------------------------------------------------------------------------
+    | Meeting ID
+    |--------------------------------------------------------------------------
+    */
 
-      if (
-        !date ||
-        !time
-      ) {
-        setError(
-          "New date and time are required."
-        );
+    if (!meeting?.id) {
+      setError(
+        "Meeting ID is missing. Refresh the meetings page and try again."
+      );
 
-        return;
-      }
+      return;
+    }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Reason
-      |--------------------------------------------------------------------------
-      */
+    /*
+    |--------------------------------------------------------------------------
+    | Date
+    |--------------------------------------------------------------------------
+    */
 
-      if (
-        !reason.trim()
-      ) {
-        setError(
-          "Reason is required."
-        );
+    if (!date) {
+      setError(
+        "Select a new meeting date."
+      );
 
-        return;
-      }
+      return;
+    }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Prevent Past Date
-      |--------------------------------------------------------------------------
-      */
+    /*
+    |--------------------------------------------------------------------------
+    | Time
+    |--------------------------------------------------------------------------
+    */
 
-      if (
-        date <
-        getLocalDate()
-      ) {
-        setError(
-          "Meeting date cannot be in the past."
-        );
+    if (!time) {
+      setError(
+        "Select a new meeting time."
+      );
 
-        return;
-      }
+      return;
+    }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Build Start Date / Time
-      |--------------------------------------------------------------------------
-      */
+    /*
+    |--------------------------------------------------------------------------
+    | Reason
+    |--------------------------------------------------------------------------
+    |
+    | Backend requires:
+    |
+    | reason:
+    |   string
+    |   min 2
+    |   max 1000
+    |
+    */
 
-      const startsAt =
+    const cleanReason =
+      reason.trim();
+
+    if (!cleanReason) {
+      setError(
+        "Reschedule reason is required."
+      );
+
+      return;
+    }
+
+    if (
+      cleanReason.length < 2
+    ) {
+      setError(
+        "Reschedule reason must be at least 2 characters."
+      );
+
+      return;
+    }
+
+    if (
+      cleanReason.length >
+      1000
+    ) {
+      setError(
+        "Reschedule reason cannot exceed 1000 characters."
+      );
+
+      return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Construct New Start
+    |--------------------------------------------------------------------------
+    */
+
+    const newStart =
+      new Date(
+        `${date}T${time}:00`
+      );
+
+    if (
+      Number.isNaN(
+        newStart.getTime()
+      )
+    ) {
+      setError(
+        "Enter a valid meeting date and time."
+      );
+
+      return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Exact Future Validation
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      newStart.getTime() <=
+      Date.now()
+    ) {
+      setError(
+        "Meeting date and time must be in the future."
+      );
+
+      return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Preserve Existing Meeting Duration
+    |--------------------------------------------------------------------------
+    |
+    | If the existing meeting has a valid
+    | startsAt and endsAt, preserve the
+    | same duration when rescheduling.
+    |
+    | If there is no valid end time,
+    | endsAt remains null because the
+    | backend allows it.
+    |
+    */
+
+    const existingStart =
+      toValidDate(
+        meeting.startsAt
+      );
+
+    const existingEnd =
+      toValidDate(
+        meeting.endsAt
+      );
+
+    let newEnd = null;
+
+    if (
+      existingStart &&
+      existingEnd &&
+      existingEnd.getTime() >
+        existingStart.getTime()
+    ) {
+      const duration =
+        existingEnd.getTime() -
+        existingStart.getTime();
+
+      newEnd =
         new Date(
-          `${date}T${time}:00`
+          newStart.getTime() +
+            duration
         );
+    }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Validate Date
-      |--------------------------------------------------------------------------
-      */
+    /*
+    |--------------------------------------------------------------------------
+    | Reschedule Meeting
+    |--------------------------------------------------------------------------
+    |
+    | meetings.api.js expects:
+    |
+    | {
+    |   meetingId,
+    |   data
+    | }
+    |
+    | Backend expects data:
+    |
+    | {
+    |   startsAt,
+    |   endsAt?,
+    |   reason
+    | }
+    |
+    */
 
-      if (
-        Number.isNaN(
-          startsAt.getTime()
-        )
-      ) {
-        setError(
-          "Enter a valid date and time."
-        );
+    try {
+      await mutation.mutateAsync({
+        meetingId:
+          meeting.id,
 
-        return;
-      }
+        data: {
+          startsAt:
+            newStart.toISOString(),
 
-      /*
-      |--------------------------------------------------------------------------
-      | Prevent Past Date / Time
-      |--------------------------------------------------------------------------
-      |
-      | Allow the current minute.
-      |
-      | Example:
-      |
-      | Selected: 11:58
-      | Submitted: 11:58:30
-      |
-      | This should remain valid.
-      |
-      */
+          endsAt:
+            newEnd
+              ? newEnd.toISOString()
+              : null,
 
-      const now =
-        new Date();
+          reason:
+            cleanReason,
+        },
+      });
 
-      const minimumAllowed =
-        now.getTime() -
-        60 * 1000;
-
-      if (
-        startsAt.getTime() <
-        minimumAllowed
-      ) {
-        setError(
-          "Meeting date and time cannot be in the past. Select the current time or a future time."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Default One-hour Duration
-      |--------------------------------------------------------------------------
-      */
-
-      const endsAt =
-        new Date(
-          startsAt.getTime() +
-            60 *
-              60 *
-              1000
-        );
-
-      /*
-      |--------------------------------------------------------------------------
-      | Safety Check
-      |--------------------------------------------------------------------------
-      */
-
-      if (
-        endsAt <=
-        startsAt
-      ) {
-        setError(
-          "Meeting end time must be after the start time."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Request
-      |--------------------------------------------------------------------------
-      */
-
-      try {
-        await mutation.mutateAsync({
-          meetingId:
-            meeting.id,
-
-          data: {
-            startsAt:
-              startsAt.toISOString(),
-
-            endsAt:
-              endsAt.toISOString(),
-
-            reason:
-              reason.trim(),
-          },
-        });
-
-        onClose();
-      } catch (
+      onClose();
+    } catch (
+      requestError
+    ) {
+      const responseData =
         requestError
-      ) {
-        setError(
-          requestError
-            ?.response
-            ?.data
+          ?.response
+          ?.data;
+
+      /*
+       * Support a few common backend
+       * validation-error response shapes.
+       */
+      const arrayErrors =
+        Array.isArray(
+          responseData?.errors
+        )
+          ? responseData.errors
+          : [];
+
+      const validationMessage =
+        arrayErrors
+          .map((item) => {
+            if (
+              typeof item ===
+              "string"
+            ) {
+              return item;
+            }
+
+            return (
+              item?.message ||
+              item?.msg ||
+              null
+            );
+          })
+          .filter(Boolean)
+          .join(" ");
+
+      setError(
+        validationMessage ||
+          responseData
             ?.message ||
-            requestError
-              ?.message ||
-            "Unable to reschedule meeting."
-        );
-      }
-    };
+          requestError
+            ?.message ||
+          "Unable to reschedule meeting."
+      );
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -650,44 +565,35 @@ const RescheduleMeetingModal = ({
         className="tl-modal"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="reschedule-meeting-title"
       >
-        {/* Header */}
-
         <header className="modal-head">
           <div>
-            <h2>
+            <h2 id="reschedule-meeting-title">
               Reschedule meeting
             </h2>
 
             <p>
-              <b>
-                {
-                  meeting.title
-                }
-              </b>
+              Choose a new date
+              and time for this
+              meeting.
             </p>
           </div>
 
           <button
             type="button"
             className="icon-control"
-            onClick={
-              onClose
-            }
             disabled={
               mutation.isPending
             }
+            onClick={
+              onClose
+            }
             aria-label="Close"
           >
-            <X
-              size={
-                15
-              }
-            />
+            <X size={15} />
           </button>
         </header>
-
-        {/* Body */}
 
         <div className="modal-body">
           {error && (
@@ -696,8 +602,29 @@ const RescheduleMeetingModal = ({
             </div>
           )}
 
+          {/* Meeting Context */}
+
+          <div className="activity-context">
+            <small>
+              Meeting
+            </small>
+
+            <b>
+              {meeting.title}
+            </b>
+
+            {meeting.companyName && (
+              <span>
+                {
+                  meeting.companyName
+                }
+              </span>
+            )}
+          </div>
+
           <div className="form-section">
             <div className="form-grid2">
+
               {/* New Date */}
 
               <label>
@@ -705,11 +632,10 @@ const RescheduleMeetingModal = ({
 
                 <input
                   type="date"
-                  min={
-                    today
-                  }
-                  value={
-                    date
+                  min={today}
+                  value={date}
+                  disabled={
+                    mutation.isPending
                   }
                   onChange={
                     handleDateChange
@@ -725,13 +651,14 @@ const RescheduleMeetingModal = ({
                 <input
                   type="time"
                   min={
-                    date ===
-                    today
+                    date === today
                       ? currentTime
                       : undefined
                   }
-                  value={
-                    time
+                  value={time}
+                  disabled={
+                    mutation.isPending ||
+                    !date
                   }
                   onChange={
                     handleTimeChange
@@ -745,28 +672,35 @@ const RescheduleMeetingModal = ({
                 Reason *
 
                 <textarea
-                  rows="3"
+                  rows="4"
+                  maxLength={
+                    1000
+                  }
                   value={
                     reason
                   }
+                  disabled={
+                    mutation.isPending
+                  }
+                  placeholder="Why is this meeting being rescheduled?"
                   onChange={(
                     event
                   ) => {
                     setReason(
-                      event.target
+                      event
+                        .target
                         .value
                     );
 
-                    setError("");
+                    setError(
+                      ""
+                    );
                   }}
-                  autoFocus
                 />
               </label>
             </div>
           </div>
         </div>
-
-        {/* Footer */}
 
         <footer className="modal-foot">
           <button
@@ -794,7 +728,7 @@ const RescheduleMeetingModal = ({
           >
             {mutation.isPending
               ? "Rescheduling..."
-              : "Reschedule"}
+              : "Reschedule meeting"}
           </button>
         </footer>
       </section>

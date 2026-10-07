@@ -1,561 +1,312 @@
-import {
-  useMemo,
-  useState,
-} from "react";
+import { useMemo, useState } from "react";
 
 import CompanyFormModal from "./CompanyFormModal.jsx";
 
-import {
-  useCompaniesQuery,
-} from "./companies.queries.js";
+import { useCompaniesQuery } from "./companies.queries.js";
 
-/*
-|--------------------------------------------------------------------------
-| Stage CSS Class
-|--------------------------------------------------------------------------
-*/
-
-const getStageClass = (
-  stage
-) => {
+const getStageClass = (stage) => {
   if (!stage) {
     return "status";
   }
 
-  return `status ${String(
-    stage
-  )
-    .replaceAll(
-      " ",
-      "-"
-    )
-    .replaceAll(
-      "/",
-      "-"
-    )}`;
+  return `status ${String(stage).replaceAll(" ", "-").replaceAll("/", "-")}`;
 };
 
-/*
-|--------------------------------------------------------------------------
-| CSV Value
-|--------------------------------------------------------------------------
-*/
+const csvValue = (value) => {
+  const text = String(value ?? "");
 
-const csvValue = (
-  value
-) => {
-  const text =
-    String(
-      value ?? ""
-    );
-
-  return `"${text.replaceAll(
-    '"',
-    '""'
-  )}"`;
+  return `"${text.replaceAll('"', '""')}"`;
 };
 
-/*
-|--------------------------------------------------------------------------
-| Companies Page
-|--------------------------------------------------------------------------
-*/
+const CompaniesPage = () => {
+  const [companyModalOpen, setCompanyModalOpen] = useState(false);
 
-const CompaniesPage =
-  () => {
-    const [
-      companyModalOpen,
-      setCompanyModalOpen,
-    ] = useState(
-      false
-    );
+  const params = useMemo(
+    () => ({
+      page: 1,
 
-    /*
-    |--------------------------------------------------------------------------
-    | Query
-    |--------------------------------------------------------------------------
-    */
+      limit: 100,
 
-    const params =
-      useMemo(
-        () => ({
-          page: 1,
+      sort: "createdAt",
 
-          limit: 100,
+      direction: "desc",
+    }),
+    [],
+  );
 
-          sort:
-            "createdAt",
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    useCompaniesQuery(params);
 
-          direction:
-            "asc",
-        }),
-        []
-      );
+  const companies = data?.data?.companies || [];
 
-    const {
-      data,
-      isLoading,
-      isFetching,
-      isError,
-      error,
-      refetch,
-    } =
-      useCompaniesQuery(
-        params
-      );
+  const handleExport = () => {
+    if (companies.length === 0) {
+      return;
+    }
 
-    const companies =
-      data?.data
-        ?.companies ||
-      [];
+    const headers = [
+      "Company ID",
+      "Company / brand",
+      "Industry",
+      "City",
+      "Website",
+      "Existing agency",
+      "Source",
+      "Stage",
+      "Contacts",
+    ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | Export Companies
-    |--------------------------------------------------------------------------
-    */
+    const rows = companies.map((company) => [
+      company.companyCode,
+      company.name,
+      company.industry,
+      company.city,
+      company.website,
+      company.agencyRelationship,
+      company.source,
+      company.currentStage || "—",
+      company.contactsCount,
+    ]);
 
-    const handleExport =
-      () => {
-        if (
-          companies.length ===
-          0
-        ) {
-          return;
-        }
+    const csv = [
+      headers.map(csvValue).join(","),
 
-        const headers = [
-          "Company ID",
-          "Company / brand",
-          "Industry",
-          "City",
-          "Website",
-          "Existing agency",
-          "Source",
-          "Stage",
-          "Contacts",
-        ];
+      ...rows.map((row) => row.map(csvValue).join(",")),
+    ].join("\n");
 
-        const rows =
-          companies.map(
-            (
-              company
-            ) => [
-              company.companyCode,
-              company.name,
-              company.industry,
-              company.city,
-              company.website,
-              company.agencyRelationship,
-              company.source,
-              company.currentStage ||
-                "—",
-              company.contactsCount,
-            ]
-          );
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;",
+    });
 
-        const csv = [
-          headers
-            .map(
-              csvValue
-            )
-            .join(
-              ","
-            ),
+    const url = URL.createObjectURL(blob);
 
-          ...rows.map(
-            (
-              row
-            ) =>
-              row
-                .map(
-                  csvValue
-                )
-                .join(
-                  ","
-                )
-          ),
-        ].join(
-          "\n"
-        );
+    const anchor = document.createElement("a");
 
-        const blob =
-          new Blob(
-            [
-              csv,
-            ],
-            {
-              type:
-                "text/csv;charset=utf-8;",
-            }
-          );
+    anchor.href = url;
 
-        const url =
-          URL.createObjectURL(
-            blob
-          );
+    anchor.download = "tempest-companies.csv";
 
-        const anchor =
-          document.createElement(
-            "a"
-          );
+    document.body.appendChild(anchor);
 
-        anchor.href =
-          url;
+    anchor.click();
 
-        anchor.download =
-          "tempest-companies.csv";
+    anchor.remove();
 
-        document.body.appendChild(
-          anchor
-        );
+    URL.revokeObjectURL(url);
+  };
 
-        anchor.click();
+  return (
+    <>
+      {/* --------------------------------------------------------------- */}
+      {/* Page Title */}
+      {/* --------------------------------------------------------------- */}
 
-        anchor.remove();
+      <div className="tl-title-row">
+        <div>
+          <h1>Company Master</h1>
 
-        URL.revokeObjectURL(
-          url
-        );
-      };
+          <p>
+            One company record supports multiple contacts, leads and
+            interactions.
+          </p>
+        </div>
 
-    return (
-      <>
-        {/* --------------------------------------------------------------- */}
-        {/* Page Title */}
-        {/* --------------------------------------------------------------- */}
+        <div className="button-row">
+          <button
+            type="button"
+            className="tl-secondary"
+            onClick={handleExport}
+            disabled={companies.length === 0}
+          >
+            Export
+          </button>
 
-        <div className="tl-title-row">
-          <div>
-            <h1>
-              Company Master
-            </h1>
+          <button
+            type="button"
+            className="tl-primary"
+            onClick={() => setCompanyModalOpen(true)}
+          >
+            + Add company
+          </button>
+        </div>
+      </div>
+
+      {/* --------------------------------------------------------------- */}
+      {/* Companies Table */}
+      {/* --------------------------------------------------------------- */}
+
+      <article className="tl-card no-pad">
+        {isLoading ? (
+          <div className="empty-state">
+            <h2>Loading companies</h2>
+
+            <p>Loading company records...</p>
+          </div>
+        ) : isError ? (
+          <div className="empty-state">
+            <h2>Unable to load companies</h2>
 
             <p>
-              One company record
-              supports multiple
-              contacts, leads and
-              interactions.
+              {error?.response?.data?.message ||
+                "Something went wrong while loading companies."}
             </p>
-          </div>
-
-          <div className="button-row">
-            <button
-              type="button"
-              className="tl-secondary"
-              onClick={
-                handleExport
-              }
-              disabled={
-                companies.length ===
-                0
-              }
-            >
-              Export
-            </button>
 
             <button
               type="button"
               className="tl-primary"
-              onClick={() =>
-                setCompanyModalOpen(
-                  true
-                )
-              }
+              onClick={() => refetch()}
             >
-              + Add company
+              Try again
             </button>
           </div>
-        </div>
+        ) : (
+          <div className="table-wrap">
+            <table className="tl-table">
+              <thead>
+                <tr>
+                  <th>Company ID</th>
 
-        {/* --------------------------------------------------------------- */}
-        {/* Companies Table */}
-        {/* --------------------------------------------------------------- */}
+                  <th>Company / brand</th>
 
-        <article className="tl-card no-pad">
-          {isLoading ? (
-            <div className="empty-state">
-              <h2>
-                Loading companies
-              </h2>
+                  <th>Industry</th>
 
-              <p>
-                Loading company
-                records...
-              </p>
-            </div>
-          ) : isError ? (
-            <div className="empty-state">
-              <h2>
-                Unable to load
-                companies
-              </h2>
+                  <th>City</th>
 
-              <p>
-                {error
-                  ?.response
-                  ?.data
-                  ?.message ||
-                  "Something went wrong while loading companies."}
-              </p>
+                  <th>Website</th>
 
-              <button
-                type="button"
-                className="tl-primary"
-                onClick={() =>
-                  refetch()
-                }
-              >
-                Try again
-              </button>
-            </div>
-          ) : (
-            <div className="table-wrap">
-              <table className="tl-table">
-                <thead>
+                  <th>Existing agency</th>
+
+                  <th>Source</th>
+
+                  <th>Status</th>
+
+                  <th>Contacts</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {companies.length === 0 ? (
                   <tr>
-                    <th>
-                      Company ID
-                    </th>
+                    <td colSpan={9}>
+                      <div className="empty-state">
+                        <h2>No companies found</h2>
 
-                    <th>
-                      Company /
-                      brand
-                    </th>
+                        <p>Create your first company record.</p>
 
-                    <th>
-                      Industry
-                    </th>
-
-                    <th>
-                      City
-                    </th>
-
-                    <th>
-                      Website
-                    </th>
-
-                    <th>
-                      Existing
-                      agency
-                    </th>
-
-                    <th>
-                      Source
-                    </th>
-
-                    <th>
-                      Status
-                    </th>
-
-                    <th>
-                      Contacts
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {companies.length ===
-                  0 ? (
-                    <tr>
-                      <td
-                        colSpan={
-                          9
-                        }
-                      >
-                        <div className="empty-state">
-                          <h2>
-                            No companies
-                            found
-                          </h2>
-
-                          <p>
-                            Create your
-                            first company
-                            record.
-                          </p>
-
-                          <button
-                            type="button"
-                            className="tl-primary"
-                            onClick={() =>
-                              setCompanyModalOpen(
-                                true
-                              )
-                            }
-                          >
-                            + Add company
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    companies.map(
-                      (
-                        company
-                      ) => (
-                        <tr
-                          key={
-                            company.id
-                          }
+                        <button
+                          type="button"
+                          className="tl-primary"
+                          onClick={() => setCompanyModalOpen(true)}
                         >
-                          {/* Company ID */}
+                          + Add company
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  companies.map((company) => (
+                    <tr key={company.id}>
+                      {/* Company ID */}
 
-                          <td>
-                            {
-                              company.companyCode
+                      <td>{company.companyCode}</td>
+
+                      {/* Company */}
+
+                      <td>
+                        <b>{company.name}</b>
+                      </td>
+
+                      {/* Industry */}
+
+                      <td>{company.industry || "—"}</td>
+
+                      {/* City */}
+
+                      <td>{company.city || "—"}</td>
+
+                      {/* Website */}
+
+                      <td>
+                        {company.website ? (
+                          <a
+                            href={
+                              company.website.startsWith("http://") ||
+                              company.website.startsWith("https://")
+                                ? company.website
+                                : `https://${company.website}`
                             }
-                          </td>
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {company.website
+                              .replace(/^https?:\/\//, "")
+                              .replace(/\/$/, "")}
+                          </a>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
 
-                          {/* Company */}
+                      {/* Existing Agency */}
 
-                          <td>
-                            <b>
-                              {
-                                company.name
-                              }
-                            </b>
-                          </td>
+                      <td>{company.agencyRelationship || "—"}</td>
 
-                          {/* Industry */}
+                      {/* Source */}
 
-                          <td>
-                            {company.industry ||
-                              "—"}
-                          </td>
+                      <td>{company.source || "—"}</td>
 
-                          {/* City */}
+                      {/* Stage */}
 
-                          <td>
-                            {company.city ||
-                              "—"}
-                          </td>
+                      <td>
+                        {company.currentStage ? (
+                          <span className={getStageClass(company.currentStage)}>
+                            {company.currentStage}
+                          </span>
+                        ) : (
+                          <span className="status">No lead</span>
+                        )}
+                      </td>
 
-                          {/* Website */}
+                      {/* Contacts */}
 
-                          <td>
-                            {company.website ? (
-                              <a
-                                href={
-                                  company.website.startsWith(
-                                    "http://"
-                                  ) ||
-                                  company.website.startsWith(
-                                    "https://"
-                                  )
-                                    ? company.website
-                                    : `https://${company.website}`
-                                }
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                {company.website
-                                  .replace(
-                                    /^https?:\/\//,
-                                    ""
-                                  )
-                                  .replace(
-                                    /\/$/,
-                                    ""
-                                  )}
-                              </a>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
+                      <td>{Number(company.contactsCount || 0)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
 
-                          {/* Existing Agency */}
+      {/* --------------------------------------------------------------- */}
+      {/* Small Loading State When Refreshing */}
+      {/* --------------------------------------------------------------- */}
 
-                          <td>
-                            {company.agencyRelationship ||
-                              "—"}
-                          </td>
+      {isFetching && !isLoading && (
+        <div
+          style={{
+            marginTop: "8px",
 
-                          {/* Source */}
+            color: "var(--muted)",
 
-                          <td>
-                            {company.source ||
-                              "—"}
-                          </td>
+            fontSize: "10px",
+          }}
+        >
+          Refreshing...
+        </div>
+      )}
 
-                          {/* Stage */}
+      {/* --------------------------------------------------------------- */}
+      {/* Add Company Modal */}
+      {/* --------------------------------------------------------------- */}
 
-                          <td>
-                            {company.currentStage ? (
-                              <span
-                                className={
-                                  getStageClass(
-                                    company.currentStage
-                                  )
-                                }
-                              >
-                                {
-                                  company.currentStage
-                                }
-                              </span>
-                            ) : (
-                              <span className="status">
-                                No lead
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Contacts */}
-
-                          <td>
-                            {Number(
-                              company.contactsCount ||
-                                0
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    )
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </article>
-
-        {/* --------------------------------------------------------------- */}
-        {/* Small Loading State When Refreshing */}
-        {/* --------------------------------------------------------------- */}
-
-        {isFetching &&
-          !isLoading && (
-            <div
-              style={{
-                marginTop:
-                  "8px",
-
-                color:
-                  "var(--muted)",
-
-                fontSize:
-                  "10px",
-              }}
-            >
-              Refreshing...
-            </div>
-          )}
-
-        {/* --------------------------------------------------------------- */}
-        {/* Add Company Modal */}
-        {/* --------------------------------------------------------------- */}
-
-        <CompanyFormModal
-          open={
-            companyModalOpen
-          }
-          onClose={() =>
-            setCompanyModalOpen(
-              false
-            )
-          }
-        />
-      </>
-    );
-  };
+      <CompanyFormModal
+        open={companyModalOpen}
+        onClose={() => setCompanyModalOpen(false)}
+      />
+    </>
+  );
+};
 
 export default CompaniesPage;

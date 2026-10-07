@@ -18,66 +18,26 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| Local Date
+| Date / Time Helpers
 |--------------------------------------------------------------------------
 */
 
-const getLocalDate =
-  () => {
-    const date =
-      new Date();
+const pad2 = (value) =>
+  String(value).padStart(2, "0");
 
-    const year =
-      date.getFullYear();
+const getLocalDate = (
+  value = new Date()
+) =>
+  `${value.getFullYear()}-${pad2(
+    value.getMonth() + 1
+  )}-${pad2(value.getDate())}`;
 
-    const month =
-      String(
-        date.getMonth() + 1
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const day =
-      String(
-        date.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${year}-${month}-${day}`;
-  };
-
-/*
-|--------------------------------------------------------------------------
-| Local Time
-|--------------------------------------------------------------------------
-*/
-
-const getLocalTime =
-  () => {
-    const date =
-      new Date();
-
-    const hours =
-      String(
-        date.getHours()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const minutes =
-      String(
-        date.getMinutes()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${hours}:${minutes}`;
-  };
+const getLocalTime = (
+  value = new Date()
+) =>
+  `${pad2(value.getHours())}:${pad2(
+    value.getMinutes()
+  )}`;
 
 /*
 |--------------------------------------------------------------------------
@@ -103,14 +63,9 @@ const ScheduleFollowupModal = ({
     useMemo(
       () => ({
         page: 1,
-
         limit: 100,
-
-        sort:
-          "createdAt",
-
-        direction:
-          "desc",
+        sort: "createdAt",
+        direction: "desc",
       }),
       []
     );
@@ -144,16 +99,12 @@ const ScheduleFollowupModal = ({
   const [
     date,
     setDate,
-  ] = useState(
-    getLocalDate()
-  );
+  ] = useState("");
 
   const [
     time,
     setTime,
-  ] = useState(
-    getLocalTime()
-  );
+  ] = useState("");
 
   const [
     priority,
@@ -163,13 +114,18 @@ const ScheduleFollowupModal = ({
   );
 
   const [
+    notes,
+    setNotes,
+  ] = useState("");
+
+  const [
     error,
     setError,
   ] = useState("");
 
   /*
   |--------------------------------------------------------------------------
-  | Reset When Opened
+  | Reset Every Time Modal Opens
   |--------------------------------------------------------------------------
   */
 
@@ -178,22 +134,12 @@ const ScheduleFollowupModal = ({
       return;
     }
 
-    /*
-     * Always calculate the current
-     * date/time when the modal opens.
-     */
-
-    const currentDate =
-      getLocalDate();
-
-    const currentTime =
-      getLocalTime();
+    const now =
+      new Date();
 
     setSelectedLeadId(
       lead?.id
-        ? String(
-            lead.id
-          )
+        ? String(lead.id)
         : ""
     );
 
@@ -202,23 +148,88 @@ const ScheduleFollowupModal = ({
         ""
     );
 
+    /*
+     * Use the actual current date/time.
+     *
+     * Nothing is silently scheduled
+     * for 10 AM.
+     */
     setDate(
-      currentDate
+      getLocalDate(now)
     );
 
     setTime(
-      currentTime
+      getLocalTime(now)
     );
 
-    setPriority(
-      lead?.priority ||
+    /*
+     * Follow-up priority is independent
+     * from lead priority unless the lead
+     * already has a compatible value.
+     */
+    if (
+      [
+        "High",
+        "Medium",
+        "Low",
+      ].includes(
+        lead?.priority
+      )
+    ) {
+      setPriority(
+        lead.priority
+      );
+    } else {
+      setPriority(
         "Medium"
-    );
+      );
+    }
 
+    setNotes("");
     setError("");
   }, [
     open,
     lead,
+  ]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Escape
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handler = (
+      event
+    ) => {
+      if (
+        event.key ===
+          "Escape" &&
+        !mutation.isPending
+      ) {
+        onClose();
+      }
+    };
+
+    window.addEventListener(
+      "keydown",
+      handler
+    );
+
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        handler
+      );
+    };
+  }, [
+    open,
+    onClose,
+    mutation.isPending,
   ]);
 
   /*
@@ -252,9 +263,7 @@ const ScheduleFollowupModal = ({
   const resolvedLead =
     lead ||
     leads.find(
-      (
-        item
-      ) =>
+      (item) =>
         Number(
           item.id
         ) ===
@@ -270,75 +279,60 @@ const ScheduleFollowupModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleDateChange =
-    (
-      event
-    ) => {
-      const selectedDate =
-        event.target.value;
+  const handleDateChange = (
+    event
+  ) => {
+    const selectedDate =
+      event.target.value;
 
-      const nowDate =
-        getLocalDate();
+    if (!selectedDate) {
+      setDate("");
+      setTime("");
+      setError("");
 
-      const nowTime =
-        getLocalTime();
+      return;
+    }
 
-      /*
-       * Allow clearing the field.
-       */
+    const nowDate =
+      getLocalDate();
 
-      if (!selectedDate) {
-        setDate("");
+    const nowTime =
+      getLocalTime();
 
-        setError("");
-
-        return;
-      }
-
-      /*
-       * Additional protection.
-       * Browser min normally prevents
-       * past date selection.
-       */
-
-      if (
-        selectedDate <
-        nowDate
-      ) {
-        setError(
-          "Follow-up date cannot be in the past."
-        );
-
-        return;
-      }
-
-      setDate(
-        selectedDate
+    if (
+      selectedDate <
+      nowDate
+    ) {
+      setError(
+        "Follow-up date cannot be in the past."
       );
 
-      /*
-       * If the user changes back to
-       * today and the currently selected
-       * time has already passed,
-       * automatically use current time.
-       */
+      return;
+    }
 
-      if (
-        selectedDate ===
-          nowDate &&
-        (
-          !time ||
-          time <
-            nowTime
-        )
-      ) {
-        setTime(
-          nowTime
-        );
-      }
+    setDate(
+      selectedDate
+    );
 
-      setError("");
-    };
+    /*
+     * If user moves the date back to
+     * today and the selected time has
+     * already passed, clear the time.
+     *
+     * Do not manufacture a hidden
+     * replacement time.
+     */
+    if (
+      selectedDate ===
+        nowDate &&
+      time &&
+      time < nowTime
+    ) {
+      setTime("");
+    }
+
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -346,55 +340,43 @@ const ScheduleFollowupModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleTimeChange =
-    (
-      event
-    ) => {
-      const selectedTime =
-        event.target.value;
+  const handleTimeChange = (
+    event
+  ) => {
+    const selectedTime =
+      event.target.value;
 
-      const nowDate =
-        getLocalDate();
+    if (!selectedTime) {
+      setTime("");
+      setError("");
 
-      const nowTime =
-        getLocalTime();
+      return;
+    }
 
-      /*
-       * Allow clearing the field.
-       */
+    const nowDate =
+      getLocalDate();
 
-      if (!selectedTime) {
-        setTime("");
+    const nowTime =
+      getLocalTime();
 
-        setError("");
-
-        return;
-      }
-
-      /*
-       * If follow-up is today,
-       * past time is not allowed.
-       */
-
-      if (
-        date ===
-          nowDate &&
-        selectedTime <
-          nowTime
-      ) {
-        setError(
-          "Follow-up time cannot be in the past."
-        );
-
-        return;
-      }
-
-      setTime(
-        selectedTime
+    if (
+      date === nowDate &&
+      selectedTime <
+        nowTime
+    ) {
+      setError(
+        "Follow-up time cannot be in the past."
       );
 
-      setError("");
-    };
+      return;
+    }
+
+    setTime(
+      selectedTime
+    );
+
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -412,7 +394,9 @@ const ScheduleFollowupModal = ({
       |--------------------------------------------------------------------------
       */
 
-      if (!resolvedLead) {
+      if (
+        !resolvedLead?.id
+      ) {
         setError(
           "Related lead is required."
         );
@@ -424,11 +408,17 @@ const ScheduleFollowupModal = ({
       |--------------------------------------------------------------------------
       | Action
       |--------------------------------------------------------------------------
+      |
+      | Backend:
+      | min 2
+      | max 500
+      |
       */
 
-      if (
-        !action.trim()
-      ) {
+      const cleanAction =
+        action.trim();
+
+      if (!cleanAction) {
         setError(
           "Action is required."
         );
@@ -436,18 +426,23 @@ const ScheduleFollowupModal = ({
         return;
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Date / Time Required
-      |--------------------------------------------------------------------------
-      */
-
       if (
-        !date ||
-        !time
+        cleanAction.length <
+        2
       ) {
         setError(
-          "Date and time are required."
+          "Action must be at least 2 characters."
+        );
+
+        return;
+      }
+
+      if (
+        cleanAction.length >
+        500
+      ) {
+        setError(
+          "Action cannot exceed 500 characters."
         );
 
         return;
@@ -455,19 +450,21 @@ const ScheduleFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Prevent Past Date
+      | Date / Time
       |--------------------------------------------------------------------------
       */
 
-      const nowDate =
-        getLocalDate();
-
-      if (
-        date <
-        nowDate
-      ) {
+      if (!date) {
         setError(
-          "Follow-up date cannot be in the past."
+          "Follow-up date is required."
+        );
+
+        return;
+      }
+
+      if (!time) {
+        setError(
+          "Follow-up time is required."
         );
 
         return;
@@ -475,28 +472,22 @@ const ScheduleFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Convert Local Date / Time
+      | Construct Local Date / Time
       |--------------------------------------------------------------------------
       */
 
-      const dueAt =
+      const dueDate =
         new Date(
           `${date}T${time}:00`
         );
 
-      /*
-      |--------------------------------------------------------------------------
-      | Validate Date
-      |--------------------------------------------------------------------------
-      */
-
       if (
         Number.isNaN(
-          dueAt.getTime()
+          dueDate.getTime()
         )
       ) {
         setError(
-          "Enter a valid date and time."
+          "Enter a valid follow-up date and time."
         );
 
         return;
@@ -504,38 +495,25 @@ const ScheduleFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Reject Past Date / Time
+      | Current / Future Validation
       |--------------------------------------------------------------------------
       |
-      | HTML min protects the UI, but
-      | validation is required here too.
-      |
-      | 60-second tolerance allows the
-      | current minute.
-      |
-      | Example:
-      |
-      | Modal opens at 11:58:05.
-      | Time field = 11:58.
-      | User submits at 11:58:30.
-      |
-      | That should still be accepted.
+      | Backend allows a 60-second
+      | tolerance because browser time
+      | fields operate at minute precision.
       |
       */
 
-      const now =
-        new Date();
-
       const minimumAllowed =
-        now.getTime() -
+        Date.now() -
         60 * 1000;
 
       if (
-        dueAt.getTime() <
+        dueDate.getTime() <
         minimumAllowed
       ) {
         setError(
-          "Follow-up date and time cannot be in the past. Select the current time or a future time."
+          "Follow-up date and time cannot be in the past."
         );
 
         return;
@@ -543,8 +521,61 @@ const ScheduleFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Request
+      | Priority
       |--------------------------------------------------------------------------
+      */
+
+      if (
+        ![
+          "High",
+          "Medium",
+          "Low",
+        ].includes(
+          priority
+        )
+      ) {
+        setError(
+          "Select a valid priority."
+        );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Notes
+      |--------------------------------------------------------------------------
+      */
+
+      const cleanNotes =
+        notes.trim();
+
+      if (
+        cleanNotes.length >
+        5000
+      ) {
+        setError(
+          "Notes cannot exceed 5000 characters."
+        );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Create Follow-up
+      |--------------------------------------------------------------------------
+      |
+      | Backend createFollowupSchema expects:
+      |
+      | {
+      |   leadId,
+      |   action,
+      |   dueAt,
+      |   priority,
+      |   notes
+      | }
+      |
       */
 
       try {
@@ -555,14 +586,15 @@ const ScheduleFollowupModal = ({
             ),
 
           action:
-            action.trim(),
+            cleanAction,
 
           dueAt:
-            dueAt.toISOString(),
+            dueDate.toISOString(),
 
           priority,
 
           notes:
+            cleanNotes ||
             null,
         });
 
@@ -570,11 +602,43 @@ const ScheduleFollowupModal = ({
       } catch (
         requestError
       ) {
-        setError(
+        const responseData =
           requestError
             ?.response
-            ?.data
-            ?.message ||
+            ?.data;
+
+        const errors =
+          Array.isArray(
+            responseData?.errors
+          )
+            ? responseData.errors
+            : [];
+
+        const validationMessage =
+          errors
+            .map(
+              (item) => {
+                if (
+                  typeof item ===
+                  "string"
+                ) {
+                  return item;
+                }
+
+                return (
+                  item?.message ||
+                  item?.msg ||
+                  null
+                );
+              }
+            )
+            .filter(Boolean)
+            .join(" ");
+
+        setError(
+          validationMessage ||
+            responseData
+              ?.message ||
             requestError
               ?.message ||
             "Unable to schedule follow-up."
@@ -590,14 +654,24 @@ const ScheduleFollowupModal = ({
 
   return (
     <div className="modal-backdrop">
-      <section className="tl-modal">
+      <section
+        className="tl-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="schedule-followup-title"
+      >
         {/* Header */}
 
         <header className="modal-head">
           <div>
-            <h2>
+            <h2 id="schedule-followup-title">
               Schedule follow-up
             </h2>
+
+            <p>
+              Schedule the next
+              action for this lead.
+            </p>
           </div>
 
           <button
@@ -612,9 +686,7 @@ const ScheduleFollowupModal = ({
             aria-label="Close"
           >
             <X
-              size={
-                15
-              }
+              size={15}
             />
           </button>
         </header>
@@ -630,6 +702,7 @@ const ScheduleFollowupModal = ({
 
           <div className="form-section">
             <div className="form-grid2">
+
               {/* Related Lead */}
 
               {!lead ? (
@@ -641,13 +714,15 @@ const ScheduleFollowupModal = ({
                       selectedLeadId
                     }
                     disabled={
+                      mutation.isPending ||
                       leadsQuery.isLoading
                     }
                     onChange={(
                       event
                     ) => {
                       setSelectedLeadId(
-                        event.target
+                        event
+                          .target
                           .value
                       );
 
@@ -713,14 +788,20 @@ const ScheduleFollowupModal = ({
 
                 <input
                   type="text"
+                  maxLength={500}
                   value={
                     action
                   }
+                  disabled={
+                    mutation.isPending
+                  }
+                  placeholder="e.g. Call customer to discuss proposal"
                   onChange={(
                     event
                   ) => {
                     setAction(
-                      event.target
+                      event
+                        .target
                         .value
                     );
 
@@ -737,11 +818,12 @@ const ScheduleFollowupModal = ({
 
                 <input
                   type="date"
-                  min={
-                    today
-                  }
+                  min={today}
                   value={
                     date
+                  }
+                  disabled={
+                    mutation.isPending
                   }
                   onChange={
                     handleDateChange
@@ -757,13 +839,16 @@ const ScheduleFollowupModal = ({
                 <input
                   type="time"
                   min={
-                    date ===
-                    today
+                    date === today
                       ? currentTime
                       : undefined
                   }
                   value={
                     time
+                  }
+                  disabled={
+                    mutation.isPending ||
+                    !date
                   }
                   onChange={
                     handleTimeChange
@@ -774,20 +859,26 @@ const ScheduleFollowupModal = ({
               {/* Priority */}
 
               <label>
-                Priority
+                Priority *
 
                 <select
                   value={
                     priority
                   }
+                  disabled={
+                    mutation.isPending
+                  }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setPriority(
-                      event.target
+                      event
+                        .target
                         .value
-                    )
-                  }
+                    );
+
+                    setError("");
+                  }}
                 >
                   <option value="High">
                     High
@@ -801,6 +892,35 @@ const ScheduleFollowupModal = ({
                     Low
                   </option>
                 </select>
+              </label>
+
+              {/* Notes */}
+
+              <label className="full">
+                Notes
+
+                <textarea
+                  rows="4"
+                  maxLength={5000}
+                  value={
+                    notes
+                  }
+                  disabled={
+                    mutation.isPending
+                  }
+                  placeholder="Optional notes"
+                  onChange={(
+                    event
+                  ) => {
+                    setNotes(
+                      event
+                        .target
+                        .value
+                    );
+
+                    setError("");
+                  }}
+                />
               </label>
             </div>
           </div>

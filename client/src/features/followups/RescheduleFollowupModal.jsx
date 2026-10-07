@@ -13,161 +13,69 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| Local Date
+| Date / Time Helpers
 |--------------------------------------------------------------------------
 */
 
-const getLocalDate =
-  () => {
-    const now =
-      new Date();
+const pad2 = (value) =>
+  String(value).padStart(2, "0");
 
-    const year =
-      now.getFullYear();
+const getLocalDate = (
+  value = new Date()
+) =>
+  `${value.getFullYear()}-${pad2(
+    value.getMonth() + 1
+  )}-${pad2(value.getDate())}`;
 
-    const month =
-      String(
-        now.getMonth() + 1
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const day =
-      String(
-        now.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${year}-${month}-${day}`;
-  };
+const getLocalTime = (
+  value = new Date()
+) =>
+  `${pad2(value.getHours())}:${pad2(
+    value.getMinutes()
+  )}`;
 
 /*
 |--------------------------------------------------------------------------
-| Local Time
+| Convert Timestamp To Local Inputs
 |--------------------------------------------------------------------------
 */
 
-const getLocalTime =
-  () => {
-    const now =
-      new Date();
+const toLocalInputs = (
+  value
+) => {
+  if (!value) {
+    return {
+      date: "",
+      time: "",
+    };
+  }
 
-    const hours =
-      String(
-        now.getHours()
-      ).padStart(
-        2,
-        "0"
-      );
+  const parsed =
+    new Date(value);
 
-    const minutes =
-      String(
-        now.getMinutes()
-      ).padStart(
-        2,
-        "0"
-      );
+  if (
+    Number.isNaN(
+      parsed.getTime()
+    )
+  ) {
+    return {
+      date: "",
+      time: "",
+    };
+  }
 
-    return `${hours}:${minutes}`;
+  return {
+    date:
+      getLocalDate(
+        parsed
+      ),
+
+    time:
+      getLocalTime(
+        parsed
+      ),
   };
-
-/*
-|--------------------------------------------------------------------------
-| Date To Local Input
-|--------------------------------------------------------------------------
-*/
-
-const getDateInputValue =
-  (
-    value
-  ) => {
-    if (!value) {
-      return "";
-    }
-
-    const date =
-      new Date(
-        value
-      );
-
-    if (
-      Number.isNaN(
-        date.getTime()
-      )
-    ) {
-      return "";
-    }
-
-    const year =
-      date.getFullYear();
-
-    const month =
-      String(
-        date.getMonth() + 1
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const day =
-      String(
-        date.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${year}-${month}-${day}`;
-  };
-
-/*
-|--------------------------------------------------------------------------
-| Time To Local Input
-|--------------------------------------------------------------------------
-*/
-
-const getTimeInputValue =
-  (
-    value
-  ) => {
-    if (!value) {
-      return "";
-    }
-
-    const date =
-      new Date(
-        value
-      );
-
-    if (
-      Number.isNaN(
-        date.getTime()
-      )
-    ) {
-      return "";
-    }
-
-    const hours =
-      String(
-        date.getHours()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const minutes =
-      String(
-        date.getMinutes()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${hours}:${minutes}`;
-  };
+};
 
 /*
 |--------------------------------------------------------------------------
@@ -211,7 +119,7 @@ const RescheduleFollowupModal = ({
 
   /*
   |--------------------------------------------------------------------------
-  | Reset
+  | Populate Every Time Modal Opens
   |--------------------------------------------------------------------------
   */
 
@@ -223,78 +131,120 @@ const RescheduleFollowupModal = ({
       return;
     }
 
-    const now =
-      new Date();
+    /*
+     * Follow-up API exposes the
+     * scheduled timestamp as dueAt.
+     */
+    const existingValue =
+      followup.dueAt ||
+      null;
 
-    const currentDate =
-      getLocalDate();
+    const existing =
+      toLocalInputs(
+        existingValue
+      );
 
-    const currentTime =
-      getLocalTime();
-
-    const existingDue =
-      followup.dueAt
+    const existingDateTime =
+      existingValue
         ? new Date(
-            followup.dueAt
+            existingValue
           )
         : null;
 
     /*
-    |--------------------------------------------------------------------------
-    | Existing Follow-up Is Still Future
-    |--------------------------------------------------------------------------
-    |
-    | Keep its existing date/time.
-    |
-    */
-
+     * If the existing follow-up is
+     * overdue, its current timestamp
+     * cannot be reused.
+     *
+     * Suggest 30 minutes from now.
+     */
     if (
-      existingDue &&
-      !Number.isNaN(
-        existingDue.getTime()
-      ) &&
-      existingDue.getTime() >=
-        now.getTime()
+      !existingDateTime ||
+      Number.isNaN(
+        existingDateTime.getTime()
+      ) ||
+      existingDateTime.getTime() <=
+        Date.now()
     ) {
+      const suggested =
+        new Date(
+          Date.now() +
+            30 *
+              60 *
+              1000
+        );
+
       setDate(
-        getDateInputValue(
-          followup.dueAt
+        getLocalDate(
+          suggested
         )
       );
 
       setTime(
-        getTimeInputValue(
-          followup.dueAt
+        getLocalTime(
+          suggested
         )
       );
     } else {
-      /*
-      |--------------------------------------------------------------------------
-      | Existing Follow-up Is Past
-      |--------------------------------------------------------------------------
-      |
-      | Do not put an overdue date/time
-      | back into the form.
-      |
-      | Start from current date/time.
-      |
-      */
-
       setDate(
-        currentDate
+        existing.date
       );
 
       setTime(
-        currentTime
+        existing.time
       );
     }
 
+    /*
+     * Reason must never carry over
+     * from a previous modal session.
+     */
     setReason("");
-
     setError("");
   }, [
     open,
-    followup,
+    followup?.id,
+    followup?.dueAt,
+  ]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Escape
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handler = (
+      event
+    ) => {
+      if (
+        event.key ===
+          "Escape" &&
+        !mutation.isPending
+      ) {
+        onClose();
+      }
+    };
+
+    window.addEventListener(
+      "keydown",
+      handler
+    );
+
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        handler
+      );
+    };
+  }, [
+    open,
+    onClose,
+    mutation.isPending,
   ]);
 
   /*
@@ -310,12 +260,6 @@ const RescheduleFollowupModal = ({
     return null;
   }
 
-  /*
-  |--------------------------------------------------------------------------
-  | Current Date / Time
-  |--------------------------------------------------------------------------
-  */
-
   const today =
     getLocalDate();
 
@@ -328,73 +272,57 @@ const RescheduleFollowupModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleDateChange =
-    (
-      event
-    ) => {
-      const selectedDate =
-        event.target.value;
+  const handleDateChange = (
+    event
+  ) => {
+    const selectedDate =
+      event.target.value;
 
-      const nowDate =
-        getLocalDate();
+    if (!selectedDate) {
+      setDate("");
+      setTime("");
+      setError("");
 
-      const nowTime =
-        getLocalTime();
+      return;
+    }
 
-      /*
-       * Allow empty value.
-       */
+    const nowDate =
+      getLocalDate();
 
-      if (!selectedDate) {
-        setDate("");
+    const nowTime =
+      getLocalTime();
 
-        setError("");
-
-        return;
-      }
-
-      /*
-       * Reject past dates.
-       */
-
-      if (
-        selectedDate <
-        nowDate
-      ) {
-        setError(
-          "Follow-up date cannot be in the past."
-        );
-
-        return;
-      }
-
-      setDate(
-        selectedDate
+    if (
+      selectedDate <
+      nowDate
+    ) {
+      setError(
+        "Follow-up date cannot be in the past."
       );
 
-      /*
-       * If user selects today and the
-       * existing selected time has
-       * already passed, automatically
-       * move it to current time.
-       */
+      return;
+    }
 
-      if (
-        selectedDate ===
-          nowDate &&
-        (
-          !time ||
-          time <
-            nowTime
-        )
-      ) {
-        setTime(
-          nowTime
-        );
-      }
+    setDate(
+      selectedDate
+    );
 
-      setError("");
-    };
+    /*
+     * If the user moves back to today
+     * while a past time is selected,
+     * clear the time.
+     */
+    if (
+      selectedDate ===
+        nowDate &&
+      time &&
+      time < nowTime
+    ) {
+      setTime("");
+    }
+
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -402,55 +330,43 @@ const RescheduleFollowupModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleTimeChange =
-    (
-      event
-    ) => {
-      const selectedTime =
-        event.target.value;
+  const handleTimeChange = (
+    event
+  ) => {
+    const selectedTime =
+      event.target.value;
 
-      const nowDate =
-        getLocalDate();
+    if (!selectedTime) {
+      setTime("");
+      setError("");
 
-      const nowTime =
-        getLocalTime();
+      return;
+    }
 
-      /*
-       * Allow clearing the value.
-       */
+    const nowDate =
+      getLocalDate();
 
-      if (!selectedTime) {
-        setTime("");
+    const nowTime =
+      getLocalTime();
 
-        setError("");
-
-        return;
-      }
-
-      /*
-       * Past time is not allowed
-       * when selected date is today.
-       */
-
-      if (
-        date ===
-          nowDate &&
-        selectedTime <
-          nowTime
-      ) {
-        setError(
-          "Follow-up time cannot be in the past."
-        );
-
-        return;
-      }
-
-      setTime(
-        selectedTime
+    if (
+      date === nowDate &&
+      selectedTime <
+        nowTime
+    ) {
+      setError(
+        "Follow-up time cannot be in the past."
       );
 
-      setError("");
-    };
+      return;
+    }
+
+    setTime(
+      selectedTime
+    );
+
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -464,17 +380,32 @@ const RescheduleFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Required Fields
+      | Follow-up ID
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        !followup?.id
+      ) {
+        setError(
+          "Follow-up ID is missing. Refresh the page and try again."
+        );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Date / Time
       |--------------------------------------------------------------------------
       */
 
       if (
         !date ||
-        !time ||
-        !reason.trim()
+        !time
       ) {
         setError(
-          "New date, time and reason are required."
+          "Follow-up date and time are required."
         );
 
         return;
@@ -482,16 +413,44 @@ const RescheduleFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Prevent Past Date
+      | Reason
       |--------------------------------------------------------------------------
+      |
+      | Backend:
+      | required
+      | min 2
+      | max 1000
+      |
       */
 
+      const cleanReason =
+        reason.trim();
+
+      if (!cleanReason) {
+        setError(
+          "Reschedule reason is required."
+        );
+
+        return;
+      }
+
       if (
-        date <
-        getLocalDate()
+        cleanReason.length <
+        2
       ) {
         setError(
-          "Follow-up date cannot be in the past."
+          "Reschedule reason must be at least 2 characters."
+        );
+
+        return;
+      }
+
+      if (
+        cleanReason.length >
+        1000
+      ) {
+        setError(
+          "Reschedule reason cannot exceed 1000 characters."
         );
 
         return;
@@ -499,7 +458,7 @@ const RescheduleFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Create Local Date / Time
+      | Exact Local Timestamp
       |--------------------------------------------------------------------------
       */
 
@@ -507,12 +466,6 @@ const RescheduleFollowupModal = ({
         new Date(
           `${date}T${time}:00`
         );
-
-      /*
-      |--------------------------------------------------------------------------
-      | Validate Date
-      |--------------------------------------------------------------------------
-      */
 
       if (
         Number.isNaN(
@@ -528,24 +481,16 @@ const RescheduleFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Reject Past Date / Time
+      | Future Validation
       |--------------------------------------------------------------------------
       |
-      | Allow the current minute.
-      |
-      | Example:
-      | 11:58 selected
-      | 11:58:30 submitted
-      |
-      | This should still be valid.
+      | Match backend's 60-second
+      | tolerance.
       |
       */
 
-      const now =
-        new Date();
-
       const minimumAllowed =
-        now.getTime() -
+        Date.now() -
         60 * 1000;
 
       if (
@@ -553,7 +498,7 @@ const RescheduleFollowupModal = ({
         minimumAllowed
       ) {
         setError(
-          "Follow-up date and time cannot be in the past. Select the current time or a future time."
+          "Follow-up date and time cannot be in the past."
         );
 
         return;
@@ -561,8 +506,78 @@ const RescheduleFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Request
+      | Prevent No-op Reschedule
       |--------------------------------------------------------------------------
+      */
+
+      if (
+        followup.dueAt
+      ) {
+        const oldDate =
+          new Date(
+            followup.dueAt
+          );
+
+        if (
+          !Number.isNaN(
+            oldDate.getTime()
+          )
+        ) {
+          /*
+           * HTML time inputs have
+           * minute precision.
+           */
+          const oldMinute =
+            Math.floor(
+              oldDate.getTime() /
+                60000
+            );
+
+          const newMinute =
+            Math.floor(
+              dueAt.getTime() /
+                60000
+            );
+
+          if (
+            oldMinute ===
+            newMinute
+          ) {
+            setError(
+              "Choose a different date or time to reschedule the follow-up."
+            );
+
+            return;
+          }
+        }
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Reschedule
+      |--------------------------------------------------------------------------
+      |
+      | followups.api.js expects:
+      |
+      | {
+      |   followupId,
+      |   data
+      | }
+      |
+      | Backend schema expects:
+      |
+      | {
+      |   dueAt,
+      |   reason,
+      |   action?,
+      |   priority?
+      | }
+      |
+      | We intentionally omit action and
+      | priority here. The service falls
+      | back to the existing follow-up's
+      | values.
+      |
       */
 
       try {
@@ -574,14 +589,8 @@ const RescheduleFollowupModal = ({
             dueAt:
               dueAt.toISOString(),
 
-            action:
-              followup.action,
-
-            priority:
-              followup.priority,
-
             reason:
-              reason.trim(),
+              cleanReason,
           },
         });
 
@@ -589,11 +598,43 @@ const RescheduleFollowupModal = ({
       } catch (
         requestError
       ) {
-        setError(
+        const responseData =
           requestError
             ?.response
-            ?.data
-            ?.message ||
+            ?.data;
+
+        const errors =
+          Array.isArray(
+            responseData?.errors
+          )
+            ? responseData.errors
+            : [];
+
+        const validationMessage =
+          errors
+            .map(
+              (item) => {
+                if (
+                  typeof item ===
+                  "string"
+                ) {
+                  return item;
+                }
+
+                return (
+                  item?.message ||
+                  item?.msg ||
+                  null
+                );
+              }
+            )
+            .filter(Boolean)
+            .join(" ");
+
+        setError(
+          validationMessage ||
+            responseData
+              ?.message ||
             requestError
               ?.message ||
             "Unable to reschedule follow-up."
@@ -609,31 +650,39 @@ const RescheduleFollowupModal = ({
 
   return (
     <div className="modal-backdrop">
-      <section className="tl-modal">
+      <section
+        className="tl-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reschedule-followup-title"
+      >
         {/* Header */}
 
         <header className="modal-head">
           <div>
-            <h2>
+            <h2 id="reschedule-followup-title">
               Reschedule follow-up
             </h2>
+
+            <p>
+              Choose a new date and
+              time for this follow-up.
+            </p>
           </div>
 
           <button
             type="button"
             className="icon-control"
-            onClick={
-              onClose
-            }
             disabled={
               mutation.isPending
+            }
+            onClick={
+              onClose
             }
             aria-label="Close"
           >
             <X
-              size={
-                15
-              }
+              size={15}
             />
           </button>
         </header>
@@ -647,70 +696,103 @@ const RescheduleFollowupModal = ({
             </div>
           )}
 
-          <div className="form-grid2">
-            {/* New Date */}
+          {/* Follow-up Context */}
 
-            <label>
-              New date *
+          <div className="activity-context">
+            <small>
+              Follow-up
+            </small>
 
-              <input
-                type="date"
-                min={
-                  today
+            <b>
+              {followup.action ||
+                "Follow-up"}
+            </b>
+
+            {followup.companyName && (
+              <span>
+                {
+                  followup.companyName
                 }
-                value={
-                  date
-                }
-                onChange={
-                  handleDateChange
-                }
-              />
-            </label>
 
-            {/* New Time */}
+                {followup.leadCode
+                  ? ` · ${followup.leadCode}`
+                  : ""}
+              </span>
+            )}
+          </div>
 
-            <label>
-              New time *
+          <div className="form-section">
+            <div className="form-grid2">
 
-              <input
-                type="time"
-                min={
-                  date ===
-                  today
-                    ? currentTime
-                    : undefined
-                }
-                value={
-                  time
-                }
-                onChange={
-                  handleTimeChange
-                }
-              />
-            </label>
+              {/* Date */}
 
-            {/* Reason */}
+              <label>
+                New date *
 
-            <label className="full">
-              Reason *
+                <input
+                  type="date"
+                  min={today}
+                  value={date}
+                  disabled={
+                    mutation.isPending
+                  }
+                  onChange={
+                    handleDateChange
+                  }
+                  autoFocus
+                />
+              </label>
 
-              <textarea
-                rows="4"
-                value={
-                  reason
-                }
-                onChange={(
-                  event
-                ) => {
-                  setReason(
-                    event.target
-                      .value
-                  );
+              {/* Time */}
 
-                  setError("");
-                }}
-              />
-            </label>
+              <label>
+                New time *
+
+                <input
+                  type="time"
+                  min={
+                    date === today
+                      ? currentTime
+                      : undefined
+                  }
+                  value={time}
+                  disabled={
+                    mutation.isPending ||
+                    !date
+                  }
+                  onChange={
+                    handleTimeChange
+                  }
+                />
+              </label>
+
+              {/* Reason */}
+
+              <label className="full">
+                Reschedule reason *
+
+                <textarea
+                  rows="3"
+                  maxLength={1000}
+                  value={reason}
+                  disabled={
+                    mutation.isPending
+                  }
+                  placeholder="Why is this follow-up being rescheduled?"
+                  onChange={(
+                    event
+                  ) => {
+                    setReason(
+                      event
+                        .target
+                        .value
+                    );
+
+                    setError("");
+                  }}
+                />
+              </label>
+            </div>
           </div>
         </div>
 
@@ -742,7 +824,7 @@ const RescheduleFollowupModal = ({
           >
             {mutation.isPending
               ? "Rescheduling..."
-              : "Reschedule"}
+              : "Reschedule follow-up"}
           </button>
         </footer>
       </section>

@@ -58,7 +58,8 @@ export const getContactController =
 
     const contact =
       await getContactService(
-        contactId
+        contactId,
+        req.user
       );
 
     res.status(200).json({
@@ -82,6 +83,9 @@ export const createContactController =
       await createContactService({
         data:
           req.validated.body,
+
+        currentUser:
+          req.user,
 
         userId:
           req.user.id,
@@ -122,6 +126,9 @@ export const updateContactController =
 
         data:
           req.validated.body,
+
+        currentUser:
+          req.user,
 
         userId:
           req.user.id,

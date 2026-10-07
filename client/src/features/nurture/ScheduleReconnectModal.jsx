@@ -15,114 +15,78 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| Local Date
+| Date / Time Helpers
 |--------------------------------------------------------------------------
 */
 
-const getLocalDate =
-  () => {
-    const date =
-      new Date();
+const pad2 = (value) =>
+  String(value).padStart(2, "0");
 
-    const year =
-      date.getFullYear();
+const getLocalDate = (
+  value = new Date()
+) =>
+  `${value.getFullYear()}-${pad2(
+    value.getMonth() + 1
+  )}-${pad2(value.getDate())}`;
 
-    const month =
-      String(
-        date.getMonth() + 1
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const day =
-      String(
-        date.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${year}-${month}-${day}`;
-  };
+const getLocalTime = (
+  value = new Date()
+) =>
+  `${pad2(value.getHours())}:${pad2(
+    value.getMinutes()
+  )}`;
 
 /*
 |--------------------------------------------------------------------------
-| Local Time
+| Resolve Lead ID
 |--------------------------------------------------------------------------
+|
+| Nurture routes are lead-based:
+|
+| /nurture/:leadId
+| /nurture/:leadId/reconnect
+|
+| Depending on the list response, the lead
+| identifier may be exposed as leadId or id.
+|
 */
 
-const getLocalTime =
-  () => {
-    const date =
-      new Date();
+const getLeadId = (
+  record
+) => {
+  if (!record) {
+    return null;
+  }
 
-    const hours =
-      String(
-        date.getHours()
-      ).padStart(
-        2,
-        "0"
-      );
+  const value =
+    record.leadId ??
+    record.id ??
+    null;
 
-    const minutes =
-      String(
-        date.getMinutes()
-      ).padStart(
-        2,
-        "0"
-      );
+  const parsed =
+    Number(value);
 
-    return `${hours}:${minutes}`;
-  };
+  if (
+    !Number.isInteger(
+      parsed
+    ) ||
+    parsed <= 0
+  ) {
+    return null;
+  }
 
-/*
-|--------------------------------------------------------------------------
-| Default Reconnect Date
-|--------------------------------------------------------------------------
-*/
-
-const getDefaultDate =
-  () => {
-    const date =
-      new Date();
-
-    date.setDate(
-      date.getDate() +
-        30
-    );
-
-    const year =
-      date.getFullYear();
-
-    const month =
-      String(
-        date.getMonth() + 1
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const day =
-      String(
-        date.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${year}-${month}-${day}`;
-  };
+  return parsed;
+};
 
 /*
 |--------------------------------------------------------------------------
-| Modal
+| Schedule Reconnect Modal
 |--------------------------------------------------------------------------
 */
 
 const ScheduleReconnectModal = ({
   open,
-  lead = null,
+  nurture = null,
   onClose,
 }) => {
   const mutation =
@@ -130,11 +94,17 @@ const ScheduleReconnectModal = ({
 
   /*
   |--------------------------------------------------------------------------
-  | Available Nurture Leads
+  | Nurture Records
   |--------------------------------------------------------------------------
+  |
+  | Keep limit: 100 for Batch 2.
+  |
+  | Batch 3 will handle the global
+  | pagination/dropdown ceiling.
+  |
   */
 
-  const params =
+  const nurtureParams =
     useMemo(
       () => ({
         page: 1,
@@ -145,13 +115,19 @@ const ScheduleReconnectModal = ({
 
   const nurtureQuery =
     useNurtureQuery(
-      params
+      nurtureParams
     );
 
-  const nurture =
+  const nurtureRecords =
     nurtureQuery.data
       ?.data
       ?.nurture ||
+    nurtureQuery.data
+      ?.data
+      ?.items ||
+    nurtureQuery.data
+      ?.data
+      ?.records ||
     [];
 
   /*
@@ -166,24 +142,20 @@ const ScheduleReconnectModal = ({
   ] = useState("");
 
   const [
-    action,
-    setAction,
-  ] = useState(
-    "Reconnect"
-  );
-
-  const [
     date,
     setDate,
-  ] = useState(
-    getDefaultDate()
-  );
+  ] = useState("");
 
   const [
     time,
     setTime,
+  ] = useState("");
+
+  const [
+    action,
+    setAction,
   ] = useState(
-    "10:00"
+    "Reconnect"
   );
 
   const [
@@ -194,13 +166,18 @@ const ScheduleReconnectModal = ({
   );
 
   const [
+    notes,
+    setNotes,
+  ] = useState("");
+
+  const [
     error,
     setError,
   ] = useState("");
 
   /*
   |--------------------------------------------------------------------------
-  | Reset
+  | Reset When Modal Opens
   |--------------------------------------------------------------------------
   */
 
@@ -209,50 +186,69 @@ const ScheduleReconnectModal = ({
       return;
     }
 
+    /*
+     * Suggest approximately
+     * 30 days from now.
+     */
+
+    const suggested =
+      new Date();
+
+    suggested.setDate(
+      suggested.getDate() +
+        30
+    );
+
+    /*
+     * Visible default time.
+     */
+
+    suggested.setHours(
+      10,
+      0,
+      0,
+      0
+    );
+
+    const initialLeadId =
+      getLeadId(
+        nurture
+      );
+
     setSelectedLeadId(
-      lead?.leadId
+      initialLeadId
         ? String(
-            lead.leadId
+            initialLeadId
           )
-        : lead?.id
-          ? String(
-              lead.id
-            )
-          : ""
+        : ""
+    );
+
+    setDate(
+      getLocalDate(
+        suggested
+      )
+    );
+
+    setTime(
+      getLocalTime(
+        suggested
+      )
     );
 
     setAction(
       "Reconnect"
     );
 
-    /*
-     * Keep existing behavior:
-     * default reconnect date is
-     * 30 days from today.
-     */
-
-    setDate(
-      getDefaultDate()
-    );
-
-    /*
-     * Keep default future-date
-     * reconnect time as 10:00.
-     */
-
-    setTime(
-      "10:00"
-    );
-
     setPriority(
-      lead?.priority ||
-        "Medium"
+      "Medium"
     );
+
+    setNotes("");
 
     setError("");
   }, [
     open,
-    lead,
+    nurture,
   ]);
 
   /*
@@ -266,29 +262,29 @@ const ScheduleReconnectModal = ({
       return undefined;
     }
 
-    const handler =
-      (
-        event
-      ) => {
-        if (
-          event.key ===
-            "Escape" &&
-          !mutation.isPending
-        ) {
-          onClose();
-        }
-      };
+    const handler = (
+      event
+    ) => {
+      if (
+        event.key ===
+          "Escape" &&
+        !mutation.isPending
+      ) {
+        onClose();
+      }
+    };
 
     window.addEventListener(
       "keydown",
       handler
     );
 
-    return () =>
+    return () => {
       window.removeEventListener(
         "keydown",
         handler
       );
+    };
   }, [
     open,
     onClose,
@@ -297,7 +293,7 @@ const ScheduleReconnectModal = ({
 
   /*
   |--------------------------------------------------------------------------
-  | Not Open
+  | Closed
   |--------------------------------------------------------------------------
   */
 
@@ -319,29 +315,42 @@ const ScheduleReconnectModal = ({
 
   /*
   |--------------------------------------------------------------------------
-  | Resolve Lead
+  | Resolve Nurture Record
   |--------------------------------------------------------------------------
   */
 
-  const resolvedLead =
-    lead ||
-    nurture.find(
-      (
-        item
-      ) =>
-        Number(
-          item.leadId
-        ) ===
-        Number(
-          selectedLeadId
-        )
+  const selectedLeadIdNumber =
+    Number(
+      selectedLeadId
+    );
+
+  const resolvedNurture =
+    nurture ||
+    nurtureRecords.find(
+      (item) =>
+        getLeadId(item) ===
+        selectedLeadIdNumber
     ) ||
     null;
 
+  /*
+  |--------------------------------------------------------------------------
+  | Resolve Final Lead ID
+  |--------------------------------------------------------------------------
+  */
+
   const resolvedLeadId =
-    resolvedLead?.leadId ||
-    resolvedLead?.id ||
-    null;
+    getLeadId(
+      resolvedNurture
+    ) ||
+    (
+      Number.isInteger(
+        selectedLeadIdNumber
+      ) &&
+      selectedLeadIdNumber > 0
+        ? selectedLeadIdNumber
+        : null
+    );
 
   /*
   |--------------------------------------------------------------------------
@@ -349,73 +358,72 @@ const ScheduleReconnectModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleDateChange =
-    (
-      event
-    ) => {
-      const selectedDate =
-        event.target.value;
+  const handleDateChange = (
+    event
+  ) => {
+    const selectedDate =
+      event.target.value;
 
-      const nowDate =
-        getLocalDate();
+    if (!selectedDate) {
+      setDate("");
+      setTime("");
+      setError("");
 
-      const nowTime =
-        getLocalTime();
+      return;
+    }
 
-      /*
-       * Allow clearing.
-       */
+    const now =
+      new Date();
 
-      if (!selectedDate) {
-        setDate("");
-
-        setError("");
-
-        return;
-      }
-
-      /*
-       * Reject past date.
-       */
-
-      if (
-        selectedDate <
-        nowDate
-      ) {
-        setError(
-          "Reconnect date cannot be in the past."
-        );
-
-        return;
-      }
-
-      setDate(
-        selectedDate
+    const nowDate =
+      getLocalDate(
+        now
       );
 
-      /*
-       * If the user selects today
-       * and the selected time has
-       * already passed, move it
-       * automatically to current time.
-       */
+    const nowTime =
+      getLocalTime(
+        now
+      );
 
-      if (
-        selectedDate ===
-          nowDate &&
-        (
-          !time ||
-          time <
-            nowTime
-        )
-      ) {
-        setTime(
-          nowTime
-        );
-      }
+    /*
+     * Past dates are not allowed.
+     */
 
-      setError("");
-    };
+    if (
+      selectedDate <
+      nowDate
+    ) {
+      setDate("");
+      setTime("");
+
+      setError(
+        "Reconnect date cannot be in the past."
+      );
+
+      return;
+    }
+
+    setDate(
+      selectedDate
+    );
+
+    /*
+     * If today is selected and the
+     * previously selected time is
+     * already past, clear it.
+     */
+
+    if (
+      selectedDate ===
+        nowDate &&
+      time &&
+      time < nowTime
+    ) {
+      setTime("");
+    }
+
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -423,55 +431,58 @@ const ScheduleReconnectModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleTimeChange =
-    (
-      event
-    ) => {
-      const selectedTime =
-        event.target.value;
+  const handleTimeChange = (
+    event
+  ) => {
+    const selectedTime =
+      event.target.value;
 
-      const nowDate =
-        getLocalDate();
+    if (!selectedTime) {
+      setTime("");
+      setError("");
 
-      const nowTime =
-        getLocalTime();
+      return;
+    }
 
-      /*
-       * Allow clearing.
-       */
+    const now =
+      new Date();
 
-      if (!selectedTime) {
-        setTime("");
-
-        setError("");
-
-        return;
-      }
-
-      /*
-       * Past time is blocked only
-       * when today's date is selected.
-       */
-
-      if (
-        date ===
-          nowDate &&
-        selectedTime <
-          nowTime
-      ) {
-        setError(
-          "Reconnect time cannot be in the past."
-        );
-
-        return;
-      }
-
-      setTime(
-        selectedTime
+    const nowDate =
+      getLocalDate(
+        now
       );
 
-      setError("");
-    };
+    const nowTime =
+      getLocalTime(
+        now
+      );
+
+    /*
+     * When today is selected,
+     * past times are not allowed.
+     */
+
+    if (
+      date ===
+        nowDate &&
+      selectedTime <
+        nowTime
+    ) {
+      setTime("");
+
+      setError(
+        "Reconnect time cannot be in the past."
+      );
+
+      return;
+    }
+
+    setTime(
+      selectedTime
+    );
+
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -485,7 +496,7 @@ const ScheduleReconnectModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Related Lead
+      | Lead
       |--------------------------------------------------------------------------
       */
 
@@ -493,7 +504,35 @@ const ScheduleReconnectModal = ({
         !resolvedLeadId
       ) {
         setError(
-          "Related lead is required."
+          "Select a nurture lead."
+        );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Date
+      |--------------------------------------------------------------------------
+      */
+
+      if (!date) {
+        setError(
+          "Reconnect date is required."
+        );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Time
+      |--------------------------------------------------------------------------
+      */
+
+      if (!time) {
+        setError(
+          "Reconnect time is required."
         );
 
         return;
@@ -505,8 +544,12 @@ const ScheduleReconnectModal = ({
       |--------------------------------------------------------------------------
       */
 
+      const cleanAction =
+        action.trim();
+
       if (
-        !action.trim()
+        cleanAction.length <
+        2
       ) {
         setError(
           "Reconnect action is required."
@@ -515,18 +558,12 @@ const ScheduleReconnectModal = ({
         return;
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Date / Time
-      |--------------------------------------------------------------------------
-      */
-
       if (
-        !date ||
-        !time
+        cleanAction.length >
+        500
       ) {
         setError(
-          "Reconnect date and time are required."
+          "Reconnect action cannot exceed 500 characters."
         );
 
         return;
@@ -534,16 +571,23 @@ const ScheduleReconnectModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Prevent Past Date
+      | Priority
       |--------------------------------------------------------------------------
       */
 
+      const allowedPriorities = [
+        "High",
+        "Medium",
+        "Low",
+      ];
+
       if (
-        date <
-        getLocalDate()
+        !allowedPriorities.includes(
+          priority
+        )
       ) {
         setError(
-          "Reconnect date cannot be in the past."
+          "Select a valid priority."
         );
 
         return;
@@ -551,7 +595,27 @@ const ScheduleReconnectModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Build Reconnect Date / Time
+      | Notes
+      |--------------------------------------------------------------------------
+      */
+
+      const cleanNotes =
+        notes.trim();
+
+      if (
+        cleanNotes.length >
+        5000
+      ) {
+        setError(
+          "Notes cannot exceed 5000 characters."
+        );
+
+        return;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Construct Timestamp
       |--------------------------------------------------------------------------
       */
 
@@ -559,12 +623,6 @@ const ScheduleReconnectModal = ({
         new Date(
           `${date}T${time}:00`
         );
-
-      /*
-      |--------------------------------------------------------------------------
-      | Validate Date
-      |--------------------------------------------------------------------------
-      */
 
       if (
         Number.isNaN(
@@ -580,17 +638,11 @@ const ScheduleReconnectModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Prevent Past Date / Time
+      | Present / Future Validation
       |--------------------------------------------------------------------------
       |
-      | Browser min attributes protect
-      | the normal UI flow.
-      |
-      | This additional validation
-      | protects submission too.
-      |
-      | Current minute receives a
-      | 60-second tolerance.
+      | Same 60-second tolerance as
+      | the backend schema.
       |
       */
 
@@ -603,7 +655,7 @@ const ScheduleReconnectModal = ({
         minimumAllowed
       ) {
         setError(
-          "Reconnect date and time cannot be in the past. Select the current time or a future time."
+          "Reconnect date and time cannot be in the past."
         );
 
         return;
@@ -613,18 +665,24 @@ const ScheduleReconnectModal = ({
       |--------------------------------------------------------------------------
       | Request
       |--------------------------------------------------------------------------
+      |
+      | nurture.api.js:
+      |
+      | scheduleReconnectRequest({
+      |   leadId,
+      |   data
+      | })
+      |
       */
 
       try {
         await mutation.mutateAsync({
           leadId:
-            Number(
-              resolvedLeadId
-            ),
+            resolvedLeadId,
 
           data: {
             action:
-              action.trim(),
+              cleanAction,
 
             dueAt:
               dueAt.toISOString(),
@@ -632,6 +690,7 @@ const ScheduleReconnectModal = ({
             priority,
 
             notes:
+              cleanNotes ||
               null,
           },
         });
@@ -640,11 +699,43 @@ const ScheduleReconnectModal = ({
       } catch (
         requestError
       ) {
-        setError(
+        const responseData =
           requestError
             ?.response
-            ?.data
-            ?.message ||
+            ?.data;
+
+        const errors =
+          Array.isArray(
+            responseData?.errors
+          )
+            ? responseData.errors
+            : [];
+
+        const validationMessage =
+          errors
+            .map(
+              (item) => {
+                if (
+                  typeof item ===
+                  "string"
+                ) {
+                  return item;
+                }
+
+                return (
+                  item?.message ||
+                  item?.msg ||
+                  null
+                );
+              }
+            )
+            .filter(Boolean)
+            .join(" ");
+
+        setError(
+          validationMessage ||
+            responseData
+              ?.message ||
             requestError
               ?.message ||
             "Unable to schedule reconnect."
@@ -664,37 +755,37 @@ const ScheduleReconnectModal = ({
         className="tl-modal"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="schedule-reconnect-title"
       >
         {/* Header */}
 
         <header className="modal-head">
           <div>
-            <h2>
+            <h2 id="schedule-reconnect-title">
               Schedule reconnect
             </h2>
 
             <p>
-              Create the next
-              touchpoint for this
-              nurture opportunity.
+              Choose when this
+              nurture lead should
+              return to your
+              attention.
             </p>
           </div>
 
           <button
             type="button"
             className="icon-control"
-            onClick={
-              onClose
-            }
             disabled={
               mutation.isPending
+            }
+            onClick={
+              onClose
             }
             aria-label="Close"
           >
             <X
-              size={
-                15
-              }
+              size={15}
             />
           </button>
         </header>
@@ -703,31 +794,34 @@ const ScheduleReconnectModal = ({
 
         <div className="modal-body">
           {error && (
-            <div className="error-box">
+            <div className="error-box mb-2">
               {error}
             </div>
           )}
 
           <div className="form-section">
             <div className="form-grid2">
-              {/* Related Lead */}
 
-              {!lead ? (
+              {/* Nurture Lead */}
+
+              {!nurture ? (
                 <label className="full">
-                  Related lead *
+                  Nurture lead *
 
                   <select
                     value={
                       selectedLeadId
                     }
                     disabled={
-                      nurtureQuery.isLoading
+                      nurtureQuery.isLoading ||
+                      mutation.isPending
                     }
                     onChange={(
                       event
                     ) => {
                       setSelectedLeadId(
-                        event.target
+                        event
+                          .target
                           .value
                       );
 
@@ -736,71 +830,88 @@ const ScheduleReconnectModal = ({
                   >
                     <option value="">
                       {nurtureQuery.isLoading
-                        ? "Loading..."
+                        ? "Loading nurture leads..."
                         : "Select nurture lead"}
                     </option>
 
-                    {nurture.map(
-                      (
-                        item
-                      ) => (
-                        <option
-                          key={
-                            item.leadId
-                          }
-                          value={
-                            item.leadId
-                          }
-                        >
-                          {
-                            item.companyName
-                          }
+                    {nurtureRecords.map(
+                      (item) => {
+                        const itemLeadId =
+                          getLeadId(
+                            item
+                          );
 
-                          {" · "}
+                        if (
+                          !itemLeadId
+                        ) {
+                          return null;
+                        }
 
-                          {
-                            item.leadCode
-                          }
-                        </option>
-                      )
+                        return (
+                          <option
+                            key={
+                              itemLeadId
+                            }
+                            value={
+                              itemLeadId
+                            }
+                          >
+                            {item.companyName ||
+                              item.leadName ||
+                              item.name ||
+                              `Lead #${itemLeadId}`}
+
+                            {item.leadCode
+                              ? ` · ${item.leadCode}`
+                              : ""}
+                          </option>
+                        );
+                      }
                     )}
                   </select>
                 </label>
               ) : (
                 <div className="activity-context full">
                   <small>
-                    Related lead
+                    Nurture lead
                   </small>
 
                   <b>
-                    {
-                      lead.companyName
-                    }
+                    {nurture.companyName ||
+                      nurture.leadName ||
+                      nurture.name ||
+                      (
+                        resolvedLeadId
+                          ? `Lead #${resolvedLeadId}`
+                          : "Nurture lead"
+                      )}
 
-                    {" · "}
-
-                    {
-                      lead.leadCode
-                    }
+                    {nurture.leadCode
+                      ? ` · ${nurture.leadCode}`
+                      : ""}
                   </b>
                 </div>
               )}
 
               {/* Action */}
 
-              <label>
-                Action *
+              <label className="full">
+                Reconnect action *
 
                 <input
                   type="text"
-                  value={
-                    action
+                  maxLength={500}
+                  value={action}
+                  disabled={
+                    mutation.isPending
                   }
+                  placeholder="Reconnect"
                   onChange={(
                     event
                   ) => {
                     setAction(
-                      event.target
+                      event
+                        .target
                         .value
                     );
 
@@ -812,18 +923,22 @@ const ScheduleReconnectModal = ({
               {/* Date */}
 
               <label>
-                Date *
+                Reconnect date *
 
                 <input
                   type="date"
-                  min={
-                    today
-                  }
-                  value={
-                    date
+                  min={today}
+                  value={date}
+                  disabled={
+                    mutation.isPending
                   }
                   onChange={
                     handleDateChange
+                  }
+                  autoFocus={
+                    Boolean(
+                      nurture
+                    )
                   }
                 />
               </label>
@@ -831,18 +946,19 @@ const ScheduleReconnectModal = ({
               {/* Time */}
 
               <label>
-                Time *
+                Reconnect time *
 
                 <input
                   type="time"
                   min={
-                    date ===
-                    today
+                    date === today
                       ? currentTime
                       : undefined
                   }
-                  value={
-                    time
+                  value={time}
+                  disabled={
+                    mutation.isPending ||
+                    !date
                   }
                   onChange={
                     handleTimeChange
@@ -853,17 +969,19 @@ const ScheduleReconnectModal = ({
               {/* Priority */}
 
               <label>
-                Priority
+                Priority *
 
                 <select
-                  value={
-                    priority
+                  value={priority}
+                  disabled={
+                    mutation.isPending
                   }
                   onChange={(
                     event
                   ) => {
                     setPriority(
-                      event.target
+                      event
+                        .target
                         .value
                     );
 
@@ -882,6 +1000,33 @@ const ScheduleReconnectModal = ({
                     Low
                   </option>
                 </select>
+              </label>
+
+              {/* Notes */}
+
+              <label className="full">
+                Notes
+
+                <textarea
+                  rows="4"
+                  maxLength={5000}
+                  value={notes}
+                  disabled={
+                    mutation.isPending
+                  }
+                  placeholder="Optional reconnect context"
+                  onChange={(
+                    event
+                  ) => {
+                    setNotes(
+                      event
+                        .target
+                        .value
+                    );
+
+                    setError("");
+                  }}
+                />
               </label>
             </div>
           </div>
@@ -915,7 +1060,7 @@ const ScheduleReconnectModal = ({
           >
             {mutation.isPending
               ? "Scheduling..."
-              : "Schedule"}
+              : "Schedule reconnect"}
           </button>
         </footer>
       </section>

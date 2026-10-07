@@ -1,90 +1,27 @@
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 
-import {
-  X,
-} from "lucide-react";
-
-import {
-  useCompleteMeetingMutation,
-} from "./meetings.queries.js";
+import { useCompleteMeetingMutation } from "./meetings.queries.js";
 
 /*
 |--------------------------------------------------------------------------
-| Local Date
+| Date / Time Helpers
 |--------------------------------------------------------------------------
 */
 
-const getLocalDate =
-  () => {
-    const date =
-      new Date();
+const pad2 = (value) => String(value).padStart(2, "0");
 
-    const year =
-      date.getFullYear();
+const getLocalDate = (value = new Date()) =>
+  `${value.getFullYear()}-${pad2(value.getMonth() + 1)}-${pad2(
+    value.getDate()
+  )}`;
 
-    const month =
-      String(
-        date.getMonth() + 1
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const day =
-      String(
-        date.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${year}-${month}-${day}`;
-  };
+const getLocalTime = (value = new Date()) =>
+  `${pad2(value.getHours())}:${pad2(value.getMinutes())}`;
 
 /*
 |--------------------------------------------------------------------------
-| Tomorrow
-|--------------------------------------------------------------------------
-*/
-
-const getTomorrow =
-  () => {
-    const date =
-      new Date();
-
-    date.setDate(
-      date.getDate() +
-        1
-    );
-
-    const year =
-      date.getFullYear();
-
-    const month =
-      String(
-        date.getMonth() + 1
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const day =
-      String(
-        date.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${year}-${month}-${day}`;
-  };
-
-/*
-|--------------------------------------------------------------------------
-| Complete Meeting
+| Complete Meeting Modal
 |--------------------------------------------------------------------------
 */
 
@@ -93,8 +30,7 @@ const CompleteMeetingModal = ({
   meeting,
   onClose,
 }) => {
-  const mutation =
-    useCompleteMeetingMutation();
+  const mutation = useCompleteMeetingMutation();
 
   /*
   |--------------------------------------------------------------------------
@@ -102,36 +38,26 @@ const CompleteMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const [
-    notes,
-    setNotes,
-  ] = useState("");
+  const [outcome, setOutcome] = useState("");
+  const [notes, setNotes] = useState("");
 
-  const [
-    outcome,
-    setOutcome,
-  ] = useState("");
-
-  const [
-    nextAction,
-    setNextAction,
-  ] = useState("");
+  const [nextAction, setNextAction] = useState("");
 
   const [
     followUpDate,
     setFollowUpDate,
-  ] = useState(
-    getTomorrow()
-  );
+  ] = useState("");
 
   const [
-    error,
-    setError,
+    followUpTime,
+    setFollowUpTime,
   ] = useState("");
+
+  const [error, setError] = useState("");
 
   /*
   |--------------------------------------------------------------------------
-  | Reset
+  | Reset Every Time Modal Opens
   |--------------------------------------------------------------------------
   */
 
@@ -140,24 +66,60 @@ const CompleteMeetingModal = ({
       return;
     }
 
+    setOutcome("");
     setNotes("");
 
-    setOutcome("");
-
-    setNextAction("");
-
     /*
-     * Default follow-up remains tomorrow.
+     * Follow-up is optional.
+     *
+     * Do not automatically populate
+     * next action, date or time.
      */
-
-    setFollowUpDate(
-      getTomorrow()
-    );
+    setNextAction("");
+    setFollowUpDate("");
+    setFollowUpTime("");
 
     setError("");
   }, [
     open,
-    meeting,
+    meeting?.id,
+  ]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Escape
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handler = (event) => {
+      if (
+        event.key === "Escape" &&
+        !mutation.isPending
+      ) {
+        onClose();
+      }
+    };
+
+    window.addEventListener(
+      "keydown",
+      handler
+    );
+
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        handler
+      );
+    };
+  }, [
+    open,
+    onClose,
+    mutation.isPending,
   ]);
 
   /*
@@ -166,21 +128,12 @@ const CompleteMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  if (
-    !open ||
-    !meeting
-  ) {
+  if (!open || !meeting) {
     return null;
   }
 
-  /*
-  |--------------------------------------------------------------------------
-  | Current Date
-  |--------------------------------------------------------------------------
-  */
-
-  const today =
-    getLocalDate();
+  const today = getLocalDate();
+  const currentTime = getLocalTime();
 
   /*
   |--------------------------------------------------------------------------
@@ -188,47 +141,92 @@ const CompleteMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleFollowUpDateChange =
-    (
-      event
-    ) => {
-      const selectedDate =
-        event.target.value;
+  const handleDateChange = (event) => {
+    const selectedDate = event.target.value;
 
-      /*
-       * Allow clearing so normal
-       * required validation can handle it.
-       */
+    if (!selectedDate) {
+      setFollowUpDate("");
+      setFollowUpTime("");
+      setError("");
 
-      if (!selectedDate) {
-        setFollowUpDate("");
+      return;
+    }
 
-        setError("");
+    const nowDate = getLocalDate();
+    const nowTime = getLocalTime();
 
-        return;
-      }
-
-      /*
-       * Reject past date.
-       */
-
-      if (
-        selectedDate <
-        getLocalDate()
-      ) {
-        setError(
-          "Follow-up date cannot be in the past."
-        );
-
-        return;
-      }
-
-      setFollowUpDate(
-        selectedDate
+    if (selectedDate < nowDate) {
+      setError(
+        "Follow-up date cannot be in the past."
       );
 
+      return;
+    }
+
+    setFollowUpDate(selectedDate);
+
+    /*
+     * If the user changes the date back
+     * to today and the selected time is
+     * already past, clear the time.
+     */
+    if (
+      selectedDate === nowDate &&
+      followUpTime &&
+      followUpTime < nowTime
+    ) {
+      setFollowUpTime("");
+    }
+
+    setError("");
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Follow-up Time Change
+  |--------------------------------------------------------------------------
+  */
+
+  const handleTimeChange = (event) => {
+    const selectedTime = event.target.value;
+
+    if (!selectedTime) {
+      setFollowUpTime("");
       setError("");
-    };
+
+      return;
+    }
+
+    const nowDate = getLocalDate();
+    const nowTime = getLocalTime();
+
+    if (
+      followUpDate === nowDate &&
+      selectedTime < nowTime
+    ) {
+      setError(
+        "Follow-up time cannot be in the past."
+      );
+
+      return;
+    }
+
+    setFollowUpTime(selectedTime);
+    setError("");
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Clear Follow-up
+  |--------------------------------------------------------------------------
+  */
+
+  const clearFollowUp = () => {
+    setNextAction("");
+    setFollowUpDate("");
+    setFollowUpTime("");
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -236,21 +234,165 @@ const CompleteMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const submit =
-    async () => {
-      setError("");
+  const submit = async () => {
+    setError("");
 
-      /*
-      |--------------------------------------------------------------------------
-      | Notes
-      |--------------------------------------------------------------------------
-      */
+    /*
+    |--------------------------------------------------------------------------
+    | Meeting ID
+    |--------------------------------------------------------------------------
+    */
+
+    if (!meeting?.id) {
+      setError(
+        "Meeting ID is missing. Refresh the meetings page and try again."
+      );
+
+      return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Outcome
+    |--------------------------------------------------------------------------
+    */
+
+    const cleanOutcome = outcome.trim();
+
+    if (!cleanOutcome) {
+      setError(
+        "Meeting outcome is required."
+      );
+
+      return;
+    }
+
+    if (cleanOutcome.length < 2) {
+      setError(
+        "Meeting outcome must be at least 2 characters."
+      );
+
+      return;
+    }
+
+    if (cleanOutcome.length > 500) {
+      setError(
+        "Meeting outcome cannot exceed 500 characters."
+      );
+
+      return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notes
+    |--------------------------------------------------------------------------
+    |
+    | Backend completeMeetingSchema requires notes.
+    | Minimum: 2
+    | Maximum: 5000
+    |
+    */
+
+    const cleanNotes = notes.trim();
+
+    if (!cleanNotes) {
+      setError(
+        "Meeting notes are required."
+      );
+
+      return;
+    }
+
+    if (cleanNotes.length < 2) {
+      setError(
+        "Meeting notes must be at least 2 characters."
+      );
+
+      return;
+    }
+
+    if (cleanNotes.length > 5000) {
+      setError(
+        "Meeting notes cannot exceed 5000 characters."
+      );
+
+      return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Optional Follow-up
+    |--------------------------------------------------------------------------
+    |
+    | Backend requires:
+    |
+    | nextAction + followUpAt
+    |
+    | to be supplied together.
+    |
+    | Both may also be omitted/null.
+    |
+    */
+
+    const cleanNextAction =
+      nextAction.trim();
+
+    const hasNextAction = Boolean(
+      cleanNextAction
+    );
+
+    const hasFollowUpDate = Boolean(
+      followUpDate
+    );
+
+    const hasFollowUpTime = Boolean(
+      followUpTime
+    );
+
+    const hasAnyFollowUp =
+      hasNextAction ||
+      hasFollowUpDate ||
+      hasFollowUpTime;
+
+    let followUpAt = null;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validate Optional Follow-up
+    |--------------------------------------------------------------------------
+    */
+
+    if (hasAnyFollowUp) {
+      if (!hasNextAction) {
+        setError(
+          "Enter a next action for the follow-up."
+        );
+
+        return;
+      }
 
       if (
-        !notes.trim()
+        cleanNextAction.length > 500
       ) {
         setError(
-          "Meeting notes are required."
+          "Next action cannot exceed 500 characters."
+        );
+
+        return;
+      }
+
+      if (!hasFollowUpDate) {
+        setError(
+          "Select a follow-up date."
+        );
+
+        return;
+      }
+
+      if (!hasFollowUpTime) {
+        setError(
+          "Select a follow-up time."
         );
 
         return;
@@ -258,129 +400,22 @@ const CompleteMeetingModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Outcome
+      | Construct Exact Local Timestamp
       |--------------------------------------------------------------------------
       */
 
-      if (
-        !outcome.trim()
-      ) {
-        setError(
-          "Meeting outcome is required."
+      const followUpDateTime =
+        new Date(
+          `${followUpDate}T${followUpTime}:00`
         );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Next Action
-      |--------------------------------------------------------------------------
-      */
-
-      if (
-        !nextAction.trim()
-      ) {
-        setError(
-          "Next action is required."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Follow-up Date
-      |--------------------------------------------------------------------------
-      */
-
-      if (
-        !followUpDate
-      ) {
-        setError(
-          "Follow-up date is required."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Prevent Past Date
-      |--------------------------------------------------------------------------
-      */
-
-      const currentDate =
-        getLocalDate();
-
-      if (
-        followUpDate <
-        currentDate
-      ) {
-        setError(
-          "Follow-up date cannot be in the past."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Build Follow-up Date / Time
-      |--------------------------------------------------------------------------
-      |
-      | This modal currently does not have a time field.
-      |
-      | If TODAY is selected:
-      | use current local time.
-      |
-      | If a FUTURE date is selected:
-      | use 10:00 AM.
-      |
-      | This prevents today's follow-up from becoming a past datetime
-      | when the current time is already after 10:00 AM.
-      |
-      */
-
-      let followUpAt;
-
-      if (
-        followUpDate ===
-        currentDate
-      ) {
-        /*
-         * Current time + small buffer.
-         *
-         * The buffer prevents the timestamp
-         * from becoming past while the
-         * request is being submitted.
-         */
-
-        followUpAt =
-          new Date(
-            Date.now() +
-              60 * 1000
-          );
-      } else {
-        followUpAt =
-          new Date(
-            `${followUpDate}T10:00:00`
-          );
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Validate Generated Date
-      |--------------------------------------------------------------------------
-      */
 
       if (
         Number.isNaN(
-          followUpAt.getTime()
+          followUpDateTime.getTime()
         )
       ) {
         setError(
-          "Enter a valid follow-up date."
+          "Enter a valid follow-up date and time."
         );
 
         return;
@@ -388,66 +423,89 @@ const CompleteMeetingModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Final Past Date / Time Protection
+      | Future Validation
       |--------------------------------------------------------------------------
       */
-
-      const minimumAllowed =
-        Date.now() -
-        60 * 1000;
 
       if (
-        followUpAt.getTime() <
-        minimumAllowed
+        followUpDateTime.getTime() <=
+        Date.now()
       ) {
         setError(
-          "Follow-up date cannot be in the past."
+          "Follow-up date and time must be in the future."
         );
 
         return;
       }
 
+      followUpAt =
+        followUpDateTime.toISOString();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Complete Meeting
+    |--------------------------------------------------------------------------
+    |
+    | meetings.api.js expects:
+    |
+    | {
+    |   meetingId,
+    |   data
+    | }
+    |
+    */
+
+    try {
+      await mutation.mutateAsync({
+        meetingId: meeting.id,
+
+        data: {
+          outcome: cleanOutcome,
+
+          notes: cleanNotes,
+
+          nextAction:
+            hasAnyFollowUp
+              ? cleanNextAction
+              : null,
+
+          followUpAt:
+            hasAnyFollowUp
+              ? followUpAt
+              : null,
+        },
+      });
+
+      onClose();
+    } catch (requestError) {
       /*
-      |--------------------------------------------------------------------------
-      | Request
-      |--------------------------------------------------------------------------
-      */
-
-      try {
-        await mutation.mutateAsync({
-          meetingId:
-            meeting.id,
-
-          data: {
-            outcome:
-              outcome.trim(),
-
-            notes:
-              notes.trim(),
-
-            nextAction:
-              nextAction.trim(),
-
-            followUpAt:
-              followUpAt.toISOString(),
-          },
-        });
-
-        onClose();
-      } catch (
+       * Prefer detailed validation messages
+       * when the backend provides them.
+       */
+      const responseData =
         requestError
-      ) {
-        setError(
-          requestError
-            ?.response
-            ?.data
-            ?.message ||
-            requestError
-              ?.message ||
-            "Unable to complete meeting."
-        );
-      }
-    };
+          ?.response
+          ?.data;
+
+      const validationMessage =
+        responseData
+          ?.errors
+          ?.map?.(
+            (item) =>
+              item?.message
+          )
+          ?.filter(Boolean)
+          ?.join(" ");
+
+      setError(
+        validationMessage ||
+        responseData?.message ||
+        requestError?.message ||
+        "Unable to complete meeting."
+      );
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -461,44 +519,33 @@ const CompleteMeetingModal = ({
         className="tl-modal"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="complete-meeting-title"
       >
-        {/* Header */}
-
         <header className="modal-head">
           <div>
-            <h2>
+            <h2 id="complete-meeting-title">
               Complete meeting
             </h2>
 
             <p>
-              <b>
-                {
-                  meeting.title
-                }
-              </b>
+              Record the outcome and,
+              if needed, schedule the
+              next follow-up.
             </p>
           </div>
 
           <button
             type="button"
             className="icon-control"
-            onClick={
-              onClose
-            }
             disabled={
               mutation.isPending
             }
+            onClick={onClose}
             aria-label="Close"
           >
-            <X
-              size={
-                15
-              }
-            />
+            <X size={15} />
           </button>
         </header>
-
-        {/* Body */}
 
         <div className="modal-body">
           {error && (
@@ -507,24 +554,43 @@ const CompleteMeetingModal = ({
             </div>
           )}
 
+          {/* Meeting Context */}
+
+          <div className="activity-context">
+            <small>
+              Meeting
+            </small>
+
+            <b>
+              {meeting.title}
+            </b>
+
+            {meeting.companyName && (
+              <span>
+                {meeting.companyName}
+              </span>
+            )}
+          </div>
+
           <div className="form-section">
             <div className="form-grid2">
-              {/* Meeting Notes */}
+
+              {/* Outcome */}
 
               <label className="full">
-                Meeting notes *
+                Outcome *
 
                 <textarea
-                  rows="4"
-                  value={
-                    notes
+                  rows="3"
+                  maxLength={500}
+                  value={outcome}
+                  disabled={
+                    mutation.isPending
                   }
-                  onChange={(
-                    event
-                  ) => {
-                    setNotes(
-                      event.target
-                        .value
+                  placeholder="What happened during the meeting?"
+                  onChange={(event) => {
+                    setOutcome(
+                      event.target.value
                     );
 
                     setError("");
@@ -533,22 +599,22 @@ const CompleteMeetingModal = ({
                 />
               </label>
 
-              {/* Outcome */}
+              {/* Notes */}
 
-              <label>
-                Outcome *
+              <label className="full">
+                Notes *
 
-                <input
-                  type="text"
-                  value={
-                    outcome
+                <textarea
+                  rows="4"
+                  maxLength={5000}
+                  value={notes}
+                  disabled={
+                    mutation.isPending
                   }
-                  onChange={(
-                    event
-                  ) => {
-                    setOutcome(
-                      event.target
-                        .value
+                  placeholder="Meeting notes are required"
+                  onChange={(event) => {
+                    setNotes(
+                      event.target.value
                     );
 
                     setError("");
@@ -556,22 +622,65 @@ const CompleteMeetingModal = ({
                 />
               </label>
 
+              {/* Optional Follow-up */}
+
+              <div className="full">
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent:
+                      "space-between",
+                    gap: "12px",
+                  }}
+                >
+                  <div>
+                    <strong>
+                      Next follow-up
+                    </strong>
+
+                    <div>
+                      <small>
+                        Optional
+                      </small>
+                    </div>
+                  </div>
+
+                  {(nextAction ||
+                    followUpDate ||
+                    followUpTime) && (
+                    <button
+                      type="button"
+                      className="tl-secondary"
+                      disabled={
+                        mutation.isPending
+                      }
+                      onClick={
+                        clearFollowUp
+                      }
+                    >
+                      Clear follow-up
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Next Action */}
 
-              <label>
-                Next action *
+              <label className="full">
+                Next action
 
                 <input
                   type="text"
-                  value={
-                    nextAction
+                  maxLength={500}
+                  value={nextAction}
+                  disabled={
+                    mutation.isPending
                   }
-                  onChange={(
-                    event
-                  ) => {
+                  placeholder="e.g. Send revised proposal"
+                  onChange={(event) => {
                     setNextAction(
-                      event.target
-                        .value
+                      event.target.value
                     );
 
                     setError("");
@@ -582,18 +691,45 @@ const CompleteMeetingModal = ({
               {/* Follow-up Date */}
 
               <label>
-                Follow-up date *
+                Follow-up date
 
                 <input
                   type="date"
-                  min={
-                    today
-                  }
+                  min={today}
                   value={
                     followUpDate
                   }
+                  disabled={
+                    mutation.isPending
+                  }
                   onChange={
-                    handleFollowUpDateChange
+                    handleDateChange
+                  }
+                />
+              </label>
+
+              {/* Follow-up Time */}
+
+              <label>
+                Follow-up time
+
+                <input
+                  type="time"
+                  min={
+                    followUpDate ===
+                    today
+                      ? currentTime
+                      : undefined
+                  }
+                  value={
+                    followUpTime
+                  }
+                  disabled={
+                    mutation.isPending ||
+                    !followUpDate
+                  }
+                  onChange={
+                    handleTimeChange
                   }
                 />
               </label>
@@ -601,18 +737,14 @@ const CompleteMeetingModal = ({
           </div>
         </div>
 
-        {/* Footer */}
-
         <footer className="modal-foot">
           <button
             type="button"
             className="tl-secondary"
-            onClick={
-              onClose
-            }
             disabled={
               mutation.isPending
             }
+            onClick={onClose}
           >
             Cancel
           </button>
@@ -620,12 +752,10 @@ const CompleteMeetingModal = ({
           <button
             type="button"
             className="tl-primary"
-            onClick={
-              submit
-            }
             disabled={
               mutation.isPending
             }
+            onClick={submit}
           >
             {mutation.isPending
               ? "Completing..."

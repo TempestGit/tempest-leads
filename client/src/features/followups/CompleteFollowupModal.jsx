@@ -13,66 +13,26 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| Local Date
+| Date / Time Helpers
 |--------------------------------------------------------------------------
 */
 
-const getLocalDate =
-  () => {
-    const now =
-      new Date();
+const pad2 = (value) =>
+  String(value).padStart(2, "0");
 
-    const year =
-      now.getFullYear();
+const getLocalDate = (
+  value = new Date()
+) =>
+  `${value.getFullYear()}-${pad2(
+    value.getMonth() + 1
+  )}-${pad2(value.getDate())}`;
 
-    const month =
-      String(
-        now.getMonth() + 1
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const day =
-      String(
-        now.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${year}-${month}-${day}`;
-  };
-
-/*
-|--------------------------------------------------------------------------
-| Local Time
-|--------------------------------------------------------------------------
-*/
-
-const getLocalTime =
-  () => {
-    const now =
-      new Date();
-
-    const hours =
-      String(
-        now.getHours()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const minutes =
-      String(
-        now.getMinutes()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${hours}:${minutes}`;
-  };
+const getLocalTime = (
+  value = new Date()
+) =>
+  `${pad2(value.getHours())}:${pad2(
+    value.getMinutes()
+  )}`;
 
 /*
 |--------------------------------------------------------------------------
@@ -112,15 +72,18 @@ const CompleteFollowupModal = ({
   const [
     nextDate,
     setNextDate,
-  ] = useState(
-    getLocalDate()
-  );
+  ] = useState("");
 
   const [
     nextTime,
     setNextTime,
+  ] = useState("");
+
+  const [
+    nextPriority,
+    setNextPriority,
   ] = useState(
-    getLocalTime()
+    "Medium"
   );
 
   const [
@@ -130,52 +93,95 @@ const CompleteFollowupModal = ({
 
   /*
   |--------------------------------------------------------------------------
-  | Reset When Opened
+  | Reset On Open
   |--------------------------------------------------------------------------
   */
 
   useEffect(() => {
-    if (
-      !open ||
-      !followup
-    ) {
+    if (!open) {
       return;
     }
 
-    /*
-     * Calculate current date/time
-     * whenever the modal opens.
-     */
-
-    const currentDate =
-      getLocalDate();
-
-    const currentTime =
-      getLocalTime();
-
     setOutcome("");
-
     setNotes("");
 
+    /*
+     * Next follow-up is optional.
+     *
+     * Do not create a hidden date/time.
+     */
     setNextAction("");
+    setNextDate("");
+    setNextTime("");
 
-    setNextDate(
-      currentDate
-    );
-
-    setNextTime(
-      currentTime
-    );
+    if (
+      [
+        "High",
+        "Medium",
+        "Low",
+      ].includes(
+        followup?.priority
+      )
+    ) {
+      setNextPriority(
+        followup.priority
+      );
+    } else {
+      setNextPriority(
+        "Medium"
+      );
+    }
 
     setError("");
   }, [
     open,
-    followup,
+    followup?.id,
+    followup?.priority,
   ]);
 
   /*
   |--------------------------------------------------------------------------
-  | Not Open
+  | Escape
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handler = (
+      event
+    ) => {
+      if (
+        event.key ===
+          "Escape" &&
+        !mutation.isPending
+      ) {
+        onClose();
+      }
+    };
+
+    window.addEventListener(
+      "keydown",
+      handler
+    );
+
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        handler
+      );
+    };
+  }, [
+    open,
+    onClose,
+    mutation.isPending,
+  ]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Closed
   |--------------------------------------------------------------------------
   */
 
@@ -185,12 +191,6 @@ const CompleteFollowupModal = ({
   ) {
     return null;
   }
-
-  /*
-  |--------------------------------------------------------------------------
-  | Current Date / Time
-  |--------------------------------------------------------------------------
-  */
 
   const today =
     getLocalDate();
@@ -204,73 +204,52 @@ const CompleteFollowupModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleDateChange =
-    (
-      event
-    ) => {
-      const selectedDate =
-        event.target.value;
+  const handleDateChange = (
+    event
+  ) => {
+    const selectedDate =
+      event.target.value;
 
-      const nowDate =
-        getLocalDate();
+    if (!selectedDate) {
+      setNextDate("");
+      setNextTime("");
+      setError("");
 
-      const nowTime =
-        getLocalTime();
+      return;
+    }
 
-      /*
-       * Allow clearing the field.
-       */
+    const nowDate =
+      getLocalDate();
 
-      if (!selectedDate) {
-        setNextDate("");
+    const nowTime =
+      getLocalTime();
 
-        setError("");
-
-        return;
-      }
-
-      /*
-       * Reject past date.
-       */
-
-      if (
-        selectedDate <
-        nowDate
-      ) {
-        setError(
-          "Next follow-up date cannot be in the past."
-        );
-
-        return;
-      }
-
-      setNextDate(
-        selectedDate
+    if (
+      selectedDate <
+      nowDate
+    ) {
+      setError(
+        "Next follow-up date cannot be in the past."
       );
 
-      /*
-       * If user changes back to today
-       * and selected time has already
-       * passed, automatically move the
-       * time to current time.
-       */
+      return;
+    }
 
-      if (
-        selectedDate ===
-          nowDate &&
-        (
-          !nextTime ||
-          nextTime <
-            nowTime
-        )
-      ) {
-        setNextTime(
-          nowTime
-        );
-      }
+    setNextDate(
+      selectedDate
+    );
 
-      setError("");
-    };
+    if (
+      selectedDate ===
+        nowDate &&
+      nextTime &&
+      nextTime < nowTime
+    ) {
+      setNextTime("");
+    }
+
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -278,52 +257,74 @@ const CompleteFollowupModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleTimeChange =
-    (
-      event
-    ) => {
-      const selectedTime =
-        event.target.value;
+  const handleTimeChange = (
+    event
+  ) => {
+    const selectedTime =
+      event.target.value;
 
-      const nowDate =
-        getLocalDate();
+    if (!selectedTime) {
+      setNextTime("");
+      setError("");
 
-      const nowTime =
-        getLocalTime();
+      return;
+    }
 
-      /*
-       * Allow clearing.
-       */
+    const nowDate =
+      getLocalDate();
 
-      if (!selectedTime) {
-        setNextTime("");
+    const nowTime =
+      getLocalTime();
 
-        setError("");
+    if (
+      nextDate ===
+        nowDate &&
+      selectedTime <
+        nowTime
+    ) {
+      setError(
+        "Next follow-up time cannot be in the past."
+      );
 
-        return;
-      }
+      return;
+    }
 
-      /*
-       * If date is today,
-       * past time is not allowed.
-       */
+    setNextTime(
+      selectedTime
+    );
+
+    setError("");
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Clear Optional Next Follow-up
+  |--------------------------------------------------------------------------
+  */
+
+  const clearNextFollowup =
+    () => {
+      setNextAction("");
+      setNextDate("");
+      setNextTime("");
 
       if (
-        nextDate ===
-          nowDate &&
-        selectedTime <
-          nowTime
+        [
+          "High",
+          "Medium",
+          "Low",
+        ].includes(
+          followup?.priority
+        )
       ) {
-        setError(
-          "Next follow-up time cannot be in the past."
+        setNextPriority(
+          followup.priority
         );
-
-        return;
+      } else {
+        setNextPriority(
+          "Medium"
+        );
       }
-
-      setNextTime(
-        selectedTime
-      );
 
       setError("");
     };
@@ -340,19 +341,15 @@ const CompleteFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Required Fields
+      | Follow-up ID
       |--------------------------------------------------------------------------
       */
 
       if (
-        !outcome.trim() ||
-        !notes.trim() ||
-        !nextAction.trim() ||
-        !nextDate ||
-        !nextTime
+        !followup?.id
       ) {
         setError(
-          "Outcome, notes, next action, next follow-up date and time are required."
+          "Follow-up ID is missing. Refresh the page and try again."
         );
 
         return;
@@ -360,16 +357,38 @@ const CompleteFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Prevent Past Date
+      | Outcome
       |--------------------------------------------------------------------------
       */
 
+      const cleanOutcome =
+        outcome.trim();
+
+      if (!cleanOutcome) {
+        setError(
+          "Outcome is required."
+        );
+
+        return;
+      }
+
       if (
-        nextDate <
-        getLocalDate()
+        cleanOutcome.length <
+        2
       ) {
         setError(
-          "Next follow-up date cannot be in the past."
+          "Outcome must be at least 2 characters."
+        );
+
+        return;
+      }
+
+      if (
+        cleanOutcome.length >
+        500
+      ) {
+        setError(
+          "Outcome cannot exceed 500 characters."
         );
 
         return;
@@ -377,28 +396,38 @@ const CompleteFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Create Next Follow-up Date / Time
+      | Notes
       |--------------------------------------------------------------------------
       */
 
-      const nextFollowUpAt =
-        new Date(
-          `${nextDate}T${nextTime}:00`
+      const cleanNotes =
+        notes.trim();
+
+      if (!cleanNotes) {
+        setError(
+          "Notes are required."
         );
 
-      /*
-      |--------------------------------------------------------------------------
-      | Validate Date
-      |--------------------------------------------------------------------------
-      */
+        return;
+      }
 
       if (
-        Number.isNaN(
-          nextFollowUpAt.getTime()
-        )
+        cleanNotes.length <
+        2
       ) {
         setError(
-          "Enter a valid next follow-up date and time."
+          "Notes must be at least 2 characters."
+        );
+
+        return;
+      }
+
+      if (
+        cleanNotes.length >
+        5000
+      ) {
+        setError(
+          "Notes cannot exceed 5000 characters."
         );
 
         return;
@@ -406,40 +435,178 @@ const CompleteFollowupModal = ({
 
       /*
       |--------------------------------------------------------------------------
-      | Prevent Past Date / Time
+      | Optional Next Follow-up
+      |--------------------------------------------------------------------------
+      */
+
+      const cleanNextAction =
+        nextAction.trim();
+
+      const hasAction =
+        Boolean(
+          cleanNextAction
+        );
+
+      const hasDate =
+        Boolean(
+          nextDate
+        );
+
+      const hasTime =
+        Boolean(
+          nextTime
+        );
+
+      const hasAnyNextFollowup =
+        hasAction ||
+        hasDate ||
+        hasTime;
+
+      let nextFollowUpAt;
+
+      /*
+       * If the user does not enter anything
+       * for the next follow-up, completion
+       * is allowed.
+       */
+      if (
+        hasAnyNextFollowup
+      ) {
+        if (!hasAction) {
+          setError(
+            "Enter a next action or clear the next follow-up."
+          );
+
+          return;
+        }
+
+        if (
+          cleanNextAction.length <
+          2
+        ) {
+          setError(
+            "Next action must be at least 2 characters."
+          );
+
+          return;
+        }
+
+        if (
+          cleanNextAction.length >
+          500
+        ) {
+          setError(
+            "Next action cannot exceed 500 characters."
+          );
+
+          return;
+        }
+
+        if (!hasDate) {
+          setError(
+            "Select a next follow-up date or clear the next follow-up."
+          );
+
+          return;
+        }
+
+        if (!hasTime) {
+          setError(
+            "Select a next follow-up time or clear the next follow-up."
+          );
+
+          return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Construct Date / Time
+        |--------------------------------------------------------------------------
+        */
+
+        const nextDateTime =
+          new Date(
+            `${nextDate}T${nextTime}:00`
+          );
+
+        if (
+          Number.isNaN(
+            nextDateTime.getTime()
+          )
+        ) {
+          setError(
+            "Enter a valid next follow-up date and time."
+          );
+
+          return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Match Server's 60 Second Tolerance
+        |--------------------------------------------------------------------------
+        */
+
+        const minimumAllowed =
+          Date.now() -
+          60 * 1000;
+
+        if (
+          nextDateTime.getTime() <
+          minimumAllowed
+        ) {
+          setError(
+            "Next follow-up date and time cannot be in the past."
+          );
+
+          return;
+        }
+
+        nextFollowUpAt =
+          nextDateTime.toISOString();
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Build Payload
       |--------------------------------------------------------------------------
       |
-      | The input min attributes prevent
-      | normal past selections, but we
-      | validate again before sending
-      | the API request.
+      | Important:
       |
-      | 60-second tolerance allows the
-      | current minute.
+      | When no next follow-up exists we
+      | OMIT the optional properties.
+      |
+      | We do not send:
+      |
+      | nextAction: null
+      | nextFollowUpAt: null
       |
       */
 
-      const now =
-        new Date();
+      const data = {
+        outcome:
+          cleanOutcome,
 
-      const minimumAllowed =
-        now.getTime() -
-        60 * 1000;
+        notes:
+          cleanNotes,
+      };
 
       if (
-        nextFollowUpAt.getTime() <
-        minimumAllowed
+        hasAnyNextFollowup
       ) {
-        setError(
-          "Next follow-up date and time cannot be in the past. Select the current time or a future time."
-        );
+        data.nextAction =
+          cleanNextAction;
 
-        return;
+        data.nextFollowUpAt =
+          nextFollowUpAt;
+
+        data.nextPriority =
+          nextPriority;
       }
 
       /*
       |--------------------------------------------------------------------------
-      | Request
+      | Complete
       |--------------------------------------------------------------------------
       */
 
@@ -448,33 +615,50 @@ const CompleteFollowupModal = ({
           followupId:
             followup.id,
 
-          data: {
-            outcome:
-              outcome.trim(),
-
-            notes:
-              notes.trim(),
-
-            nextAction:
-              nextAction.trim(),
-
-            nextFollowUpAt:
-              nextFollowUpAt.toISOString(),
-
-            nextPriority:
-              followup.priority,
-          },
+          data,
         });
 
         onClose();
       } catch (
         requestError
       ) {
-        setError(
+        const responseData =
           requestError
             ?.response
-            ?.data
-            ?.message ||
+            ?.data;
+
+        const errors =
+          Array.isArray(
+            responseData?.errors
+          )
+            ? responseData.errors
+            : [];
+
+        const validationMessage =
+          errors
+            .map(
+              (item) => {
+                if (
+                  typeof item ===
+                  "string"
+                ) {
+                  return item;
+                }
+
+                return (
+                  item?.message ||
+                  item?.msg ||
+                  null
+                );
+              }
+            )
+            .filter(Boolean)
+            .join(" ");
+
+        setError(
+          validationMessage ||
+            responseData
+              ?.message ||
             requestError
               ?.message ||
             "Unable to complete follow-up."
@@ -490,39 +674,40 @@ const CompleteFollowupModal = ({
 
   return (
     <div className="modal-backdrop">
-      <section className="tl-modal">
+      <section
+        className="tl-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="complete-followup-title"
+      >
         {/* Header */}
 
         <header className="modal-head">
           <div>
-            <h2>
+            <h2 id="complete-followup-title">
               Complete follow-up
             </h2>
 
             <p>
-              <b>
-                {
-                  followup.action
-                }
-              </b>
+              Record the result and
+              optionally schedule
+              another follow-up.
             </p>
           </div>
 
           <button
             type="button"
             className="icon-control"
-            onClick={
-              onClose
-            }
             disabled={
               mutation.isPending
+            }
+            onClick={
+              onClose
             }
             aria-label="Close"
           >
             <X
-              size={
-                15
-              }
+              size={15}
             />
           </button>
         </header>
@@ -536,28 +721,57 @@ const CompleteFollowupModal = ({
             </div>
           )}
 
+          {/* Context */}
+
+          <div className="activity-context">
+            <small>
+              Follow-up
+            </small>
+
+            <b>
+              {followup.action ||
+                "Follow-up"}
+            </b>
+
+            {followup.companyName && (
+              <span>
+                {
+                  followup.companyName
+                }
+              </span>
+            )}
+          </div>
+
           <div className="form-section">
             <div className="form-grid2">
+
               {/* Outcome */}
 
-              <label>
+              <label className="full">
                 Outcome *
 
-                <input
-                  type="text"
+                <textarea
+                  rows="3"
+                  maxLength={500}
                   value={
                     outcome
                   }
+                  disabled={
+                    mutation.isPending
+                  }
+                  placeholder="What happened with this follow-up?"
                   onChange={(
                     event
                   ) => {
                     setOutcome(
-                      event.target
+                      event
+                        .target
                         .value
                     );
 
                     setError("");
                   }}
+                  autoFocus
                 />
               </label>
 
@@ -568,14 +782,20 @@ const CompleteFollowupModal = ({
 
                 <textarea
                   rows="4"
+                  maxLength={5000}
                   value={
                     notes
                   }
+                  disabled={
+                    mutation.isPending
+                  }
+                  placeholder="Record the follow-up notes"
                   onChange={(
                     event
                   ) => {
                     setNotes(
-                      event.target
+                      event
+                        .target
                         .value
                     );
 
@@ -584,21 +804,78 @@ const CompleteFollowupModal = ({
                 />
               </label>
 
+              {/* Optional Next Follow-up */}
+
+              <div className="full">
+                <div
+                  style={{
+                    display:
+                      "flex",
+
+                    alignItems:
+                      "center",
+
+                    justifyContent:
+                      "space-between",
+
+                    gap:
+                      "12px",
+                  }}
+                >
+                  <div>
+                    <strong>
+                      Next follow-up
+                    </strong>
+
+                    <div>
+                      <small>
+                        Optional
+                      </small>
+                    </div>
+                  </div>
+
+                  {(
+                    nextAction ||
+                    nextDate ||
+                    nextTime
+                  ) && (
+                    <button
+                      type="button"
+                      className="tl-secondary"
+                      disabled={
+                        mutation.isPending
+                      }
+                      onClick={
+                        clearNextFollowup
+                      }
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Next Action */}
 
-              <label>
-                Next action *
+              <label className="full">
+                Next action
 
                 <input
                   type="text"
+                  maxLength={500}
                   value={
                     nextAction
                   }
+                  disabled={
+                    mutation.isPending
+                  }
+                  placeholder="Optional — e.g. Call customer next week"
                   onChange={(
                     event
                   ) => {
                     setNextAction(
-                      event.target
+                      event
+                        .target
                         .value
                     );
 
@@ -607,18 +884,19 @@ const CompleteFollowupModal = ({
                 />
               </label>
 
-              {/* Next Follow-up Date */}
+              {/* Next Date */}
 
               <label>
-                Next follow-up date *
+                Follow-up date
 
                 <input
                   type="date"
-                  min={
-                    today
-                  }
+                  min={today}
                   value={
                     nextDate
+                  }
+                  disabled={
+                    mutation.isPending
                   }
                   onChange={
                     handleDateChange
@@ -626,10 +904,10 @@ const CompleteFollowupModal = ({
                 />
               </label>
 
-              {/* Next Follow-up Time */}
+              {/* Next Time */}
 
               <label>
-                Next follow-up time *
+                Follow-up time
 
                 <input
                   type="time"
@@ -642,10 +920,52 @@ const CompleteFollowupModal = ({
                   value={
                     nextTime
                   }
+                  disabled={
+                    mutation.isPending ||
+                    !nextDate
+                  }
                   onChange={
                     handleTimeChange
                   }
                 />
+              </label>
+
+              {/* Priority */}
+
+              <label>
+                Next priority
+
+                <select
+                  value={
+                    nextPriority
+                  }
+                  disabled={
+                    mutation.isPending
+                  }
+                  onChange={(
+                    event
+                  ) => {
+                    setNextPriority(
+                      event
+                        .target
+                        .value
+                    );
+
+                    setError("");
+                  }}
+                >
+                  <option value="High">
+                    High
+                  </option>
+
+                  <option value="Medium">
+                    Medium
+                  </option>
+
+                  <option value="Low">
+                    Low
+                  </option>
+                </select>
               </label>
             </div>
           </div>
@@ -679,7 +999,7 @@ const CompleteFollowupModal = ({
           >
             {mutation.isPending
               ? "Completing..."
-              : "Mark complete"}
+              : "Complete follow-up"}
           </button>
         </footer>
       </section>

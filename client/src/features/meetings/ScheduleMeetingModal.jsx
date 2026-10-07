@@ -1,88 +1,28 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 
-import {
-  X,
-} from "lucide-react";
-
-import {
-  useLeadsQuery,
-} from "../leads/leads.queries.js";
-
-import {
-  useCreateMeetingMutation,
-} from "./meetings.queries.js";
+import { useLeadsQuery } from "../leads/leads.queries.js";
+import { useCreateMeetingMutation } from "./meetings.queries.js";
 
 /*
 |--------------------------------------------------------------------------
-| Local Date
+| Date / Time Helpers
 |--------------------------------------------------------------------------
 */
 
-const getLocalDate =
-  () => {
-    const date =
-      new Date();
+const pad2 = (value) => String(value).padStart(2, "0");
 
-    const year =
-      date.getFullYear();
+const getLocalDate = (value = new Date()) =>
+  `${value.getFullYear()}-${pad2(value.getMonth() + 1)}-${pad2(
+    value.getDate()
+  )}`;
 
-    const month =
-      String(
-        date.getMonth() +
-          1
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const day =
-      String(
-        date.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${year}-${month}-${day}`;
-  };
+const getLocalTime = (value = new Date()) =>
+  `${pad2(value.getHours())}:${pad2(value.getMinutes())}`;
 
 /*
 |--------------------------------------------------------------------------
-| Local Time
-|--------------------------------------------------------------------------
-*/
-
-const getLocalTime =
-  () => {
-    const date =
-      new Date();
-
-    const hours =
-      String(
-        date.getHours()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const minutes =
-      String(
-        date.getMinutes()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${hours}:${minutes}`;
-  };
-
-/*
-|--------------------------------------------------------------------------
-| Schedule Meeting
+| Schedule Meeting Modal
 |--------------------------------------------------------------------------
 */
 
@@ -91,8 +31,7 @@ const ScheduleMeetingModal = ({
   lead = null,
   onClose,
 }) => {
-  const mutation =
-    useCreateMeetingMutation();
+  const mutation = useCreateMeetingMutation();
 
   /*
   |--------------------------------------------------------------------------
@@ -100,31 +39,20 @@ const ScheduleMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const leadParams =
-    useMemo(
-      () => ({
-        page: 1,
+  const leadParams = useMemo(
+    () => ({
+      page: 1,
+      limit: 100,
+      sort: "createdAt",
+      direction: "desc",
+    }),
+    []
+  );
 
-        limit: 100,
-
-        sort:
-          "createdAt",
-
-        direction:
-          "desc",
-      }),
-      []
-    );
-
-  const leadsQuery =
-    useLeadsQuery(
-      leadParams
-    );
+  const leadsQuery = useLeadsQuery(leadParams);
 
   const leads =
-    leadsQuery.data
-      ?.data
-      ?.leads || [];
+    leadsQuery.data?.data?.leads || [];
 
   /*
   |--------------------------------------------------------------------------
@@ -145,23 +73,17 @@ const ScheduleMeetingModal = ({
   const [
     date,
     setDate,
-  ] = useState(
-    getLocalDate()
-  );
+  ] = useState("");
 
   const [
     time,
     setTime,
-  ] = useState(
-    getLocalTime()
-  );
+  ] = useState("");
 
   const [
     meetingType,
     setMeetingType,
-  ] = useState(
-    "VIDEO_CALL"
-  );
+  ] = useState("VIDEO_CALL");
 
   const [
     agenda,
@@ -175,7 +97,7 @@ const ScheduleMeetingModal = ({
 
   /*
   |--------------------------------------------------------------------------
-  | Reset
+  | Reset Every Time Modal Opens
   |--------------------------------------------------------------------------
   */
 
@@ -184,36 +106,33 @@ const ScheduleMeetingModal = ({
       return;
     }
 
+    const now = new Date();
+
     /*
-     * Calculate the current date/time
-     * every time the modal opens.
+     * Default the meeting slightly into the future.
      *
-     * Do not use values calculated when
-     * the JavaScript file first loaded.
+     * This avoids opening the modal at 14:30:45,
+     * displaying 14:30, and then immediately
+     * submitting an already-past timestamp.
      */
-
-    const currentDate =
-      getLocalDate();
-
-    const currentTime =
-      getLocalTime();
+    const defaultStart = new Date(
+      now.getTime() + 5 * 60 * 1000
+    );
 
     setSelectedLeadId(
       lead?.id
-        ? String(
-            lead.id
-          )
+        ? String(lead.id)
         : ""
     );
 
     setTitle("");
 
     setDate(
-      currentDate
+      getLocalDate(defaultStart)
     );
 
     setTime(
-      currentTime
+      getLocalTime(defaultStart)
     );
 
     setMeetingType(
@@ -239,29 +158,26 @@ const ScheduleMeetingModal = ({
       return undefined;
     }
 
-    const handler =
-      (
-        event
-      ) => {
-        if (
-          event.key ===
-            "Escape" &&
-          !mutation.isPending
-        ) {
-          onClose();
-        }
-      };
+    const handler = (event) => {
+      if (
+        event.key === "Escape" &&
+        !mutation.isPending
+      ) {
+        onClose();
+      }
+    };
 
     window.addEventListener(
       "keydown",
       handler
     );
 
-    return () =>
+    return () => {
       window.removeEventListener(
         "keydown",
         handler
       );
+    };
   }, [
     open,
     onClose,
@@ -284,30 +200,22 @@ const ScheduleMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const today =
-    getLocalDate();
+  const today = getLocalDate();
 
-  const currentTime =
-    getLocalTime();
+  const currentTime = getLocalTime();
 
   /*
   |--------------------------------------------------------------------------
-  | Lead
+  | Resolve Lead
   |--------------------------------------------------------------------------
   */
 
   const resolvedLead =
     lead ||
     leads.find(
-      (
-        item
-      ) =>
-        Number(
-          item.id
-        ) ===
-        Number(
-          selectedLeadId
-        )
+      (item) =>
+        Number(item.id) ===
+        Number(selectedLeadId)
     ) ||
     null;
 
@@ -317,64 +225,46 @@ const ScheduleMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleDateChange =
-    (
-      event
-    ) => {
-      const selectedDate =
-        event.target.value;
+  const handleDateChange = (event) => {
+    const selectedDate =
+      event.target.value;
 
-      const nowDate =
-        getLocalDate();
+    const nowDate =
+      getLocalDate();
 
-      const nowTime =
-        getLocalTime();
+    const nowTime =
+      getLocalTime();
 
-      /*
-       * Browser min should already
-       * prevent this, but keep a
-       * JavaScript check as well.
-       */
-
-      if (
-        selectedDate &&
-        selectedDate <
-          nowDate
-      ) {
-        setError(
-          "Meeting date cannot be in the past."
-        );
-
-        return;
-      }
-
-      setDate(
-        selectedDate
+    if (
+      selectedDate &&
+      selectedDate < nowDate
+    ) {
+      setError(
+        "Meeting date cannot be in the past."
       );
 
-      /*
-       * If user changes the date back
-       * to today and the selected time
-       * is already in the past, move
-       * the time to the current time.
-       */
+      return;
+    }
 
-      if (
-        selectedDate ===
-          nowDate &&
-        (
-          !time ||
-          time <
-            nowTime
-        )
-      ) {
-        setTime(
-          nowTime
-        );
-      }
+    setDate(selectedDate);
 
-      setError("");
-    };
+    /*
+     * If the user switches back to today
+     * while an older time is selected,
+     * move it to the current minute.
+     *
+     * Exact validation still runs again
+     * when the user submits.
+     */
+    if (
+      selectedDate === nowDate &&
+      (!time || time < nowTime)
+    ) {
+      setTime(nowTime);
+    }
+
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -382,43 +272,31 @@ const ScheduleMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleTimeChange =
-    (
-      event
-    ) => {
-      const selectedTime =
-        event.target.value;
+  const handleTimeChange = (event) => {
+    const selectedTime =
+      event.target.value;
 
-      const nowDate =
-        getLocalDate();
+    const nowDate =
+      getLocalDate();
 
-      const nowTime =
-        getLocalTime();
+    const nowTime =
+      getLocalTime();
 
-      /*
-       * Past times are not allowed
-       * when the meeting date is today.
-       */
-
-      if (
-        date ===
-          nowDate &&
-        selectedTime <
-          nowTime
-      ) {
-        setError(
-          "Meeting time cannot be in the past."
-        );
-
-        return;
-      }
-
-      setTime(
-        selectedTime
+    if (
+      date === nowDate &&
+      selectedTime < nowTime
+    ) {
+      setError(
+        "Meeting time cannot be in the past."
       );
 
-      setError("");
-    };
+      return;
+    }
+
+    setTime(selectedTime);
+
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -426,199 +304,171 @@ const ScheduleMeetingModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const submit =
-    async () => {
-      setError("");
+  const submit = async () => {
+    setError("");
 
-      /*
-      |--------------------------------------------------------------------------
-      | Lead
-      |--------------------------------------------------------------------------
-      */
+    /*
+    |--------------------------------------------------------------------------
+    | Lead
+    |--------------------------------------------------------------------------
+    */
 
-      if (
-        !resolvedLead
-      ) {
-        setError(
-          "Related lead is required."
-        );
+    if (!resolvedLead) {
+      setError(
+        "Related lead is required."
+      );
 
-        return;
-      }
+      return;
+    }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Title
-      |--------------------------------------------------------------------------
-      */
+    /*
+    |--------------------------------------------------------------------------
+    | Title
+    |--------------------------------------------------------------------------
+    */
 
-      if (
-        !title.trim()
-      ) {
-        setError(
-          "Meeting title is required."
-        );
+    if (!title.trim()) {
+      setError(
+        "Meeting title is required."
+      );
 
-        return;
-      }
+      return;
+    }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Date / Time Required
-      |--------------------------------------------------------------------------
-      */
+    /*
+    |--------------------------------------------------------------------------
+    | Date + Time
+    |--------------------------------------------------------------------------
+    */
 
-      if (
-        !date ||
-        !time
-      ) {
-        setError(
-          "Meeting date and time are required."
-        );
+    if (!date || !time) {
+      setError(
+        "Meeting date and time are required."
+      );
 
-        return;
-      }
+      return;
+    }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Browser Local Time -> Date
-      |--------------------------------------------------------------------------
-      */
+    /*
+    |--------------------------------------------------------------------------
+    | Construct Local Timestamp
+    |--------------------------------------------------------------------------
+    */
 
-      const startsAt =
-        new Date(
-          `${date}T${time}:00`
-        );
+    const startsAt = new Date(
+      `${date}T${time}:00`
+    );
 
-      /*
-      |--------------------------------------------------------------------------
-      | Invalid Date
-      |--------------------------------------------------------------------------
-      */
+    if (
+      Number.isNaN(
+        startsAt.getTime()
+      )
+    ) {
+      setError(
+        "Enter a valid meeting date and time."
+      );
 
-      if (
-        Number.isNaN(
-          startsAt.getTime()
-        )
-      ) {
-        setError(
-          "Enter a valid meeting date and time."
-        );
+      return;
+    }
 
-        return;
-      }
+    /*
+    |--------------------------------------------------------------------------
+    | Exact Future Validation
+    |--------------------------------------------------------------------------
+    |
+    | Do not use the old one-minute tolerance.
+    |
+    | A newly scheduled meeting should actually
+    | be in the future.
+    |
+    */
 
-      /*
-      |--------------------------------------------------------------------------
-      | Reject Past Date / Time
-      |--------------------------------------------------------------------------
-      |
-      | The input min attributes improve the UI,
-      | but this check is still required because
-      | HTML validation can be bypassed.
-      |
-      | We allow the current minute. Without the
-      | tolerance, selecting 14:38 and clicking
-      | submit at 14:38:20 would incorrectly fail.
-      |
-      */
+    if (
+      startsAt.getTime() <=
+      Date.now()
+    ) {
+      setError(
+        "Meeting date and time must be in the future."
+      );
 
-      const now =
-        new Date();
+      return;
+    }
 
-      const minimumAllowed =
-        now.getTime() -
-        60 * 1000;
+    /*
+    |--------------------------------------------------------------------------
+    | Default Duration
+    |--------------------------------------------------------------------------
+    |
+    | The existing UI does not expose an end
+    | time, so preserve the existing one-hour
+    | meeting duration.
+    |
+    */
 
-      if (
-        startsAt.getTime() <
-        minimumAllowed
-      ) {
-        setError(
-          "Meeting date and time cannot be in the past. Select the current time or a future time."
-        );
+    const endsAt = new Date(
+      startsAt.getTime() +
+        60 * 60 * 1000
+    );
 
-        return;
-      }
+    /*
+    |--------------------------------------------------------------------------
+    | Create
+    |--------------------------------------------------------------------------
+    */
 
-      /*
-      |--------------------------------------------------------------------------
-      | Default End Time
-      |--------------------------------------------------------------------------
-      |
-      | Prototype does not ask for an
-      | end time, so use one hour.
-      |
-      */
+    try {
+      await mutation.mutateAsync({
+        leadId:
+          Number(
+            resolvedLead.id
+          ),
 
-      const endsAt =
-        new Date(
-          startsAt.getTime() +
-            60 *
-              60 *
-              1000
-        );
+        /*
+         * Preserve existing behavior:
+         * use the lead's primary contact.
+         */
+        contactId:
+          resolvedLead.primaryContactId
+            ? Number(
+                resolvedLead.primaryContactId
+              )
+            : null,
 
-      /*
-      |--------------------------------------------------------------------------
-      | Create Meeting
-      |--------------------------------------------------------------------------
-      */
+        title:
+          title.trim(),
 
-      try {
-        await mutation.mutateAsync({
-          leadId:
-            Number(
-              resolvedLead.id
-            ),
+        startsAt:
+          startsAt.toISOString(),
 
-          contactId:
-            resolvedLead.primaryContactId
-              ? Number(
-                  resolvedLead.primaryContactId
-                )
-              : null,
+        endsAt:
+          endsAt.toISOString(),
 
-          title:
-            title.trim(),
+        meetingType,
 
-          startsAt:
-            startsAt.toISOString(),
+        participants: [],
 
-          endsAt:
-            endsAt.toISOString(),
+        location: null,
 
-          meetingType,
+        meetingUrl: null,
 
-          participants:
-            [],
+        agenda:
+          agenda.trim() ||
+          null,
+      });
 
-          location:
-            null,
-
-          meetingUrl:
-            null,
-
-          agenda:
-            agenda.trim() ||
-            null,
-        });
-
-        onClose();
-      } catch (
+      onClose();
+    } catch (requestError) {
+      setError(
         requestError
-      ) {
-        setError(
+          ?.response
+          ?.data
+          ?.message ||
           requestError
-            ?.response
-            ?.data
             ?.message ||
-            requestError
-              ?.message ||
-            "Unable to schedule meeting."
-        );
-      }
-    };
+          "Unable to schedule meeting."
+      );
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -634,8 +484,6 @@ const ScheduleMeetingModal = ({
         aria-modal="true"
         aria-labelledby="schedule-meeting-title"
       >
-        {/* Header */}
-
         <header className="modal-head">
           <div>
             <h2 id="schedule-meeting-title">
@@ -643,32 +491,23 @@ const ScheduleMeetingModal = ({
             </h2>
 
             <p>
-              Schedule a discovery
-              or client
-              conversation.
+              Schedule a discovery or
+              client conversation.
             </p>
           </div>
 
           <button
             type="button"
             className="icon-control"
-            onClick={
-              onClose
-            }
+            onClick={onClose}
             disabled={
               mutation.isPending
             }
             aria-label="Close"
           >
-            <X
-              size={
-                15
-              }
-            />
+            <X size={15} />
           </button>
         </header>
-
-        {/* Body */}
 
         <div className="modal-body">
           {error && (
@@ -679,6 +518,7 @@ const ScheduleMeetingModal = ({
 
           <div className="form-section">
             <div className="form-grid2">
+
               {/* Related Lead */}
 
               {!lead ? (
@@ -690,14 +530,12 @@ const ScheduleMeetingModal = ({
                       selectedLeadId
                     }
                     disabled={
-                      leadsQuery.isLoading
+                      leadsQuery.isLoading ||
+                      mutation.isPending
                     }
-                    onChange={(
-                      event
-                    ) => {
+                    onChange={(event) => {
                       setSelectedLeadId(
-                        event.target
-                          .value
+                        event.target.value
                       );
 
                       setError("");
@@ -710,26 +548,14 @@ const ScheduleMeetingModal = ({
                     </option>
 
                     {leads.map(
-                      (
-                        item
-                      ) => (
+                      (item) => (
                         <option
-                          key={
-                            item.id
-                          }
-                          value={
-                            item.id
-                          }
+                          key={item.id}
+                          value={item.id}
                         >
-                          {
-                            item.companyName
-                          }
-
+                          {item.companyName}
                           {" · "}
-
-                          {
-                            item.leadCode
-                          }
+                          {item.leadCode}
                         </option>
                       )
                     )}
@@ -742,15 +568,9 @@ const ScheduleMeetingModal = ({
                   </small>
 
                   <b>
-                    {
-                      lead.companyName
-                    }
-
+                    {lead.companyName}
                     {" · "}
-
-                    {
-                      lead.leadCode
-                    }
+                    {lead.leadCode}
                   </b>
                 </div>
               )}
@@ -762,15 +582,13 @@ const ScheduleMeetingModal = ({
 
                 <input
                   type="text"
-                  value={
-                    title
+                  value={title}
+                  disabled={
+                    mutation.isPending
                   }
-                  onChange={(
-                    event
-                  ) => {
+                  onChange={(event) => {
                     setTitle(
-                      event.target
-                        .value
+                      event.target.value
                     );
 
                     setError("");
@@ -786,11 +604,10 @@ const ScheduleMeetingModal = ({
 
                 <input
                   type="date"
-                  min={
-                    today
-                  }
-                  value={
-                    date
+                  min={today}
+                  value={date}
+                  disabled={
+                    mutation.isPending
                   }
                   onChange={
                     handleDateChange
@@ -806,13 +623,13 @@ const ScheduleMeetingModal = ({
                 <input
                   type="time"
                   min={
-                    date ===
-                    today
+                    date === today
                       ? currentTime
                       : undefined
                   }
-                  value={
-                    time
+                  value={time}
+                  disabled={
+                    mutation.isPending
                   }
                   onChange={
                     handleTimeChange
@@ -820,7 +637,7 @@ const ScheduleMeetingModal = ({
                 />
               </label>
 
-              {/* Type */}
+              {/* Meeting Type */}
 
               <label>
                 Meeting type
@@ -829,14 +646,16 @@ const ScheduleMeetingModal = ({
                   value={
                     meetingType
                   }
-                  onChange={(
-                    event
-                  ) =>
-                    setMeetingType(
-                      event.target
-                        .value
-                    )
+                  disabled={
+                    mutation.isPending
                   }
+                  onChange={(event) => {
+                    setMeetingType(
+                      event.target.value
+                    );
+
+                    setError("");
+                  }}
                 >
                   <option value="VIDEO_CALL">
                     Video call
@@ -859,24 +678,22 @@ const ScheduleMeetingModal = ({
 
                 <textarea
                   rows="4"
-                  value={
-                    agenda
+                  value={agenda}
+                  disabled={
+                    mutation.isPending
                   }
-                  onChange={(
-                    event
-                  ) =>
+                  onChange={(event) => {
                     setAgenda(
-                      event.target
-                        .value
-                    )
-                  }
+                      event.target.value
+                    );
+
+                    setError("");
+                  }}
                 />
               </label>
             </div>
           </div>
         </div>
-
-        {/* Footer */}
 
         <footer className="modal-foot">
           <button
@@ -885,9 +702,7 @@ const ScheduleMeetingModal = ({
             disabled={
               mutation.isPending
             }
-            onClick={
-              onClose
-            }
+            onClick={onClose}
           >
             Cancel
           </button>
@@ -898,9 +713,7 @@ const ScheduleMeetingModal = ({
             disabled={
               mutation.isPending
             }
-            onClick={
-              submit
-            }
+            onClick={submit}
           >
             {mutation.isPending
               ? "Scheduling..."
