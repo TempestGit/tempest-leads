@@ -1,22 +1,18 @@
 import { z } from "zod";
-
 /*
 |--------------------------------------------------------------------------
 | Contact Status
 |--------------------------------------------------------------------------
 */
-
 export const CONTACT_STATUSES = [
   "ACTIVE",
   "INACTIVE",
 ];
-
 /*
 |--------------------------------------------------------------------------
 | Helpers
 |--------------------------------------------------------------------------
 */
-
 const nullableText = (
   maxLength
 ) =>
@@ -29,7 +25,6 @@ const nullableText = (
       ) {
         return null;
       }
-
       return value;
     },
     z
@@ -38,7 +33,6 @@ const nullableText = (
       .max(maxLength)
       .nullable()
   );
-
 const optionalNullableText = (
   maxLength
 ) =>
@@ -47,7 +41,6 @@ const optionalNullableText = (
       if (value === "") {
         return null;
       }
-
       return value;
     },
     z
@@ -57,13 +50,11 @@ const optionalNullableText = (
       .nullable()
       .optional()
   );
-
 /*
 |--------------------------------------------------------------------------
 | Email Helpers
 |--------------------------------------------------------------------------
 */
-
 const nullableEmail =
   z.preprocess(
     (value) => {
@@ -74,7 +65,6 @@ const nullableEmail =
       ) {
         return null;
       }
-
       return value;
     },
     z
@@ -86,14 +76,12 @@ const nullableEmail =
       .max(190)
       .nullable()
   );
-
 const optionalNullableEmail =
   z.preprocess(
     (value) => {
       if (value === "") {
         return null;
       }
-
       return value;
     },
     z
@@ -106,7 +94,6 @@ const optionalNullableEmail =
       .nullable()
       .optional()
   );
-
 /*
 |--------------------------------------------------------------------------
 | Phone Helpers
@@ -135,7 +122,6 @@ const optionalNullableEmail =
 | 98765abc10
 |
 */
-
 const nullablePhone =
   z.preprocess(
     (value) => {
@@ -146,7 +132,6 @@ const nullablePhone =
       ) {
         return null;
       }
-
       return value;
     },
     z
@@ -164,7 +149,6 @@ const nullablePhone =
       )
       .nullable()
   );
-
 const optionalNullablePhone =
   z.preprocess(
     (value) => {
@@ -173,7 +157,6 @@ const optionalNullablePhone =
       ) {
         return null;
       }
-
       return value;
     },
     z
@@ -192,13 +175,11 @@ const optionalNullablePhone =
       .nullable()
       .optional()
   );
-
 /*
 |--------------------------------------------------------------------------
 | Create Contact
 |--------------------------------------------------------------------------
 */
-
 export const createContactSchema =
   z.object({
     /*
@@ -206,7 +187,6 @@ export const createContactSchema =
     | Company
     |--------------------------------------------------------------------------
     */
-
     companyId:
       z.coerce
         .number()
@@ -216,13 +196,11 @@ export const createContactSchema =
         .positive(
           "Company is required."
         ),
-
     /*
     |--------------------------------------------------------------------------
     | Name
     |--------------------------------------------------------------------------
     */
-
     name:
       z
         .string()
@@ -235,54 +213,44 @@ export const createContactSchema =
           150,
           "Contact name is too long."
         ),
-
     /*
     |--------------------------------------------------------------------------
     | Designation
     |--------------------------------------------------------------------------
     */
-
     designation:
       nullableText(
         150
       ),
-
     /*
     |--------------------------------------------------------------------------
     | Phone
     |--------------------------------------------------------------------------
     */
-
     phone:
       nullablePhone,
-
     /*
     |--------------------------------------------------------------------------
     | Email
     |--------------------------------------------------------------------------
     */
-
     email:
       nullableEmail,
-
     /*
     |--------------------------------------------------------------------------
     | Decision Maker
     |--------------------------------------------------------------------------
     */
-
     isDecisionMaker:
       z
         .boolean()
         .default(false),
   });
-
 /*
 |--------------------------------------------------------------------------
 | Update Contact
 |--------------------------------------------------------------------------
 */
-
 export const updateContactSchema =
   z
     .object({
@@ -291,20 +259,17 @@ export const updateContactSchema =
       | Company
       |--------------------------------------------------------------------------
       */
-
       companyId:
         z.coerce
           .number()
           .int()
           .positive()
           .optional(),
-
       /*
       |--------------------------------------------------------------------------
       | Name
       |--------------------------------------------------------------------------
       */
-
       name:
         z
           .string()
@@ -315,66 +280,54 @@ export const updateContactSchema =
           )
           .max(150)
           .optional(),
-
       /*
       |--------------------------------------------------------------------------
       | Designation
       |--------------------------------------------------------------------------
       */
-
       designation:
         optionalNullableText(
           150
         ),
-
       /*
       |--------------------------------------------------------------------------
       | Phone
       |--------------------------------------------------------------------------
       */
-
       phone:
         optionalNullablePhone,
-
       /*
       |--------------------------------------------------------------------------
       | Email
       |--------------------------------------------------------------------------
       */
-
       email:
         optionalNullableEmail,
-
       /*
       |--------------------------------------------------------------------------
       | Decision Maker
       |--------------------------------------------------------------------------
       */
-
       isDecisionMaker:
         z
           .boolean()
           .optional(),
-
       /*
       |--------------------------------------------------------------------------
       | Status
       |--------------------------------------------------------------------------
       */
-
       status:
         z
           .enum(
             CONTACT_STATUSES
           )
           .optional(),
-
       /*
       |--------------------------------------------------------------------------
       | Notes
       |--------------------------------------------------------------------------
       */
-
       notes:
         optionalNullableText(
           5000
@@ -390,13 +343,11 @@ export const updateContactSchema =
           "At least one field must be provided.",
       }
     );
-
 /*
 |--------------------------------------------------------------------------
 | Contact ID
 |--------------------------------------------------------------------------
 */
-
 export const contactIdSchema =
   z.object({
     contactId:
@@ -409,13 +360,11 @@ export const contactIdSchema =
           "Contact ID must be positive."
         ),
   });
-
 /*
 |--------------------------------------------------------------------------
 | Query Boolean
 |--------------------------------------------------------------------------
 */
-
 const queryBoolean =
   z
     .enum([
@@ -427,13 +376,11 @@ const queryBoolean =
         value === "true"
     )
     .optional();
-
 /*
 |--------------------------------------------------------------------------
 | Contact List Query
 |--------------------------------------------------------------------------
 */
-
 export const contactListSchema =
   z.object({
     /*
@@ -441,7 +388,6 @@ export const contactListSchema =
     | Search
     |--------------------------------------------------------------------------
     */
-
     search:
       z
         .string()
@@ -449,55 +395,46 @@ export const contactListSchema =
         .max(190)
         .optional()
         .default(""),
-
     /*
     |--------------------------------------------------------------------------
     | Company
     |--------------------------------------------------------------------------
     */
-
     companyId:
       z.coerce
         .number()
         .int()
         .positive()
         .optional(),
-
     /*
     |--------------------------------------------------------------------------
     | Decision Maker
     |--------------------------------------------------------------------------
     */
-
     isDecisionMaker:
       queryBoolean,
-
     /*
     |--------------------------------------------------------------------------
     | Status
     |--------------------------------------------------------------------------
     */
-
     status:
       z
         .enum(
           CONTACT_STATUSES
         )
         .optional(),
-
     /*
     |--------------------------------------------------------------------------
     | Pagination
     |--------------------------------------------------------------------------
     */
-
     page:
       z.coerce
         .number()
         .int()
         .min(1)
         .default(1),
-
     limit:
       z.coerce
         .number()
@@ -505,13 +442,11 @@ export const contactListSchema =
         .min(1)
         .max(100)
         .default(20),
-
     /*
     |--------------------------------------------------------------------------
     | Sorting
     |--------------------------------------------------------------------------
     */
-
     sort:
       z
         .enum([
@@ -523,7 +458,6 @@ export const contactListSchema =
         .default(
           "createdAt"
         ),
-
     direction:
       z
         .enum([

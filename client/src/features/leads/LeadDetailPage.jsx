@@ -1,3 +1,4 @@
+import { Pencil, Trash2, LoaderCircle, X } from "lucide-react";
 import {
   useMemo,
   useState,
@@ -9,6 +10,7 @@ import {
 import useAuth from "../auth/useAuth.js";
 import {
   useContactsQuery,
+  useDeleteContactMutation,
 } from "../contacts/contacts.queries.js";
 import {
   useLeadQuery,
@@ -292,6 +294,24 @@ const LeadDetailPage =
     ] = useState(
       false
     );
+
+    const [editingContact, setEditingContact] = useState(null);
+    const [deletingContact, setDeletingContact] = useState(null);
+    const [deleteError, setDeleteError] = useState("");
+    const deleteContactMutation = useDeleteContactMutation();
+
+    const confirmDeleteContact = async () => {
+      if (!deletingContact) return;
+      setDeleteError("");
+      try {
+        await deleteContactMutation.mutateAsync(deletingContact.id);
+        setDeletingContact(null);
+        await Promise.all([contactsQuery.refetch(), leadQuery.refetch()]);
+      } catch (error) {
+        setDeleteError(error?.response?.data?.message || "Unable to delete contact.");
+      }
+    };
+
     /*
     |--------------------------------------------------------------------------
     | Requested Stage
@@ -876,9 +896,7 @@ const LeadDetailPage =
               type="button"
               className="tl-primary"
               onClick={() =>
-                setContactModalOpen(
-                  true
-                )
+                (setEditingContact(null), setContactModalOpen(true))
               }
             >
               + Add contact
@@ -925,6 +943,7 @@ const LeadDetailPage =
                       Decision
                       maker
                     </th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -964,6 +983,20 @@ const LeadDetailPage =
                           {contact.isDecisionMaker
                             ? "Yes"
                             : "No"}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <button type="button" className="icon-control" title="Edit contact"
+                              aria-label={`Edit ${contact.name || "contact"}`}
+                              onClick={() => { setEditingContact(contact); setContactModalOpen(true); }}>
+                              <Pencil size={15} />
+                            </button>
+                            <button type="button" className="icon-control" title="Delete contact"
+                              aria-label={`Delete ${contact.name || "contact"}`}
+                              onClick={() => { setDeleteError(""); setDeletingContact(contact); }}>
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -1545,6 +1578,7 @@ const LeadDetailPage =
           open={
             contactModalOpen
           }
+          contact={editingContact}
           fixedCompanyId={
             lead.companyId
           }
@@ -1555,9 +1589,35 @@ const LeadDetailPage =
             setContactModalOpen(
               false
             );
+            setEditingContact(null);
             contactsQuery.refetch();
           }}
         />
+        {deletingContact && (
+          <div className="modal-backdrop">
+            <section className="tl-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-contact-title">
+              <header className="modal-head">
+                <h2 id="delete-contact-title">Delete contact</h2>
+                <button type="button" className="icon-control" disabled={deleteContactMutation.isPending}
+                  aria-label="Close" onClick={() => setDeletingContact(null)}><X size={15} /></button>
+              </header>
+              <div className="modal-body">
+                <p>Delete <b>{deletingContact.name || deletingContact.fullName || "this contact"}</b>?</p>
+                <p className="muted">The contact will be removed from active contact lists.</p>
+                {deleteError && <div className="error-box">{deleteError}</div>}
+              </div>
+              <footer className="modal-foot">
+                <button type="button" className="tl-secondary" disabled={deleteContactMutation.isPending}
+                  onClick={() => setDeletingContact(null)}>Cancel</button>
+                <button type="button" className="tl-danger" disabled={deleteContactMutation.isPending}
+                  onClick={confirmDeleteContact}>
+                  {deleteContactMutation.isPending ? <><LoaderCircle size={15} className="spin" /> Deleting...</> : "Delete contact"}
+                </button>
+              </footer>
+            </section>
+          </div>
+        )}
+
         {/* --------------------------------------------------------------- */}
         {/* Schedule Meeting */}
         {/* --------------------------------------------------------------- */}
