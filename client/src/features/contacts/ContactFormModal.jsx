@@ -1,186 +1,79 @@
-import {
-  LoaderCircle,
-  X,
-} from "lucide-react";
+import { LoaderCircle, X } from "lucide-react";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-import {
-  useEffect,
-} from "react";
-
-import {
-  useForm,
-} from "react-hook-form";
-
-import {
-  zodResolver,
-} from "@hookform/resolvers/zod";
-
-import {
-  useCompaniesQuery,
-} from "../companies/companies.queries.js";
-
-import {
-  useCreateContactMutation,
-} from "./contacts.queries.js";
-
+import { useCompaniesQuery } from "../companies/companies.queries.js";
+import { useCreateContactMutation } from "./contacts.queries.js";
 import {
   contactFormSchema,
   defaultContactValues,
 } from "./contacts.schema.js";
 
-/*
-|--------------------------------------------------------------------------
-| Field Error
-|--------------------------------------------------------------------------
-*/
+const FieldError = ({ message }) => {
+  if (!message) return null;
 
-const FieldError = ({
-  message,
-}) => {
-  if (!message) {
-    return null;
-  }
-
-  return (
-    <span className="form-error">
-      {message}
-    </span>
-  );
+  return <span className="form-error">{message}</span>;
 };
-
-/*
-|--------------------------------------------------------------------------
-| Add Contact Modal
-|--------------------------------------------------------------------------
-|
-| Normal usage:
-|
-| <ContactFormModal
-|   open={open}
-|   onClose={close}
-| />
-|
-| Lead-specific usage:
-|
-| <ContactFormModal
-|   open={open}
-|   onClose={close}
-|   fixedCompanyId={lead.companyId}
-|   fixedCompanyName={lead.companyName}
-| />
-|
-*/
 
 const ContactFormModal = ({
   open,
   onClose,
-
   fixedCompanyId = null,
   fixedCompanyName = "",
 }) => {
-  const createMutation =
-    useCreateContactMutation();
-
-  /*
-  |--------------------------------------------------------------------------
-  | Fixed Company
-  |--------------------------------------------------------------------------
-  */
+  const createMutation = useCreateContactMutation();
 
   const hasFixedCompany =
     fixedCompanyId !== null &&
     fixedCompanyId !== undefined &&
-    String(
-      fixedCompanyId
-    ).trim() !== "";
-
-  /*
-  |--------------------------------------------------------------------------
-  | Companies For Dropdown
-  |--------------------------------------------------------------------------
-  |
-  | We keep this query because the same modal can still be opened from
-  | ContactsPage where the user needs to select a company.
-  |
-  | When fixedCompanyId exists, the dropdown is not displayed.
-  |
-  */
+    String(fixedCompanyId).trim() !== "";
 
   const {
-    data:
-      companiesResponse,
-
-    isLoading:
-      companiesLoading,
-  } =
-    useCompaniesQuery({
-      page: 1,
-      limit: 100,
-      sort: "name",
-      direction: "asc",
-    });
+    data: companiesResponse,
+    isLoading: companiesLoading,
+  } = useCompaniesQuery({
+    page: 1,
+    limit: 100,
+    sort: "name",
+    direction: "asc",
+  });
 
   const companies =
-    companiesResponse
-      ?.data
-      ?.companies || [];
-
-  /*
-  |--------------------------------------------------------------------------
-  | Form
-  |--------------------------------------------------------------------------
-  */
+    companiesResponse?.data?.companies || [];
 
   const {
     register,
     handleSubmit,
     reset,
     setError,
-
+    setValue,
+    watch,
     formState: {
       errors,
       isSubmitting,
     },
   } = useForm({
-    resolver:
-      zodResolver(
-        contactFormSchema
-      ),
-
+    resolver: zodResolver(contactFormSchema),
+    mode: "onChange",
     defaultValues: {
       ...defaultContactValues,
-
-      companyId:
-        hasFixedCompany
-          ? String(
-              fixedCompanyId
-            )
-          : defaultContactValues
-              .companyId,
+      companyId: hasFixedCompany
+        ? String(fixedCompanyId)
+        : defaultContactValues.companyId,
     },
   });
 
-  /*
-  |--------------------------------------------------------------------------
-  | Reset When Opened
-  |--------------------------------------------------------------------------
-  */
+  const phoneValue = watch("phone") || "";
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
     reset({
       ...defaultContactValues,
-
-      companyId:
-        hasFixedCompany
-          ? String(
-              fixedCompanyId
-            )
-          : defaultContactValues
-              .companyId,
+      companyId: hasFixedCompany
+        ? String(fixedCompanyId)
+        : defaultContactValues.companyId,
     });
   }, [
     open,
@@ -189,164 +82,100 @@ const ContactFormModal = ({
     fixedCompanyId,
   ]);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Escape
-  |--------------------------------------------------------------------------
-  */
-
   useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
+    if (!open) return undefined;
 
-    const handleKeyDown =
-      (event) => {
-        if (
-          event.key ===
-          "Escape"
-        ) {
-          onClose();
-        }
-      };
-
-    window.addEventListener(
-      "keydown",
-      handleKeyDown
-    );
-
-    return () =>
-      window.removeEventListener(
-        "keydown",
-        handleKeyDown
-      );
-  }, [
-    open,
-    onClose,
-  ]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Closed
-  |--------------------------------------------------------------------------
-  */
-
-  if (!open) {
-    return null;
-  }
-
-  const busy =
-    isSubmitting ||
-    createMutation.isPending;
-
-  /*
-  |--------------------------------------------------------------------------
-  | Submit
-  |--------------------------------------------------------------------------
-  */
-
-  const submit =
-    async (values) => {
-      try {
-        /*
-        |--------------------------------------------------------------------------
-        | Force Company
-        |--------------------------------------------------------------------------
-        |
-        | If this modal was opened from Lead Detail, do NOT trust/change
-        | companyId from the form.
-        |
-        */
-
-        const payload = {
-          ...values,
-
-          companyId:
-            hasFixedCompany
-              ? Number(
-                  fixedCompanyId
-                )
-              : Number(
-                  values.companyId
-                ),
-        };
-
-        await createMutation.mutateAsync(
-          payload
-        );
-
-        reset({
-          ...defaultContactValues,
-
-          companyId:
-            hasFixedCompany
-              ? String(
-                  fixedCompanyId
-                )
-              : defaultContactValues
-                  .companyId,
-        });
-
+    const handleKeyDown = (event) => {
+      if (
+        event.key === "Escape" &&
+        !createMutation.isPending
+      ) {
         onClose();
-      } catch (error) {
-        setError(
-          "root",
-          {
-            type: "server",
-
-            message:
-              error?.response
-                ?.data
-                ?.message ||
-              "Unable to create contact.",
-          }
-        );
       }
     };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Render
-  |--------------------------------------------------------------------------
-  */
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onClose, createMutation.isPending]);
+
+  if (!open) return null;
+
+  const busy =
+    isSubmitting || createMutation.isPending;
+
+  const submit = async (values) => {
+    try {
+      const payload = {
+        ...values,
+        companyId: hasFixedCompany
+          ? Number(fixedCompanyId)
+          : Number(values.companyId),
+        phone: values.phone?.trim() || null,
+        email: values.email?.trim() || null,
+        designation: values.designation?.trim() || null,
+      };
+
+      await createMutation.mutateAsync(payload);
+
+      reset({
+        ...defaultContactValues,
+        companyId: hasFixedCompany
+          ? String(fixedCompanyId)
+          : defaultContactValues.companyId,
+      });
+
+      onClose();
+    } catch (error) {
+      setError("root", {
+        type: "server",
+        message:
+          error?.response?.data?.message ||
+          "Unable to create contact.",
+      });
+    }
+  };
+
+  const handlePhoneChange = (event) => {
+    const digitsOnly = event.target.value
+      .replace(/\D/g, "")
+      .slice(0, 10);
+
+    setValue("phone", digitsOnly, {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+  };
 
   return (
-    <div
-      className="modal-backdrop"
-    >
+    <div className="modal-backdrop">
       <section
         className="tl-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-contact-title"
       >
-        {/* Header */}
-
         <header className="modal-head">
           <div>
             <h2 id="add-contact-title">
               Add contact
             </h2>
 
-            {hasFixedCompany &&
-              fixedCompanyName && (
-                <p className="muted">
-                  Adding contact to{" "}
-                  <b>
-                    {
-                      fixedCompanyName
-                    }
-                  </b>
-                </p>
-              )}
+            {hasFixedCompany && fixedCompanyName && (
+              <p className="muted">
+                Adding contact to{" "}
+                <b>{fixedCompanyName}</b>
+              </p>
+            )}
           </div>
 
           <button
             type="button"
             className="icon-control"
-            onClick={
-              onClose
-            }
+            onClick={onClose}
             disabled={busy}
             aria-label="Close"
           >
@@ -354,52 +183,27 @@ const ContactFormModal = ({
           </button>
         </header>
 
-        <form
-          onSubmit={
-            handleSubmit(
-              submit
-            )
-          }
-        >
-          {/* Body */}
-
+        <form onSubmit={handleSubmit(submit)}>
           <div className="modal-body">
             {errors.root && (
               <div
                 className="error-box"
-                style={{
-                  marginBottom:
-                    "12px",
-                }}
+                style={{ marginBottom: "12px" }}
               >
-                {
-                  errors.root
-                    .message
-                }
+                {errors.root.message}
               </div>
             )}
 
             <div className="form-section">
               <div className="form-grid2">
-                {/* ------------------------------------------------------- */}
-                {/* Company */}
-                {/* ------------------------------------------------------- */}
-
                 <label>
                   Company *
 
                   {hasFixedCompany ? (
                     <>
-                      {/*
-                       * Keep companyId registered with react-hook-form.
-                       * User cannot modify this value.
-                       */}
-
                       <input
                         type="hidden"
-                        {...register(
-                          "companyId"
-                        )}
+                        {...register("companyId")}
                       />
 
                       <input
@@ -414,12 +218,8 @@ const ContactFormModal = ({
                     </>
                   ) : (
                     <select
-                      {...register(
-                        "companyId"
-                      )}
-                      disabled={
-                        companiesLoading
-                      }
+                      {...register("companyId")}
+                      disabled={companiesLoading || busy}
                     >
                       <option value="">
                         {companiesLoading
@@ -427,150 +227,111 @@ const ContactFormModal = ({
                           : "Select company"}
                       </option>
 
-                      {companies.map(
-                        (
-                          company
-                        ) => (
-                          <option
-                            key={
-                              company.id
-                            }
-                            value={
-                              company.id
-                            }
-                          >
-                            {
-                              company.name
-                            }
-                          </option>
-                        )
-                      )}
+                      {companies.map((company) => (
+                        <option
+                          key={company.id}
+                          value={company.id}
+                        >
+                          {company.name}
+                        </option>
+                      ))}
                     </select>
                   )}
 
                   <FieldError
-                    message={
-                      errors.companyId
-                        ?.message
-                    }
+                    message={errors.companyId?.message}
                   />
                 </label>
-
-                {/* ------------------------------------------------------- */}
-                {/* Name */}
-                {/* ------------------------------------------------------- */}
 
                 <label>
                   Name *
 
                   <input
                     type="text"
-                    {...register(
-                      "name"
-                    )}
+                    {...register("name")}
+                    maxLength={190}
+                    disabled={busy}
                     autoFocus
                   />
 
                   <FieldError
-                    message={
-                      errors.name
-                        ?.message
-                    }
+                    message={errors.name?.message}
                   />
                 </label>
-
-                {/* ------------------------------------------------------- */}
-                {/* Designation */}
-                {/* ------------------------------------------------------- */}
 
                 <label>
                   Designation
 
                   <input
                     type="text"
-                    {...register(
-                      "designation"
-                    )}
+                    {...register("designation")}
+                    maxLength={150}
+                    disabled={busy}
                   />
 
                   <FieldError
-                    message={
-                      errors.designation
-                        ?.message
-                    }
+                    message={errors.designation?.message}
                   />
                 </label>
-
-                {/* ------------------------------------------------------- */}
-                {/* Phone */}
-                {/* ------------------------------------------------------- */}
 
                 <label>
                   Phone
 
                   <input
                     type="tel"
-                    {...register(
-                      "phone"
-                    )}
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    placeholder="10-digit mobile number"
+                    maxLength={10}
+                    value={phoneValue}
+                    disabled={busy}
+                    {...register("phone", {
+                      onChange: handlePhoneChange,
+                    })}
+                    onChange={handlePhoneChange}
                   />
 
                   <FieldError
-                    message={
-                      errors.phone
-                        ?.message
-                    }
+                    message={errors.phone?.message}
                   />
-                </label>
 
-                {/* ------------------------------------------------------- */}
-                {/* Email */}
-                {/* ------------------------------------------------------- */}
+                  {!errors.phone && phoneValue.length > 0 && (
+                    <small className="muted">
+                      {phoneValue.length}/10 digits
+                    </small>
+                  )}
+                </label>
 
                 <label>
                   Email
 
                   <input
                     type="email"
-                    {...register(
-                      "email"
-                    )}
+                    placeholder="name@example.com"
+                    maxLength={254}
+                    {...register("email")}
+                    disabled={busy}
                   />
 
                   <FieldError
-                    message={
-                      errors.email
-                        ?.message
-                    }
+                    message={errors.email?.message}
                   />
                 </label>
-
-                {/* ------------------------------------------------------- */}
-                {/* Decision Maker */}
-                {/* ------------------------------------------------------- */}
 
                 <label>
                   Decision maker
 
                   <select
-                    {...register(
-                      "isDecisionMaker"
-                    )}
+                    {...register("isDecisionMaker")}
+                    disabled={busy}
                   >
-                    <option value="false">
-                      No
-                    </option>
-
-                    <option value="true">
-                      Yes
-                    </option>
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
                   </select>
 
                   <FieldError
                     message={
-                      errors
-                        .isDecisionMaker
-                        ?.message
+                      errors.isDecisionMaker?.message
                     }
                   />
                 </label>
@@ -578,15 +339,11 @@ const ContactFormModal = ({
             </div>
           </div>
 
-          {/* Footer */}
-
           <footer className="modal-foot">
             <button
               type="button"
               className="tl-secondary"
-              onClick={
-                onClose
-              }
+              onClick={onClose}
               disabled={busy}
             >
               Cancel
@@ -595,24 +352,19 @@ const ContactFormModal = ({
             <button
               type="submit"
               className="tl-primary"
-              disabled={
-                busy ||
-                (
-                  !hasFixedCompany &&
-                  companiesLoading
-                )
-              }
+              disabled={busy}
             >
-              {busy && (
-                <LoaderCircle
-                  size={14}
-                  className="animate-spin"
-                />
+              {busy ? (
+                <>
+                  <LoaderCircle
+                    size={15}
+                    className="spin"
+                  />
+                  Saving...
+                </>
+              ) : (
+                "Add contact"
               )}
-
-              {busy
-                ? "Creating..."
-                : "Create contact"}
             </button>
           </footer>
         </form>

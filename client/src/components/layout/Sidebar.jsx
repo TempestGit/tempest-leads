@@ -5,7 +5,7 @@ import {
   X,
 } from "lucide-react";
 
-import Logo from "../../../public/tempest-brand.png";
+import Logo from "../../assets/tempest-brand.png";
 
 import {
   NavLink,

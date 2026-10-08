@@ -4,7 +4,7 @@ import {
   LoaderCircle,
 } from "lucide-react";
 
-import Logo from "../../../public/tempest-branding.png";
+import branding from "../../assets/tempest-branding.png";
 
 import {
   useState,
@@ -126,7 +126,7 @@ const LoginPage = () => {
     <main className="auth-page">
       <div className="auth-brand">
         <img
-          src={Logo}
+          src={branding}
           alt="Tempest Leads"
         />
       </div>
