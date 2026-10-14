@@ -13,6 +13,7 @@ import LoginPage from "../features/auth/LoginPage";
 import CompaniesPage from "../features/companies/CompaniesPage";
 import ContactsPage from "../features/contacts/ContactsPage.jsx";
 import LeadsPage from "../features/leads/LeadsPage.jsx";
+import DashboardPage from "../features/dashboard/DashboardPage.jsx";
 import LeadDetailPage from "../features/leads/LeadDetailPage.jsx";
 import ActivitiesPage from "../features/activities/ActivitiesPage.jsx";
 import MeetingsPage from "../features/meetings/MeetingsPage.jsx";
@@ -68,10 +69,7 @@ export const router =
             {
               path: "dashboard",
 
-              element: page(
-                "Dashboard",
-                "Acquisition performance, pipeline activity and priority actions."
-              ),
+              element: <DashboardPage />,
             },
 
             {
