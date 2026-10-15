@@ -1,738 +1,360 @@
+
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { createPortal } from "react-dom";
+import {
+  CalendarClock,
+  CalendarDays,
+  Check,
+  Clock3,
+  FileText,
+  LoaderCircle,
+  X,
+} from "lucide-react";
 
 import { useRescheduleMeetingMutation } from "./meetings.queries.js";
 
-/*
-|--------------------------------------------------------------------------
-| Date / Time Helpers
-|--------------------------------------------------------------------------
-*/
-
-const pad2 = (value) =>
-  String(value).padStart(2, "0");
+const pad2 = (value) => String(value).padStart(2, "0");
 
 const getLocalDate = (value = new Date()) =>
-  `${value.getFullYear()}-${pad2(
-    value.getMonth() + 1
-  )}-${pad2(value.getDate())}`;
-
-const getLocalTime = (value = new Date()) =>
-  `${pad2(value.getHours())}:${pad2(
-    value.getMinutes()
+  `${value.getFullYear()}-${pad2(value.getMonth() + 1)}-${pad2(
+    value.getDate()
   )}`;
 
-/*
-|--------------------------------------------------------------------------
-| Safe Date
-|--------------------------------------------------------------------------
-*/
+const getLocalTime = (value = new Date()) =>
+  `${pad2(value.getHours())}:${pad2(value.getMinutes())}`;
 
 const toValidDate = (value) => {
-  if (!value) {
-    return null;
-  }
-
+  if (!value) return null;
   const date = new Date(value);
-
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-    return null;
-  }
-
-  return date;
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
-/*
-|--------------------------------------------------------------------------
-| Reschedule Meeting Modal
-|--------------------------------------------------------------------------
-*/
+const RescheduleMeetingModal = ({ open, meeting, onClose }) => {
+  const mutation = useRescheduleMeetingMutation();
 
-const RescheduleMeetingModal = ({
-  open,
-  meeting,
-  onClose,
-}) => {
-  const mutation =
-    useRescheduleMeetingMutation();
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
 
-  /*
-  |--------------------------------------------------------------------------
-  | State
-  |--------------------------------------------------------------------------
-  */
-
-  const [date, setDate] =
-    useState("");
-
-  const [time, setTime] =
-    useState("");
-
-  const [reason, setReason] =
-    useState("");
-
-  const [error, setError] =
-    useState("");
-
-  /*
-  |--------------------------------------------------------------------------
-  | Reset Every Time Modal Opens
-  |--------------------------------------------------------------------------
-  */
+  const busy = mutation.isPending;
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
-    /*
-     * Start with the meeting's existing
-     * scheduled date/time when available.
-     *
-     * We do not invent a hidden time.
-     */
+    const existingStart = toValidDate(meeting?.startsAt);
 
-    const existingStart =
-      toValidDate(
-        meeting?.startsAt
-      );
-
-    if (existingStart) {
-      setDate(
-        getLocalDate(
-          existingStart
-        )
-      );
-
-      setTime(
-        getLocalTime(
-          existingStart
-        )
-      );
-    } else {
-      setDate("");
-      setTime("");
-    }
-
+    setDate(existingStart ? getLocalDate(existingStart) : "");
+    setTime(existingStart ? getLocalTime(existingStart) : "");
     setReason("");
     setError("");
-  }, [
-    open,
-    meeting?.id,
-    meeting?.startsAt,
-  ]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Escape
-  |--------------------------------------------------------------------------
-  */
+  }, [open, meeting?.id, meeting?.startsAt]);
 
   useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
+    if (!open) return undefined;
 
-    const handler = (event) => {
-      if (
-        event.key === "Escape" &&
-        !mutation.isPending
-      ) {
-        onClose();
-      }
-    };
-
-    window.addEventListener(
-      "keydown",
-      handler
-    );
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
     return () => {
-      window.removeEventListener(
-        "keydown",
-        handler
-      );
+      document.body.style.overflow = previousOverflow;
     };
-  }, [
-    open,
-    onClose,
-    mutation.isPending,
-  ]);
+  }, [open]);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Not Open
-  |--------------------------------------------------------------------------
-  */
-
-  if (!open || !meeting) {
-    return null;
-  }
-
-  const today =
-    getLocalDate();
-
-  const currentTime =
-    getLocalTime();
-
-  /*
-  |--------------------------------------------------------------------------
-  | Date Change
-  |--------------------------------------------------------------------------
-  */
-
-  const handleDateChange = (
-    event
-  ) => {
-    const selectedDate =
-      event.target.value;
+  const handleDateChange = (event) => {
+    const selectedDate = event.target.value;
 
     if (!selectedDate) {
       setDate("");
       setTime("");
       setError("");
-
       return;
     }
 
-    const nowDate =
-      getLocalDate();
+    const today = getLocalDate();
 
-    const nowTime =
-      getLocalTime();
-
-    if (
-      selectedDate <
-      nowDate
-    ) {
-      setError(
-        "Meeting date cannot be in the past."
-      );
-
+    if (selectedDate < today) {
+      setError("Meeting date cannot be in the past.");
       return;
     }
 
-    setDate(
-      selectedDate
-    );
+    setDate(selectedDate);
 
-    /*
-     * If user changes the meeting back
-     * to today and the selected time has
-     * already passed, clear the time.
-     */
-    if (
-      selectedDate ===
-        nowDate &&
-      time &&
-      time < nowTime
-    ) {
+    if (selectedDate === today && time && time < getLocalTime()) {
       setTime("");
     }
 
     setError("");
   };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Time Change
-  |--------------------------------------------------------------------------
-  */
-
-  const handleTimeChange = (
-    event
-  ) => {
-    const selectedTime =
-      event.target.value;
-
-    if (!selectedTime) {
-      setTime("");
-      setError("");
-
-      return;
-    }
-
-    const nowDate =
-      getLocalDate();
-
-    const nowTime =
-      getLocalTime();
+  const handleTimeChange = (event) => {
+    const selectedTime = event.target.value;
 
     if (
-      date === nowDate &&
-      selectedTime <
-        nowTime
+      selectedTime &&
+      date === getLocalDate() &&
+      selectedTime < getLocalTime()
     ) {
-      setError(
-        "Meeting time cannot be in the past."
-      );
-
+      setError("Meeting time cannot be in the past.");
       return;
     }
 
-    setTime(
-      selectedTime
-    );
-
+    setTime(selectedTime);
     setError("");
   };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Submit
-  |--------------------------------------------------------------------------
-  */
+  const submit = async (event) => {
+    event.preventDefault();
+    if (busy) return;
 
-  const submit = async () => {
     setError("");
-
-    /*
-    |--------------------------------------------------------------------------
-    | Meeting ID
-    |--------------------------------------------------------------------------
-    */
 
     if (!meeting?.id) {
-      setError(
-        "Meeting ID is missing. Refresh the meetings page and try again."
-      );
-
+      setError("Meeting ID is missing. Refresh and try again.");
       return;
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Date
-    |--------------------------------------------------------------------------
-    */
 
     if (!date) {
-      setError(
-        "Select a new meeting date."
-      );
-
+      setError("Select a new meeting date.");
       return;
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Time
-    |--------------------------------------------------------------------------
-    */
 
     if (!time) {
-      setError(
-        "Select a new meeting time."
-      );
-
+      setError("Select a new meeting time.");
       return;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Reason
-    |--------------------------------------------------------------------------
-    |
-    | Backend requires:
-    |
-    | reason:
-    |   string
-    |   min 2
-    |   max 1000
-    |
-    */
+    const cleanReason = reason.trim();
 
-    const cleanReason =
-      reason.trim();
-
-    if (!cleanReason) {
-      setError(
-        "Reschedule reason is required."
-      );
-
+    if (cleanReason.length < 2) {
+      setError("Reschedule reason must be at least 2 characters.");
       return;
     }
 
-    if (
-      cleanReason.length < 2
-    ) {
-      setError(
-        "Reschedule reason must be at least 2 characters."
-      );
-
+    if (cleanReason.length > 1000) {
+      setError("Reschedule reason cannot exceed 1000 characters.");
       return;
     }
 
-    if (
-      cleanReason.length >
-      1000
-    ) {
-      setError(
-        "Reschedule reason cannot exceed 1000 characters."
-      );
+    const newStart = new Date(`${date}T${time}:00`);
 
+    if (Number.isNaN(newStart.getTime())) {
+      setError("Enter a valid meeting date and time.");
       return;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Construct New Start
-    |--------------------------------------------------------------------------
-    */
-
-    const newStart =
-      new Date(
-        `${date}T${time}:00`
-      );
-
-    if (
-      Number.isNaN(
-        newStart.getTime()
-      )
-    ) {
-      setError(
-        "Enter a valid meeting date and time."
-      );
-
+    if (newStart.getTime() <= Date.now()) {
+      setError("Meeting date and time must be in the future.");
       return;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Exact Future Validation
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-      newStart.getTime() <=
-      Date.now()
-    ) {
-      setError(
-        "Meeting date and time must be in the future."
-      );
-
-      return;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Preserve Existing Meeting Duration
-    |--------------------------------------------------------------------------
-    |
-    | If the existing meeting has a valid
-    | startsAt and endsAt, preserve the
-    | same duration when rescheduling.
-    |
-    | If there is no valid end time,
-    | endsAt remains null because the
-    | backend allows it.
-    |
-    */
-
-    const existingStart =
-      toValidDate(
-        meeting.startsAt
-      );
-
-    const existingEnd =
-      toValidDate(
-        meeting.endsAt
-      );
+    const existingStart = toValidDate(meeting.startsAt);
+    const existingEnd = toValidDate(meeting.endsAt);
 
     let newEnd = null;
 
     if (
       existingStart &&
       existingEnd &&
-      existingEnd.getTime() >
-        existingStart.getTime()
+      existingEnd.getTime() > existingStart.getTime()
     ) {
-      const duration =
-        existingEnd.getTime() -
-        existingStart.getTime();
-
-      newEnd =
-        new Date(
-          newStart.getTime() +
-            duration
-        );
+      const duration = existingEnd.getTime() - existingStart.getTime();
+      newEnd = new Date(newStart.getTime() + duration);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Reschedule Meeting
-    |--------------------------------------------------------------------------
-    |
-    | meetings.api.js expects:
-    |
-    | {
-    |   meetingId,
-    |   data
-    | }
-    |
-    | Backend expects data:
-    |
-    | {
-    |   startsAt,
-    |   endsAt?,
-    |   reason
-    | }
-    |
-    */
 
     try {
       await mutation.mutateAsync({
-        meetingId:
-          meeting.id,
-
+        meetingId: meeting.id,
         data: {
-          startsAt:
-            newStart.toISOString(),
-
-          endsAt:
-            newEnd
-              ? newEnd.toISOString()
-              : null,
-
-          reason:
-            cleanReason,
+          startsAt: newStart.toISOString(),
+          endsAt: newEnd ? newEnd.toISOString() : null,
+          reason: cleanReason,
         },
       });
 
       onClose();
-    } catch (
-      requestError
-    ) {
-      const responseData =
-        requestError
-          ?.response
-          ?.data;
+    } catch (requestError) {
+      const responseData = requestError?.response?.data;
+      const arrayErrors = Array.isArray(responseData?.errors)
+        ? responseData.errors
+        : [];
 
-      /*
-       * Support a few common backend
-       * validation-error response shapes.
-       */
-      const arrayErrors =
-        Array.isArray(
-          responseData?.errors
+      const validationMessage = arrayErrors
+        .map((item) =>
+          typeof item === "string"
+            ? item
+            : item?.message || item?.msg || null
         )
-          ? responseData.errors
-          : [];
-
-      const validationMessage =
-        arrayErrors
-          .map((item) => {
-            if (
-              typeof item ===
-              "string"
-            ) {
-              return item;
-            }
-
-            return (
-              item?.message ||
-              item?.msg ||
-              null
-            );
-          })
-          .filter(Boolean)
-          .join(" ");
+        .filter(Boolean)
+        .join(" ");
 
       setError(
         validationMessage ||
-          responseData
-            ?.message ||
-          requestError
-            ?.message ||
+          responseData?.message ||
+          requestError?.message ||
           "Unable to reschedule meeting."
       );
     }
   };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Render
-  |--------------------------------------------------------------------------
-  */
+  if (!open || !meeting) return null;
 
-  return (
-    <div className="modal-backdrop">
+  return createPortal(
+    <div className="gmp-popup-overlay">
       <section
-        className="tl-modal"
+        className="gmp-popup flex w-full max-w-[650px] flex-col overflow-hidden rounded-[24px]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="reschedule-meeting-title"
       >
-        <header className="modal-head">
-          <div>
-            <h2 id="reschedule-meeting-title">
-              Reschedule meeting
-            </h2>
-
-            <p>
-              Choose a new date
-              and time for this
-              meeting.
-            </p>
+        <header className="gmp-popup-header flex items-start justify-between gap-4 px-6 py-5">
+          <div className="flex items-start gap-3">
+            <span className="gmp-popup-brand flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl">
+              <CalendarClock size={23} />
+            </span>
+            <div>
+              <p className="gmp-eyebrow mb-1 text-[10px] font-bold uppercase tracking-[0.15em]">
+                Meeting Management
+              </p>
+              <h2
+                id="reschedule-meeting-title"
+                className="gmp-heading text-xl font-extrabold"
+              >
+                Reschedule Meeting
+              </h2>
+              <p className="gmp-muted mt-1 text-xs">
+                Choose a new date and time for this meeting.
+              </p>
+            </div>
           </div>
 
           <button
             type="button"
-            className="icon-control"
-            disabled={
-              mutation.isPending
-            }
-            onClick={
-              onClose
-            }
-            aria-label="Close"
+            onClick={onClose}
+            disabled={busy}
+            aria-label="Close reschedule meeting form"
+            className="gmp-close flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
           >
-            <X size={15} />
+            <X size={18} />
           </button>
         </header>
 
-        <div className="modal-body">
-          {error && (
-            <div className="error-box">
-              {error}
-            </div>
-          )}
-
-          {/* Meeting Context */}
-
-          <div className="activity-context">
-            <small>
-              Meeting
-            </small>
-
-            <b>
-              {meeting.title}
-            </b>
-
-            {meeting.companyName && (
-              <span>
-                {
-                  meeting.companyName
-                }
-              </span>
+        <form
+          className="gmp-popup-form flex min-h-0 flex-1 flex-col"
+          onSubmit={submit}
+        >
+          <div className="gmp-popup-body min-h-0 flex-1 overflow-y-auto px-6 py-6">
+            {error && (
+              <div className="gmp-error mb-5 rounded-xl p-3 text-sm" role="alert">
+                {error}
+              </div>
             )}
-          </div>
 
-          <div className="form-section">
-            <div className="form-grid2">
+            <div className="gmp-context mb-6 rounded-xl p-4">
+              <p className="gmp-muted text-xs font-semibold">
+                Selected Meeting
+              </p>
+              <p className="gmp-heading mt-1 text-sm font-bold">
+                {meeting.title || "Untitled Meeting"}
+              </p>
+              {meeting.companyName && (
+                <p className="gmp-muted mt-1 text-xs">
+                  {meeting.companyName}
+                </p>
+              )}
+            </div>
 
-              {/* New Date */}
-
-              <label>
-                New date *
-
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <label className="flex flex-col gap-2">
+                <span className="gmp-label flex items-center gap-2 text-xs font-bold">
+                  <CalendarDays size={15} />
+                  New Date *
+                </span>
                 <input
                   type="date"
-                  min={today}
+                  min={getLocalDate()}
                   value={date}
-                  disabled={
-                    mutation.isPending
-                  }
-                  onChange={
-                    handleDateChange
-                  }
+                  disabled={busy}
+                  onChange={handleDateChange}
+                  className="gmp-input h-11 w-full rounded-xl px-3 text-sm"
                 />
               </label>
 
-              {/* New Time */}
-
-              <label>
-                New time *
-
+              <label className="flex flex-col gap-2">
+                <span className="gmp-label flex items-center gap-2 text-xs font-bold">
+                  <Clock3 size={15} />
+                  New Time *
+                </span>
                 <input
                   type="time"
-                  min={
-                    date === today
-                      ? currentTime
-                      : undefined
-                  }
+                  min={date === getLocalDate() ? getLocalTime() : undefined}
                   value={time}
-                  disabled={
-                    mutation.isPending ||
-                    !date
-                  }
-                  onChange={
-                    handleTimeChange
-                  }
+                  disabled={busy || !date}
+                  onChange={handleTimeChange}
+                  className="gmp-input h-11 w-full rounded-xl px-3 text-sm"
                 />
               </label>
 
-              {/* Reason */}
-
-              <label className="full">
-                Reason *
-
+              <label className="flex flex-col gap-2 sm:col-span-2">
+                <span className="gmp-label flex items-center gap-2 text-xs font-bold">
+                  <FileText size={15} />
+                  Reason *
+                </span>
                 <textarea
-                  rows="4"
-                  maxLength={
-                    1000
-                  }
-                  value={
-                    reason
-                  }
-                  disabled={
-                    mutation.isPending
-                  }
-                  placeholder="Why is this meeting being rescheduled?"
-                  onChange={(
-                    event
-                  ) => {
-                    setReason(
-                      event
-                        .target
-                        .value
-                    );
-
-                    setError(
-                      ""
-                    );
+                  rows={4}
+                  maxLength={1000}
+                  value={reason}
+                  disabled={busy}
+                  onChange={(event) => {
+                    setReason(event.target.value);
+                    setError("");
                   }}
+                  placeholder="Why is this meeting being rescheduled?"
+                  className="gmp-input w-full resize-y rounded-xl p-3 text-sm"
                 />
+                <p className="gmp-muted text-right text-[11px]">
+                  {reason.length}/1000
+                </p>
               </label>
             </div>
+
+            <div className="gmp-note mt-5 rounded-xl p-4 text-xs leading-5">
+              The meeting's existing duration will be preserved when
+              valid start and end times are available.
+            </div>
           </div>
-        </div>
 
-        <footer className="modal-foot">
-          <button
-            type="button"
-            className="tl-secondary"
-            disabled={
-              mutation.isPending
-            }
-            onClick={
-              onClose
-            }
-          >
-            Cancel
-          </button>
-
-          <button
-            type="button"
-            className="tl-primary"
-            disabled={
-              mutation.isPending
-            }
-            onClick={
-              submit
-            }
-          >
-            {mutation.isPending
-              ? "Rescheduling..."
-              : "Reschedule meeting"}
-          </button>
-        </footer>
+          <footer className="gmp-popup-footer flex shrink-0 justify-end gap-3 px-6 py-5">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              className="gmp-secondary min-h-11 rounded-xl px-5 text-sm font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="gmp-primary inline-flex min-h-11 items-center gap-2 rounded-xl px-5 text-sm font-bold"
+            >
+              {busy ? (
+                <>
+                  <LoaderCircle size={16} className="animate-spin" />
+                  Rescheduling...
+                </>
+              ) : (
+                <>
+                  <Check size={17} />
+                  Reschedule Meeting
+                </>
+              )}
+            </button>
+          </footer>
+        </form>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 };
 

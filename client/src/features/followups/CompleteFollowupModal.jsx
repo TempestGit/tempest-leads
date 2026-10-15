@@ -1,249 +1,129 @@
-import {
-  useEffect,
-  useState,
-} from "react";
+
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  Clock3,
+  FileText,
+  Flag,
+  LoaderCircle,
+  RotateCcw,
   X,
 } from "lucide-react";
 
-import {
-  useCompleteFollowupMutation,
-} from "./followups.queries.js";
+import { useCompleteFollowupMutation } from "./followups.queries.js";
 
-/*
-|--------------------------------------------------------------------------
-| Date / Time Helpers
-|--------------------------------------------------------------------------
-*/
+const pad2 = (value) => String(value).padStart(2, "0");
 
-const pad2 = (value) =>
-  String(value).padStart(2, "0");
-
-const getLocalDate = (
-  value = new Date()
-) =>
-  `${value.getFullYear()}-${pad2(
-    value.getMonth() + 1
-  )}-${pad2(value.getDate())}`;
-
-const getLocalTime = (
-  value = new Date()
-) =>
-  `${pad2(value.getHours())}:${pad2(
-    value.getMinutes()
+const getLocalDate = (value = new Date()) =>
+  `${value.getFullYear()}-${pad2(value.getMonth() + 1)}-${pad2(
+    value.getDate()
   )}`;
 
-/*
-|--------------------------------------------------------------------------
-| Complete Follow-up Modal
-|--------------------------------------------------------------------------
-*/
+const getLocalTime = (value = new Date()) =>
+  `${pad2(value.getHours())}:${pad2(value.getMinutes())}`;
+
+const getApiError = (error, fallback) => {
+  const response = error?.response?.data;
+
+  const validation = (
+    Array.isArray(response?.errors) ? response.errors : []
+  )
+    .map((item) =>
+      typeof item === "string"
+        ? item
+        : item?.message || item?.msg || ""
+    )
+    .filter(Boolean)
+    .join(" ");
+
+  return validation || response?.message || error?.message || fallback;
+};
 
 const CompleteFollowupModal = ({
   open,
   followup,
   onClose,
 }) => {
-  const mutation =
-    useCompleteFollowupMutation();
+  const mutation = useCompleteFollowupMutation();
 
-  /*
-  |--------------------------------------------------------------------------
-  | State
-  |--------------------------------------------------------------------------
-  */
-
-  const [
-    outcome,
-    setOutcome,
-  ] = useState("");
-
-  const [
-    notes,
-    setNotes,
-  ] = useState("");
-
-  const [
-    nextAction,
-    setNextAction,
-  ] = useState("");
-
-  const [
-    nextDate,
-    setNextDate,
-  ] = useState("");
-
-  const [
-    nextTime,
-    setNextTime,
-  ] = useState("");
-
-  const [
-    nextPriority,
-    setNextPriority,
-  ] = useState(
-    "Medium"
-  );
-
-  const [
-    error,
-    setError,
-  ] = useState("");
-
-  /*
-  |--------------------------------------------------------------------------
-  | Reset On Open
-  |--------------------------------------------------------------------------
-  */
+  const [outcome, setOutcome] = useState("");
+  const [notes, setNotes] = useState("");
+  const [nextAction, setNextAction] = useState("");
+  const [nextDate, setNextDate] = useState("");
+  const [nextTime, setNextTime] = useState("");
+  const [nextPriority, setNextPriority] = useState("Medium");
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
     setOutcome("");
     setNotes("");
-
-    /*
-     * Next follow-up is optional.
-     *
-     * Do not create a hidden date/time.
-     */
     setNextAction("");
     setNextDate("");
     setNextTime("");
-
-    if (
-      [
-        "High",
-        "Medium",
-        "Low",
-      ].includes(
-        followup?.priority
-      )
-    ) {
-      setNextPriority(
-        followup.priority
-      );
-    } else {
-      setNextPriority(
-        "Medium"
-      );
-    }
-
+    setNextPriority(
+      ["High", "Medium", "Low"].includes(followup?.priority)
+        ? followup.priority
+        : "Medium"
+    );
     setError("");
-  }, [
-    open,
-    followup?.id,
-    followup?.priority,
-  ]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Escape
-  |--------------------------------------------------------------------------
-  */
+  }, [open, followup?.id, followup?.priority]);
 
   useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
+    if (!open) return undefined;
 
-    const handler = (
-      event
-    ) => {
-      if (
-        event.key ===
-          "Escape" &&
-        !mutation.isPending
-      ) {
-        onClose();
-      }
-    };
-
-    window.addEventListener(
-      "keydown",
-      handler
-    );
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
     return () => {
-      window.removeEventListener(
-        "keydown",
-        handler
-      );
+      document.body.style.overflow = previous;
     };
-  }, [
-    open,
-    onClose,
-    mutation.isPending,
-  ]);
+  }, [open]);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Closed
-  |--------------------------------------------------------------------------
-  */
+  if (!open || !followup) return null;
 
-  if (
-    !open ||
-    !followup
-  ) {
-    return null;
-  }
+  const busy = mutation.isPending;
+  const today = getLocalDate();
+  const currentTime = getLocalTime();
 
-  const today =
-    getLocalDate();
+  const clearNextFollowup = () => {
+    setNextAction("");
+    setNextDate("");
+    setNextTime("");
+    setNextPriority(
+      ["High", "Medium", "Low"].includes(followup.priority)
+        ? followup.priority
+        : "Medium"
+    );
+    setError("");
+  };
 
-  const currentTime =
-    getLocalTime();
+  const handleDateChange = (event) => {
+    const value = event.target.value;
 
-  /*
-  |--------------------------------------------------------------------------
-  | Date Change
-  |--------------------------------------------------------------------------
-  */
-
-  const handleDateChange = (
-    event
-  ) => {
-    const selectedDate =
-      event.target.value;
-
-    if (!selectedDate) {
+    if (!value) {
       setNextDate("");
       setNextTime("");
       setError("");
-
       return;
     }
 
-    const nowDate =
-      getLocalDate();
-
-    const nowTime =
-      getLocalTime();
-
-    if (
-      selectedDate <
-      nowDate
-    ) {
-      setError(
-        "Next follow-up date cannot be in the past."
-      );
-
+    if (value < getLocalDate()) {
+      setError("Next follow-up date cannot be in the past.");
       return;
     }
 
-    setNextDate(
-      selectedDate
-    );
+    setNextDate(value);
 
     if (
-      selectedDate ===
-        nowDate &&
+      value === getLocalDate() &&
       nextTime &&
-      nextTime < nowTime
+      nextTime < getLocalTime()
     ) {
       setNextTime("");
     }
@@ -251,759 +131,363 @@ const CompleteFollowupModal = ({
     setError("");
   };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Time Change
-  |--------------------------------------------------------------------------
-  */
-
-  const handleTimeChange = (
-    event
-  ) => {
-    const selectedTime =
-      event.target.value;
-
-    if (!selectedTime) {
-      setNextTime("");
-      setError("");
-
-      return;
-    }
-
-    const nowDate =
-      getLocalDate();
-
-    const nowTime =
-      getLocalTime();
+  const handleTimeChange = (event) => {
+    const value = event.target.value;
 
     if (
-      nextDate ===
-        nowDate &&
-      selectedTime <
-        nowTime
+      value &&
+      nextDate === getLocalDate() &&
+      value < getLocalTime()
     ) {
-      setError(
-        "Next follow-up time cannot be in the past."
-      );
-
+      setError("Next follow-up time cannot be in the past.");
       return;
     }
 
-    setNextTime(
-      selectedTime
-    );
-
+    setNextTime(value);
     setError("");
   };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Clear Optional Next Follow-up
-  |--------------------------------------------------------------------------
-  */
+  const submit = async (event) => {
+    event.preventDefault();
+    if (busy) return;
 
-  const clearNextFollowup =
-    () => {
-      setNextAction("");
-      setNextDate("");
-      setNextTime("");
+    setError("");
 
-      if (
-        [
-          "High",
-          "Medium",
-          "Low",
-        ].includes(
-          followup?.priority
-        )
-      ) {
-        setNextPriority(
-          followup.priority
-        );
-      } else {
-        setNextPriority(
-          "Medium"
-        );
-      }
+    if (!followup.id) {
+      setError("Follow-up ID is missing. Refresh and try again.");
+      return;
+    }
 
-      setError("");
+    const cleanOutcome = outcome.trim();
+    const cleanNotes = notes.trim();
+    const cleanNextAction = nextAction.trim();
+
+    if (cleanOutcome.length < 2) {
+      setError(
+        cleanOutcome
+          ? "Outcome must be at least 2 characters."
+          : "Outcome is required."
+      );
+      return;
+    }
+
+    if (cleanOutcome.length > 500) {
+      setError("Outcome cannot exceed 500 characters.");
+      return;
+    }
+
+    if (cleanNotes.length < 2) {
+      setError(
+        cleanNotes
+          ? "Notes must be at least 2 characters."
+          : "Notes are required."
+      );
+      return;
+    }
+
+    if (cleanNotes.length > 5000) {
+      setError("Notes cannot exceed 5000 characters.");
+      return;
+    }
+
+    const hasNext = Boolean(cleanNextAction || nextDate || nextTime);
+
+    const data = {
+      outcome: cleanOutcome,
+      notes: cleanNotes,
     };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Submit
-  |--------------------------------------------------------------------------
-  */
-
-  const submit =
-    async () => {
-      setError("");
-
-      /*
-      |--------------------------------------------------------------------------
-      | Follow-up ID
-      |--------------------------------------------------------------------------
-      */
-
-      if (
-        !followup?.id
-      ) {
-        setError(
-          "Follow-up ID is missing. Refresh the page and try again."
-        );
-
+    if (hasNext) {
+      if (cleanNextAction.length < 2) {
+        setError("Next action must be at least 2 characters.");
         return;
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Outcome
-      |--------------------------------------------------------------------------
-      */
-
-      const cleanOutcome =
-        outcome.trim();
-
-      if (!cleanOutcome) {
-        setError(
-          "Outcome is required."
-        );
-
+      if (cleanNextAction.length > 500) {
+        setError("Next action cannot exceed 500 characters.");
         return;
       }
 
-      if (
-        cleanOutcome.length <
-        2
-      ) {
-        setError(
-          "Outcome must be at least 2 characters."
-        );
-
+      if (!nextDate) {
+        setError("Select a next follow-up date.");
         return;
       }
 
-      if (
-        cleanOutcome.length >
-        500
-      ) {
-        setError(
-          "Outcome cannot exceed 500 characters."
-        );
-
+      if (!nextTime) {
+        setError("Select a next follow-up time.");
         return;
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Notes
-      |--------------------------------------------------------------------------
-      */
-
-      const cleanNotes =
-        notes.trim();
-
-      if (!cleanNotes) {
-        setError(
-          "Notes are required."
-        );
-
+      if (!["High", "Medium", "Low"].includes(nextPriority)) {
+        setError("Select a valid next priority.");
         return;
       }
 
-      if (
-        cleanNotes.length <
-        2
-      ) {
-        setError(
-          "Notes must be at least 2 characters."
-        );
+      const nextDateTime = new Date(
+        `${nextDate}T${nextTime}:00`
+      );
 
+      if (Number.isNaN(nextDateTime.getTime())) {
+        setError("Enter a valid next follow-up date and time.");
         return;
       }
 
-      if (
-        cleanNotes.length >
-        5000
-      ) {
-        setError(
-          "Notes cannot exceed 5000 characters."
-        );
-
+      if (nextDateTime.getTime() < Date.now() - 60 * 1000) {
+        setError("Next follow-up cannot be in the past.");
         return;
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Optional Next Follow-up
-      |--------------------------------------------------------------------------
-      */
+      data.nextAction = cleanNextAction;
+      data.nextFollowUpAt = nextDateTime.toISOString();
+      data.nextPriority = nextPriority;
+    }
 
-      const cleanNextAction =
-        nextAction.trim();
+    try {
+      await mutation.mutateAsync({
+        followupId: followup.id,
+        data,
+      });
 
-      const hasAction =
-        Boolean(
-          cleanNextAction
-        );
+      onClose();
+    } catch (requestError) {
+      setError(
+        getApiError(requestError, "Unable to complete follow-up.")
+      );
+    }
+  };
 
-      const hasDate =
-        Boolean(
-          nextDate
-        );
-
-      const hasTime =
-        Boolean(
-          nextTime
-        );
-
-      const hasAnyNextFollowup =
-        hasAction ||
-        hasDate ||
-        hasTime;
-
-      let nextFollowUpAt;
-
-      /*
-       * If the user does not enter anything
-       * for the next follow-up, completion
-       * is allowed.
-       */
-      if (
-        hasAnyNextFollowup
-      ) {
-        if (!hasAction) {
-          setError(
-            "Enter a next action or clear the next follow-up."
-          );
-
-          return;
-        }
-
-        if (
-          cleanNextAction.length <
-          2
-        ) {
-          setError(
-            "Next action must be at least 2 characters."
-          );
-
-          return;
-        }
-
-        if (
-          cleanNextAction.length >
-          500
-        ) {
-          setError(
-            "Next action cannot exceed 500 characters."
-          );
-
-          return;
-        }
-
-        if (!hasDate) {
-          setError(
-            "Select a next follow-up date or clear the next follow-up."
-          );
-
-          return;
-        }
-
-        if (!hasTime) {
-          setError(
-            "Select a next follow-up time or clear the next follow-up."
-          );
-
-          return;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Construct Date / Time
-        |--------------------------------------------------------------------------
-        */
-
-        const nextDateTime =
-          new Date(
-            `${nextDate}T${nextTime}:00`
-          );
-
-        if (
-          Number.isNaN(
-            nextDateTime.getTime()
-          )
-        ) {
-          setError(
-            "Enter a valid next follow-up date and time."
-          );
-
-          return;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Match Server's 60 Second Tolerance
-        |--------------------------------------------------------------------------
-        */
-
-        const minimumAllowed =
-          Date.now() -
-          60 * 1000;
-
-        if (
-          nextDateTime.getTime() <
-          minimumAllowed
-        ) {
-          setError(
-            "Next follow-up date and time cannot be in the past."
-          );
-
-          return;
-        }
-
-        nextFollowUpAt =
-          nextDateTime.toISOString();
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Build Payload
-      |--------------------------------------------------------------------------
-      |
-      | Important:
-      |
-      | When no next follow-up exists we
-      | OMIT the optional properties.
-      |
-      | We do not send:
-      |
-      | nextAction: null
-      | nextFollowUpAt: null
-      |
-      */
-
-      const data = {
-        outcome:
-          cleanOutcome,
-
-        notes:
-          cleanNotes,
-      };
-
-      if (
-        hasAnyNextFollowup
-      ) {
-        data.nextAction =
-          cleanNextAction;
-
-        data.nextFollowUpAt =
-          nextFollowUpAt;
-
-        data.nextPriority =
-          nextPriority;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Complete
-      |--------------------------------------------------------------------------
-      */
-
-      try {
-        await mutation.mutateAsync({
-          followupId:
-            followup.id,
-
-          data,
-        });
-
-        onClose();
-      } catch (
-        requestError
-      ) {
-        const responseData =
-          requestError
-            ?.response
-            ?.data;
-
-        const errors =
-          Array.isArray(
-            responseData?.errors
-          )
-            ? responseData.errors
-            : [];
-
-        const validationMessage =
-          errors
-            .map(
-              (item) => {
-                if (
-                  typeof item ===
-                  "string"
-                ) {
-                  return item;
-                }
-
-                return (
-                  item?.message ||
-                  item?.msg ||
-                  null
-                );
-              }
-            )
-            .filter(Boolean)
-            .join(" ");
-
-        setError(
-          validationMessage ||
-            responseData
-              ?.message ||
-            requestError
-              ?.message ||
-            "Unable to complete follow-up."
-        );
-      }
-    };
-
-  /*
-  |--------------------------------------------------------------------------
-  | Render
-  |--------------------------------------------------------------------------
-  */
-
-  return (
-    <div className="modal-backdrop">
+  return createPortal(
+    <div className="gfp-modal-overlay" role="presentation">
       <section
-        className="tl-modal"
+        className="gfp-modal gfp-modal-wide"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="complete-followup-title"
+        aria-labelledby="gfp-complete-title"
       >
-        {/* Header */}
+        <header className="gfp-modal-header">
+          <div className="flex items-center gap-3">
+            <span className="gfp-modal-brand gfp-modal-brand-green flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl">
+              <CheckCircle2 size={23} />
+            </span>
 
-        <header className="modal-head">
-          <div>
-            <h2 id="complete-followup-title">
-              Complete follow-up
-            </h2>
+            <div>
+              <h2
+                id="gfp-complete-title"
+                className="text-lg font-extrabold"
+              >
+                Complete Follow-up
+              </h2>
 
-            <p>
-              Record the result and
-              optionally schedule
-              another follow-up.
-            </p>
+              <p className="mt-1 text-xs">
+                Record the result and plan the next step.
+              </p>
+            </div>
           </div>
 
           <button
             type="button"
-            className="icon-control"
-            disabled={
-              mutation.isPending
-            }
-            onClick={
-              onClose
-            }
+            onClick={onClose}
+            disabled={busy}
             aria-label="Close"
+            className="gfp-modal-close flex h-9 w-9 items-center justify-center rounded-xl"
           >
-            <X
-              size={15}
-            />
+            <X size={18} />
           </button>
         </header>
 
-        {/* Body */}
-
-        <div className="modal-body">
-          {error && (
-            <div className="error-box">
-              {error}
-            </div>
-          )}
-
-          {/* Context */}
-
-          <div className="activity-context">
-            <small>
-              Follow-up
-            </small>
-
-            <b>
-              {followup.action ||
-                "Follow-up"}
-            </b>
-
-            {followup.companyName && (
-              <span>
-                {
-                  followup.companyName
-                }
-              </span>
+        <form onSubmit={submit} className="gfp-modal-form">
+          <div className="gfp-modal-body space-y-5">
+            {error && (
+              <div
+                role="alert"
+                className="gfp-modal-error rounded-xl px-4 py-3 text-sm"
+              >
+                {error}
+              </div>
             )}
-          </div>
 
-          <div className="form-section">
-            <div className="form-grid2">
+            <div className="gfp-context rounded-2xl p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide">
+                Current Follow-up
+              </p>
 
-              {/* Outcome */}
+              <p className="mt-2 text-sm font-bold">
+                {followup.action || "Follow-up"}
+              </p>
 
-              <label className="full">
+              {followup.companyName && (
+                <p className="mt-1 text-xs">
+                  {followup.companyName}
+                </p>
+              )}
+            </div>
+
+            <label className="gfp-field">
+              <span className="flex items-center gap-2">
+                <CheckCircle2 size={15} />
                 Outcome *
+              </span>
 
-                <textarea
-                  rows="3"
-                  maxLength={500}
-                  value={
-                    outcome
-                  }
-                  disabled={
-                    mutation.isPending
-                  }
-                  placeholder="What happened with this follow-up?"
-                  onChange={(
-                    event
-                  ) => {
-                    setOutcome(
-                      event
-                        .target
-                        .value
-                    );
+              <textarea
+                rows={3}
+                maxLength={500}
+                autoFocus
+                value={outcome}
+                disabled={busy}
+                placeholder="What happened with this follow-up?"
+                onChange={(event) => {
+                  setOutcome(event.target.value);
+                  setError("");
+                }}
+              />
+            </label>
 
-                    setError("");
-                  }}
-                  autoFocus
-                />
-              </label>
-
-              {/* Notes */}
-
-              <label className="full">
+            <label className="gfp-field">
+              <span className="flex items-center gap-2">
+                <FileText size={15} />
                 Notes *
+              </span>
 
-                <textarea
-                  rows="4"
-                  maxLength={5000}
-                  value={
-                    notes
-                  }
-                  disabled={
-                    mutation.isPending
-                  }
-                  placeholder="Record the follow-up notes"
-                  onChange={(
-                    event
-                  ) => {
-                    setNotes(
-                      event
-                        .target
-                        .value
-                    );
+              <textarea
+                rows={4}
+                maxLength={5000}
+                value={notes}
+                disabled={busy}
+                placeholder="Record the follow-up notes"
+                onChange={(event) => {
+                  setNotes(event.target.value);
+                  setError("");
+                }}
+              />
+            </label>
 
-                    setError("");
-                  }}
-                />
-              </label>
+            <div className="gfp-next-section space-y-4 rounded-2xl p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="gfp-heading flex items-center gap-2 text-sm font-bold">
+                    <RotateCcw size={16} />
+                    Next Follow-up
+                  </h3>
 
-              {/* Optional Next Follow-up */}
-
-              <div className="full">
-                <div
-                  style={{
-                    display:
-                      "flex",
-
-                    alignItems:
-                      "center",
-
-                    justifyContent:
-                      "space-between",
-
-                    gap:
-                      "12px",
-                  }}
-                >
-                  <div>
-                    <strong>
-                      Next follow-up
-                    </strong>
-
-                    <div>
-                      <small>
-                        Optional
-                      </small>
-                    </div>
-                  </div>
-
-                  {(
-                    nextAction ||
-                    nextDate ||
-                    nextTime
-                  ) && (
-                    <button
-                      type="button"
-                      className="tl-secondary"
-                      disabled={
-                        mutation.isPending
-                      }
-                      onClick={
-                        clearNextFollowup
-                      }
-                    >
-                      Clear
-                    </button>
-                  )}
+                  <p className="gfp-muted mt-1 text-xs">
+                    Optional — leave blank to finish without scheduling another.
+                  </p>
                 </div>
+
+                {(nextAction || nextDate || nextTime) && (
+                  <button
+                    type="button"
+                    onClick={clearNextFollowup}
+                    disabled={busy}
+                    className="gfp-modal-secondary rounded-lg px-3 py-2 text-xs font-bold"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
 
-              {/* Next Action */}
-
-              <label className="full">
-                Next action
+              <label className="gfp-field">
+                <span>Next Action</span>
 
                 <input
                   type="text"
                   maxLength={500}
-                  value={
-                    nextAction
-                  }
-                  disabled={
-                    mutation.isPending
-                  }
-                  placeholder="Optional — e.g. Call customer next week"
-                  onChange={(
-                    event
-                  ) => {
-                    setNextAction(
-                      event
-                        .target
-                        .value
-                    );
-
+                  value={nextAction}
+                  disabled={busy}
+                  placeholder="e.g. Call customer next week"
+                  onChange={(event) => {
+                    setNextAction(event.target.value);
                     setError("");
                   }}
                 />
               </label>
 
-              {/* Next Date */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="gfp-field">
+                  <span className="flex items-center gap-2">
+                    <CalendarDays size={15} />
+                    Follow-up Date
+                  </span>
 
-              <label>
-                Follow-up date
+                  <input
+                    type="date"
+                    min={today}
+                    value={nextDate}
+                    disabled={busy}
+                    onChange={handleDateChange}
+                  />
+                </label>
 
-                <input
-                  type="date"
-                  min={today}
-                  value={
-                    nextDate
-                  }
-                  disabled={
-                    mutation.isPending
-                  }
-                  onChange={
-                    handleDateChange
-                  }
-                />
-              </label>
+                <label className="gfp-field">
+                  <span className="flex items-center gap-2">
+                    <Clock3 size={15} />
+                    Follow-up Time
+                  </span>
 
-              {/* Next Time */}
+                  <input
+                    type="time"
+                    min={
+                      nextDate === today
+                        ? currentTime
+                        : undefined
+                    }
+                    value={nextTime}
+                    disabled={busy || !nextDate}
+                    onChange={handleTimeChange}
+                  />
+                </label>
+              </div>
 
-              <label>
-                Follow-up time
-
-                <input
-                  type="time"
-                  min={
-                    nextDate ===
-                    today
-                      ? currentTime
-                      : undefined
-                  }
-                  value={
-                    nextTime
-                  }
-                  disabled={
-                    mutation.isPending ||
-                    !nextDate
-                  }
-                  onChange={
-                    handleTimeChange
-                  }
-                />
-              </label>
-
-              {/* Priority */}
-
-              <label>
-                Next priority
+              <label className="gfp-field">
+                <span className="flex items-center gap-2">
+                  <Flag size={15} />
+                  Next Priority
+                </span>
 
                 <select
-                  value={
-                    nextPriority
-                  }
-                  disabled={
-                    mutation.isPending
-                  }
-                  onChange={(
-                    event
-                  ) => {
-                    setNextPriority(
-                      event
-                        .target
-                        .value
-                    );
-
+                  value={nextPriority}
+                  disabled={busy}
+                  onChange={(event) => {
+                    setNextPriority(event.target.value);
                     setError("");
                   }}
                 >
-                  <option value="High">
-                    High
-                  </option>
-
-                  <option value="Medium">
-                    Medium
-                  </option>
-
-                  <option value="Low">
-                    Low
-                  </option>
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
                 </select>
               </label>
             </div>
           </div>
-        </div>
 
-        {/* Footer */}
+          <footer className="gfp-modal-footer flex flex-wrap items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              className="gfp-modal-secondary rounded-xl px-5 py-2.5 text-sm font-bold"
+            >
+              Cancel
+            </button>
 
-        <footer className="modal-foot">
-          <button
-            type="button"
-            className="tl-secondary"
-            disabled={
-              mutation.isPending
-            }
-            onClick={
-              onClose
-            }
-          >
-            Cancel
-          </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="gfp-modal-primary gfp-modal-success inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold"
+            >
+              {busy ? (
+                <LoaderCircle size={16} className="animate-spin" />
+              ) : (
+                <Check size={16} />
+              )}
 
-          <button
-            type="button"
-            className="tl-primary"
-            disabled={
-              mutation.isPending
-            }
-            onClick={
-              submit
-            }
-          >
-            {mutation.isPending
-              ? "Completing..."
-              : "Complete follow-up"}
-          </button>
-        </footer>
+              {busy ? "Completing..." : "Complete Follow-up"}
+            </button>
+          </footer>
+        </form>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 };
 

@@ -8,7 +8,8 @@ import {
 
 import Providers from "./app/providers";
 
-import "./index.css";
+// import "./index.css";
+import "./app.css";
 
 createRoot(
   document.getElementById(

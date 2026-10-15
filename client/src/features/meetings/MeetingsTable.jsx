@@ -1,25 +1,19 @@
-import {
-  useEffect,
-  useState,
-} from "react";
 
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
-  Check,
+  Building2,
   CalendarClock,
+  CalendarDays,
+  Check,
+  Clock3,
   Ellipsis,
+  LoaderCircle,
+  Phone,
   UserX,
+  Video,
   X,
 } from "lucide-react";
-
-import {
-  createPortal,
-} from "react-dom";
-
-/*
-|--------------------------------------------------------------------------
-| Meeting Types
-|--------------------------------------------------------------------------
-*/
 
 const TYPE_LABELS = {
   VIDEO_CALL: "Video call",
@@ -27,115 +21,67 @@ const TYPE_LABELS = {
   PHONE_CALL: "Phone",
 };
 
-/*
-|--------------------------------------------------------------------------
-| Date
-|--------------------------------------------------------------------------
-*/
+const TYPE_ICONS = {
+  VIDEO_CALL: Video,
+  IN_PERSON: Building2,
+  PHONE_CALL: Phone,
+};
 
-const formatDate = (
-  value
-) => {
-  if (!value) {
-    return "—";
-  }
+const formatDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
 
-  const date =
-    new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+};
 
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-    return "—";
-  }
+const formatTime = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
 
-  return date.toLocaleDateString(
-    "en-IN",
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+};
+
+const normalizeStatus = (value) =>
+  String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+const statusLabel = (value) => {
+  const status = normalizeStatus(value);
+
+  return (
     {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }
+      SCHEDULED: "Scheduled",
+      RESCHEDULED: "Rescheduled",
+      COMPLETED: "Completed",
+      CANCELLED: "Cancelled",
+      CANCELED: "Cancelled",
+      NO_SHOW: "No-show",
+    }[status] ||
+    String(value || "Unknown").replaceAll("_", " ")
   );
 };
 
-/*
-|--------------------------------------------------------------------------
-| Time
-|--------------------------------------------------------------------------
-*/
-
-const formatTime = (
-  value
-) => {
-  if (!value) {
-    return "—";
-  }
-
-  const date =
-    new Date(value);
-
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-    return "—";
-  }
-
-  return date.toLocaleTimeString(
-    "en-IN",
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-    }
-  );
-};
-
-/*
-|--------------------------------------------------------------------------
-| Status
-|--------------------------------------------------------------------------
-*/
-
-const statusClass = (
-  value
-) =>
-  String(
-    value || ""
-  )
-    .toLowerCase()
-    .replaceAll(
-      "_",
-      "-"
-    );
-
-const statusLabel = (
-  value
-) =>
-  String(
-    value || ""
-  )
-    .replaceAll(
-      "_",
-      " "
-    )
-    .toLowerCase()
-    .replace(
-      /^\w/,
-      (
-        character
-      ) =>
-        character.toUpperCase()
-    );
-
-/*
-|--------------------------------------------------------------------------
-| Meetings Table
-|--------------------------------------------------------------------------
-*/
+const getInitials = (name) =>
+  String(name || "C")
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
 const MeetingsTable = ({
   meetings = [],
@@ -146,235 +92,90 @@ const MeetingsTable = ({
   onNoShow,
   onOpenLead,
 }) => {
-  /*
-  |--------------------------------------------------------------------------
-  | Floating Action Menu
-  |--------------------------------------------------------------------------
-  */
+  const [menu, setMenu] = useState(null);
+  const menuRef = useRef(null);
 
-  const [
-    menu,
-    setMenu,
-  ] = useState(
-    null
-  );
-
-  /*
-  |--------------------------------------------------------------------------
-  | Open Menu
-  |--------------------------------------------------------------------------
-  */
-
-  const openMenu = (
-    event,
-    meeting
-  ) => {
+  const openMenu = (event, meeting) => {
     event.stopPropagation();
 
-    const rect =
-      event.currentTarget
-        .getBoundingClientRect();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const width = 210;
+    const height = 156;
+    const gap = 6;
 
-    const menuWidth =
-      190;
+    const left = Math.max(
+      10,
+      Math.min(rect.right - width, window.innerWidth - width - 10)
+    );
 
-    const gap =
-      6;
+    const below = rect.bottom + gap;
+    const above = rect.top - height - gap;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Prefer opening below.
-    |--------------------------------------------------------------------------
-    */
+    const top =
+      below + height <= window.innerHeight - 10
+        ? below
+        : Math.max(10, above);
 
-    let top =
-      rect.bottom +
-      gap;
-
-    let left =
-      rect.right -
-      menuWidth;
-
-    /*
-    |--------------------------------------------------------------------------
-    | Keep Inside Viewport
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-      left < 10
-    ) {
-      left = 10;
-    }
-
-    if (
-      left +
-        menuWidth >
-      window.innerWidth -
-        10
-    ) {
-      left =
-        window.innerWidth -
-        menuWidth -
-        10;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | If there isn't enough space below, open upward.
-    |--------------------------------------------------------------------------
-    */
-
-    const estimatedMenuHeight =
-      132;
-
-    if (
-      top +
-        estimatedMenuHeight >
-      window.innerHeight -
-        10
-    ) {
-      top =
-        rect.top -
-        estimatedMenuHeight -
-        gap;
-    }
-
-    setMenu({
-      meeting,
-      top,
-      left,
-    });
+    setMenu({ meeting, top, left });
   };
-
-  /*
-  |--------------------------------------------------------------------------
-  | Close On Outside Click / Scroll / Resize
-  |--------------------------------------------------------------------------
-  */
 
   useEffect(() => {
-    if (!menu) {
-      return undefined;
-    }
+    if (!menu) return undefined;
 
-    const closeMenu =
-      () => {
-        setMenu(
-          null
-        );
-      };
+    const closeMenu = () => setMenu(null);
 
-    const handleKeyDown =
-      (
-        event
-      ) => {
-        if (
-          event.key ===
-          "Escape"
-        ) {
-          closeMenu();
-        }
-      };
+    const handlePointerDown = (event) => {
+      if (!menuRef.current?.contains(event.target)) {
+        closeMenu();
+      }
+    };
 
-    window.addEventListener(
-      "resize",
-      closeMenu
-    );
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") closeMenu();
+    };
 
-    window.addEventListener(
-      "scroll",
-      closeMenu,
-      true
-    );
-
-    document.addEventListener(
-      "keydown",
-      handleKeyDown
-    );
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
 
     return () => {
-      window.removeEventListener(
-        "resize",
-        closeMenu
-      );
-
-      window.removeEventListener(
-        "scroll",
-        closeMenu,
-        true
-      );
-
-      document.removeEventListener(
-        "keydown",
-        handleKeyDown
-      );
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
     };
-  }, [
-    menu,
-  ]);
+  }, [menu]);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Action Helper
-  |--------------------------------------------------------------------------
-  */
+  const runAction = (callback) => {
+    const selectedMeeting = menu?.meeting;
+    setMenu(null);
 
-  const runAction = (
-    callback
-  ) => {
-    const meeting =
-      menu?.meeting;
-
-    setMenu(
-      null
-    );
-
-    if (
-      meeting &&
-      callback
-    ) {
-      callback(
-        meeting
-      );
+    if (selectedMeeting && callback) {
+      callback(selectedMeeting);
     }
   };
-
-  /*
-  |--------------------------------------------------------------------------
-  | Loading
-  |--------------------------------------------------------------------------
-  */
 
   if (loading) {
     return (
-      <div className="empty-state">
-        <p>
-          Loading meetings...
-        </p>
+      <div className="gmp-muted flex min-h-[240px] flex-col items-center justify-center gap-3">
+        <LoaderCircle size={28} className="animate-spin" />
+        <p className="text-sm">Loading meetings...</p>
       </div>
     );
   }
 
-  /*
-  |--------------------------------------------------------------------------
-  | Empty
-  |--------------------------------------------------------------------------
-  */
-
-  if (
-    !meetings.length
-  ) {
+  if (!meetings.length) {
     return (
-      <div className="empty-state">
-        <h2>
-          No meetings found
-        </h2>
-
-        <p>
-          Use Schedule meeting
-          to arrange the first
-          meeting.
+      <div className="flex min-h-[260px] flex-col items-center justify-center px-5 text-center">
+        <span className="gmp-empty-icon mb-4 flex h-16 w-16 items-center justify-center rounded-2xl">
+          <CalendarDays size={29} />
+        </span>
+        <h3 className="gmp-heading text-base font-bold">
+          No Meetings Found
+        </h3>
+        <p className="gmp-muted mt-2 max-w-sm text-sm">
+          Use Schedule Meeting to arrange your first client conversation.
         </p>
       </div>
     );
@@ -382,361 +183,198 @@ const MeetingsTable = ({
 
   return (
     <>
-      <div className="table-wrap">
-        <table className="tl-table meetings-table">
+      <div className="overflow-x-auto">
+        <table className="gmp-meetings-table w-full min-w-[1000px] border-collapse text-left">
           <thead>
             <tr>
-              <th>
-                Company
-              </th>
-
-              <th>
-                Title
-              </th>
-
-              <th>
-                Date
-              </th>
-
-              <th>
-                Time
-              </th>
-
-              <th>
-                Type
-              </th>
-
-              <th>
-                Status
-              </th>
-
-              <th className="meeting-action-heading">
-                Action
-              </th>
+              {[
+                "Company",
+                "Meeting",
+                "Date",
+                "Time",
+                "Type",
+                "Status",
+                "Actions",
+              ].map((heading) => (
+                <th
+                  key={heading}
+                  className="whitespace-nowrap px-5 py-4 text-xs font-bold"
+                >
+                  {heading}
+                </th>
+              ))}
             </tr>
           </thead>
 
           <tbody>
-            {meetings.map(
-              (
-                meeting
-              ) => {
-                const active =
-                  [
-                    "SCHEDULED",
-                    "RESCHEDULED",
-                  ].includes(
-                    meeting.status
-                  );
+            {meetings.map((meeting) => {
+              const status = normalizeStatus(meeting.status);
+              const active = ["SCHEDULED", "RESCHEDULED"].includes(status);
+              const TypeIcon = TYPE_ICONS[meeting.meetingType] || Video;
+              const isMenuOpen = menu?.meeting?.id === meeting.id;
 
-                return (
-                  <tr
-                    key={
-                      meeting.id
-                    }
-                  >
-                    {/* Company */}
+              return (
+                <tr key={meeting.id}>
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <span className="gmp-company-avatar flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold">
+                        {getInitials(meeting.companyName)}
+                      </span>
 
-                    <td>
-                      {onOpenLead ? (
-                        <button
-                          type="button"
-                          className="meeting-company-link"
-                          onClick={() =>
-                            onOpenLead(
-                              meeting.leadId
-                            )
-                          }
-                        >
-                          <b>
-                            {
-                              meeting.companyName
-                            }
-                          </b>
-
-                          <small>
-                            {
-                              meeting.leadCode
-                            }
-                          </small>
-                        </button>
-                      ) : (
-                        <div className="meeting-company-copy">
-                          <b>
-                            {
-                              meeting.companyName
-                            }
-                          </b>
-
-                          <small>
-                            {
-                              meeting.leadCode
-                            }
-                          </small>
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Title */}
-
-                    <td>
-                      <div className="meeting-title-copy">
-                        <b>
-                          {
-                            meeting.title
-                          }
-                        </b>
-
-                        {meeting.contactName && (
-                          <small>
-                            {
-                              meeting.contactName
-                            }
-                          </small>
+                      <div className="min-w-0">
+                        {onOpenLead ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenLead(meeting.leadId)}
+                            className="gmp-company-link max-w-[170px] truncate text-left text-sm font-bold"
+                          >
+                            {meeting.companyName || "—"}
+                          </button>
+                        ) : (
+                          <p className="gmp-heading max-w-[170px] truncate text-sm font-bold">
+                            {meeting.companyName || "—"}
+                          </p>
                         )}
+                        <p className="gmp-muted mt-1 text-[11px]">
+                          {meeting.leadCode || "—"}
+                        </p>
                       </div>
-                    </td>
+                    </div>
+                  </td>
 
-                    {/* Date */}
+                  <td className="px-5 py-4">
+                    <p className="gmp-heading max-w-[220px] truncate text-sm font-semibold">
+                      {meeting.title || "Untitled Meeting"}
+                    </p>
+                    {meeting.contactName && (
+                      <p className="gmp-muted mt-1 max-w-[200px] truncate text-xs">
+                        {meeting.contactName}
+                      </p>
+                    )}
+                  </td>
 
-                    <td>
-                      {formatDate(
-                        meeting.startsAt
-                      )}
-                    </td>
+                  <td className="px-5 py-4">
+                    <span className="gmp-muted inline-flex items-center gap-2 whitespace-nowrap text-xs">
+                      <CalendarDays size={14} />
+                      {formatDate(meeting.startsAt)}
+                    </span>
+                  </td>
 
-                    {/* Time */}
+                  <td className="px-5 py-4">
+                    <span className="gmp-muted inline-flex items-center gap-2 whitespace-nowrap text-xs">
+                      <Clock3 size={14} />
+                      {formatTime(meeting.startsAt)}
+                    </span>
+                  </td>
 
-                    <td>
-                      {formatTime(
-                        meeting.startsAt
-                      )}
-                    </td>
-
-                    {/* Type */}
-
-                    <td>
-                      {TYPE_LABELS[
-                        meeting.meetingType
-                      ] ||
+                  <td className="px-5 py-4">
+                    <span className="gmp-type inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold">
+                      <TypeIcon size={14} />
+                      {TYPE_LABELS[meeting.meetingType] ||
                         meeting.meetingType ||
                         "—"}
-                    </td>
+                    </span>
+                  </td>
 
-                    {/* Status */}
+                  <td className="px-5 py-4">
+                    <span
+                      className="gmp-status inline-flex whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold"
+                      data-status={status}
+                    >
+                      {statusLabel(meeting.status)}
+                    </span>
+                  </td>
 
-                    <td>
-                      <span
-                        className={`status ${statusClass(
-                          meeting.status
-                        )}`}
-                      >
-                        {statusLabel(
-                          meeting.status
-                        )}
-                      </span>
-                    </td>
-
-                    {/* Actions */}
-
-                    <td className="meeting-action-cell">
-                      {active ? (
-                        <div className="meeting-action-toolbar">
-                          {/* Complete */}
-
-                          <button
-                            type="button"
-                            className="meeting-complete-btn"
-                            onClick={() =>
-                              onComplete?.(
-                                meeting
-                              )
-                            }
-                          >
-                            {/* <Check
-                              size={14}
-                              strokeWidth={2}
-                            /> */}
-                            
-
-                            <span>
-                              Complete
-                            </span>
-                          </button>
-
-                          {/* More */}
-
-                          <button
-                            type="button"
-                            className={`meeting-more-trigger ${
-                              menu
-                                ?.meeting
-                                ?.id ===
-                              meeting.id
-                                ? "active"
-                                : ""
-                            }`}
-                            aria-label="More meeting actions"
-                            aria-expanded={
-                              menu
-                                ?.meeting
-                                ?.id ===
-                              meeting.id
-                            }
-                            title="More actions"
-                            onClick={(
-                              event
-                            ) => {
-                              if (
-                                menu
-                                  ?.meeting
-                                  ?.id ===
-                                meeting.id
-                              ) {
-                                setMenu(
-                                  null
-                                );
-
-                                return;
-                              }
-
-                              openMenu(
-                                event,
-                                meeting
-                              );
-                            }}
-                          >
-                            <Ellipsis
-                              size={17}
-                            />
-                          </button>
-                        </div>
-                      ) : (
-                        <span
-                          className={`meeting-closed-label ${statusClass(
-                            meeting.status
-                          )}`}
+                  <td className="px-5 py-4">
+                    {active ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onComplete?.(meeting)}
+                          disabled={!onComplete}
+                          className="gmp-complete-button inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-bold disabled:opacity-50"
                         >
-                          {meeting.status ===
-                          "COMPLETED"
-                            ? "Completed"
-                            : meeting.status ===
-                                "CANCELLED"
-                              ? "Cancelled"
-                              : meeting.status ===
-                                  "NO_SHOW"
-                                ? "No-show"
-                                : statusLabel(
-                                    meeting.status
-                                  )}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              }
-            )}
+                          <Check size={15} />
+                          Complete
+                        </button>
+
+                        <button
+                          type="button"
+                          aria-label="More meeting actions"
+                          aria-haspopup="menu"
+                          aria-expanded={isMenuOpen}
+                          onClick={(event) => {
+                            if (isMenuOpen) {
+                              setMenu(null);
+                            } else {
+                              openMenu(event, meeting);
+                            }
+                          }}
+                          className={`gmp-more-button flex h-9 w-9 items-center justify-center rounded-xl ${
+                            isMenuOpen ? "gmp-more-active" : ""
+                          }`}
+                        >
+                          <Ellipsis size={18} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="gmp-muted text-xs font-semibold">
+                        {statusLabel(meeting.status)}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* --------------------------------------------------------------- */}
-      {/* Floating Menu - Rendered Outside Table */}
-      {/* --------------------------------------------------------------- */}
-
       {menu &&
         createPortal(
-          <>
-            {/* Invisible click-away layer */}
+          <div
+            ref={menuRef}
+            className="gmp-floating-menu fixed w-[210px] overflow-hidden rounded-2xl p-1.5"
+            style={{
+              top: menu.top,
+              left: menu.left,
+              zIndex: 2147482000,
+            }}
+            role="menu"
+            aria-label="Meeting actions"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => runAction(onReschedule)}
+              className="gmp-menu-item flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold"
+            >
+              <CalendarClock size={16} />
+              Reschedule
+            </button>
 
             <button
               type="button"
-              className="meeting-menu-backdrop"
-              aria-label="Close menu"
-              onClick={() =>
-                setMenu(
-                  null
-                )
-              }
-            />
-
-            {/* Menu */}
-
-            <div
-              className="meeting-floating-menu"
-              style={{
-                top:
-                  menu.top,
-
-                left:
-                  menu.left,
-              }}
-              role="menu"
+              role="menuitem"
+              onClick={() => runAction(onNoShow)}
+              className="gmp-menu-item flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold"
             >
-              {/* Reschedule */}
+              <UserX size={16} />
+              Mark No-show
+            </button>
 
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() =>
-                  runAction(
-                    onReschedule
-                  )
-                }
-              >
-                <CalendarClock
-                  size={15}
-                />
+            <div className="gmp-menu-divider my-1" />
 
-                <span>
-                  Reschedule
-                </span>
-              </button>
-
-              {/* No Show */}
-
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() =>
-                  runAction(
-                    onNoShow
-                  )
-                }
-              >
-                <UserX
-                  size={15}
-                />
-
-                <span>
-                  Mark no-show
-                </span>
-              </button>
-
-              <div className="meeting-menu-divider" />
-
-              {/* Cancel */}
-
-              <button
-                type="button"
-                role="menuitem"
-                className="meeting-menu-danger"
-                onClick={() =>
-                  runAction(
-                    onCancel
-                  )
-                }
-              >
-                <X
-                  size={15}
-                />
-
-                <span>
-                  Cancel meeting
-                </span>
-              </button>
-            </div>
-          </>,
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => runAction(onCancel)}
+              className="gmp-menu-danger flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold"
+            >
+              <X size={16} />
+              Cancel Meeting
+            </button>
+          </div>,
           document.body
         )}
     </>

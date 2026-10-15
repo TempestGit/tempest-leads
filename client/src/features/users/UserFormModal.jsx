@@ -1,12 +1,23 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
+  AlertCircle,
+  Building2,
+  Check,
   Eye,
   EyeOff,
+  KeyRound,
+  LoaderCircle,
+  LockKeyhole,
+  Mail,
+  MapPin,
+  Save,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+  Users,
   X,
 } from "lucide-react";
 
@@ -15,6 +26,8 @@ import {
   useUpdateUserMutation,
   useUserOptionsQuery,
 } from "./users.queries.js";
+
+import "./users-glass.css";
 
 /*
 |--------------------------------------------------------------------------
@@ -34,6 +47,38 @@ const EMPTY_FORM = {
 
 /*
 |--------------------------------------------------------------------------
+| Reusable Field
+|--------------------------------------------------------------------------
+*/
+
+const FormField = ({
+  label,
+  required = false,
+  hint,
+  children,
+  full = false,
+}) => (
+  <div className={`gum-field ${full ? "sm:col-span-2" : ""}`}>
+    <label className="gum-label mb-2 block text-xs font-bold">
+      {label}
+
+      {required && (
+        <span className="gum-required ml-1">*</span>
+      )}
+    </label>
+
+    {children}
+
+    {hint && (
+      <p className="gum-hint mt-1.5 text-[11px] leading-5">
+        {hint}
+      </p>
+    )}
+  </div>
+);
+
+/*
+|--------------------------------------------------------------------------
 | User Form Modal
 |--------------------------------------------------------------------------
 */
@@ -45,26 +90,14 @@ const UserFormModal = ({
 }) => {
   /*
   |--------------------------------------------------------------------------
-  | Queries
+  | Queries / Mutations
   |--------------------------------------------------------------------------
   */
 
-  const optionsQuery =
-    useUserOptionsQuery(
-      open
-    );
+  const optionsQuery = useUserOptionsQuery(open);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Mutations
-  |--------------------------------------------------------------------------
-  */
-
-  const createMutation =
-    useCreateUserMutation();
-
-  const updateMutation =
-    useUpdateUserMutation();
+  const createMutation = useCreateUserMutation();
+  const updateMutation = useUpdateUserMutation();
 
   /*
   |--------------------------------------------------------------------------
@@ -72,22 +105,9 @@ const UserFormModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const [
-    form,
-    setForm,
-  ] = useState(
-    EMPTY_FORM
-  );
-
-  const [
-    error,
-    setError,
-  ] = useState("");
-
-  const [
-    showPassword,
-    setShowPassword,
-  ] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   /*
   |--------------------------------------------------------------------------
@@ -95,10 +115,7 @@ const UserFormModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const isEditing =
-    Boolean(
-      user?.id
-    );
+  const isEditing = Boolean(user?.id);
 
   const isSaving =
     createMutation.isPending ||
@@ -110,35 +127,22 @@ const UserFormModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const options =
-    optionsQuery.data
-      ?.data ||
-    {};
+  const options = optionsQuery.data?.data || {};
 
-  const branches =
-    options.branches ||
-    [];
+  const branches = options.branches || [];
 
-  const roles =
-    options.roles?.length
-      ? options.roles
-      : [
-          {
-            value:
-              "OWNER",
-
-            label:
-              "User / Owner",
-          },
-
-          {
-            value:
-              "SUPER_ADMIN",
-
-            label:
-              "Super Admin",
-          },
-        ];
+  const roles = options.roles?.length
+    ? options.roles
+    : [
+        {
+          value: "OWNER",
+          label: "User / Owner",
+        },
+        {
+          value: "SUPER_ADMIN",
+          label: "Super Admin",
+        },
+      ];
 
   /*
   |--------------------------------------------------------------------------
@@ -146,26 +150,14 @@ const UserFormModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const selectedBranch =
-    useMemo(
-      () =>
-        branches.find(
-          (
-            branch
-          ) =>
-            Number(
-              branch.id
-            ) ===
-            Number(
-              form.branchId
-            )
-        ) ||
-        null,
-      [
-        branches,
-        form.branchId,
-      ]
-    );
+  const selectedBranch = useMemo(
+    () =>
+      branches.find(
+        (branch) =>
+          Number(branch.id) === Number(form.branchId)
+      ) || null,
+    [branches, form.branchId]
+  );
 
   /*
   |--------------------------------------------------------------------------
@@ -174,85 +166,62 @@ const UserFormModal = ({
   */
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
     setError("");
-    setShowPassword(
-      false
-    );
+    setShowPassword(false);
 
     if (user) {
       setForm({
-        fullName:
-          user.fullName ||
-          "",
-
-        email:
-          user.email ||
-          "",
-
-        password:
-          "",
-
-        role:
-          user.role ||
-          "OWNER",
-
-        department:
-          user.department ||
-          "",
-
-        location:
-          user.location ||
-          "",
-
-        branchId:
-          user.branchId
-            ? String(
-                user.branchId
-              )
-            : "",
+        fullName: user.fullName || "",
+        email: user.email || "",
+        password: "",
+        role: user.role || "OWNER",
+        department: user.department || "",
+        location: user.location || "",
+        branchId: user.branchId
+          ? String(user.branchId)
+          : "",
       });
 
       return;
     }
 
-    setForm({
-      ...EMPTY_FORM,
-    });
-  }, [
-    open,
-    user,
-  ]);
+    setForm({ ...EMPTY_FORM });
+  }, [open, user]);
 
   /*
   |--------------------------------------------------------------------------
-  | Change Field
+  | Static Backdrop / Scroll Lock
   |--------------------------------------------------------------------------
   */
 
-  const updateField =
-    (
-      field,
-      value
-    ) => {
-      setForm(
-        (
-          previous
-        ) => ({
-          ...previous,
+  useEffect(() => {
+    if (!open) return undefined;
 
-          [field]:
-            value,
-        })
-      );
+    const previousOverflow = document.body.style.overflow;
 
-      if (error) {
-        setError("");
-      }
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
     };
+  }, [open]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Update Field
+  |--------------------------------------------------------------------------
+  */
+
+  const updateField = (field, value) => {
+    setForm((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+
+    if (error) setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -260,34 +229,18 @@ const UserFormModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleRoleChange =
-    (
-      role
-    ) => {
-      setForm(
-        (
-          previous
-        ) => ({
-          ...previous,
+  const handleRoleChange = (role) => {
+    setForm((previous) => ({
+      ...previous,
+      role,
+      branchId:
+        role === "SUPER_ADMIN"
+          ? ""
+          : previous.branchId,
+    }));
 
-          role,
-
-          /*
-           * Super Admin is global.
-           * Remove branch when switching
-           * from Owner to Super Admin.
-           */
-          branchId:
-            role ===
-            "SUPER_ADMIN"
-              ? ""
-              : previous
-                  .branchId,
-        })
-      );
-
-      setError("");
-    };
+    setError("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -295,19 +248,14 @@ const UserFormModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const handleClose =
-    () => {
-      if (isSaving) {
-        return;
-      }
+  const handleClose = () => {
+    if (isSaving) return;
 
-      setError("");
-      setShowPassword(
-        false
-      );
+    setError("");
+    setShowPassword(false);
 
-      onClose();
-    };
+    onClose?.();
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -315,103 +263,50 @@ const UserFormModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const validateForm =
-    () => {
-      const fullName =
-        form.fullName
-          .trim();
+  const validateForm = () => {
+    const fullName = form.fullName.trim();
+    const email = form.email.trim();
 
-      const email =
-        form.email
-          .trim();
+    if (!fullName) {
+      return "Full name is required.";
+    }
 
-      if (!fullName) {
-        return (
-          "Full name is required."
-        );
-      }
+    if (fullName.length < 2) {
+      return "Full name must contain at least 2 characters.";
+    }
 
-      if (
-        fullName.length <
-        2
-      ) {
-        return (
-          "Full name must contain at least 2 characters."
-        );
-      }
+    if (!email) {
+      return "Email is required.";
+    }
 
-      if (!email) {
-        return (
-          "Email is required."
-        );
-      }
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-      const emailPattern =
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      return "Enter a valid email address.";
+    }
 
-      if (
-        !emailPattern.test(
-          email
-        )
-      ) {
-        return (
-          "Enter a valid email address."
-        );
-      }
+    if (!["OWNER", "SUPER_ADMIN"].includes(form.role)) {
+      return "Select a valid role.";
+    }
 
-      if (
-        ![
-          "OWNER",
-          "SUPER_ADMIN",
-        ].includes(
-          form.role
-        )
-      ) {
-        return (
-          "Select a valid role."
-        );
-      }
+    if (form.role === "OWNER" && !form.branchId) {
+      return "Branch is required for an Owner.";
+    }
 
-      if (
-        form.role ===
-          "OWNER" &&
-        !form.branchId
-      ) {
-        return (
-          "Branch is required for an Owner."
-        );
-      }
+    if (!isEditing && !form.password) {
+      return "Password is required.";
+    }
 
-      if (
-        !isEditing &&
-        !form.password
-      ) {
-        return (
-          "Password is required."
-        );
-      }
+    if (form.password && form.password.length < 8) {
+      return "Password must contain at least 8 characters.";
+    }
 
-      if (
-        form.password &&
-        form.password.length <
-          8
-      ) {
-        return (
-          "Password must contain at least 8 characters."
-        );
-      }
+    if (form.password.length > 128) {
+      return "Password is too long.";
+    }
 
-      if (
-        form.password.length >
-        128
-      ) {
-        return (
-          "Password is too long."
-        );
-      }
-
-      return "";
-    };
+    return "";
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -419,122 +314,56 @@ const UserFormModal = ({
   |--------------------------------------------------------------------------
   */
 
-  const submit =
-    async () => {
-      setError("");
+  const submit = async () => {
+    if (isSaving) return;
 
-      const validationError =
-        validateForm();
+    setError("");
 
-      if (
-        validationError
-      ) {
-        setError(
-          validationError
-        );
+    const validationError = validateForm();
 
-        return;
-      }
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Payload
-      |--------------------------------------------------------------------------
-      */
-
-      const data = {
-        fullName:
-          form.fullName
-            .trim(),
-
-        email:
-          form.email
-            .trim()
-            .toLowerCase(),
-
-        role:
-          form.role,
-
-        department:
-          form.department
-            .trim() ||
-          null,
-
-        location:
-          form.location
-            .trim() ||
-          null,
-
-        /*
-         * Owners must have a branch.
-         * Super Admin remains global.
-         */
-        branchId:
-          form.role ===
-          "OWNER"
-            ? Number(
-                form.branchId
-              )
-            : null,
-      };
-
-      /*
-       * On edit, blank password means:
-       * keep current password.
-       */
-      if (
-        form.password
-      ) {
-        data.password =
-          form.password;
-      }
-
-      try {
-        if (isEditing) {
-          await updateMutation
-            .mutateAsync({
-              userId:
-                Number(
-                  user.id
-                ),
-
-              data,
-            });
-        } else {
-          await createMutation
-            .mutateAsync({
-              ...data,
-
-              password:
-                form.password,
-            });
-        }
-
-        onClose();
-      } catch (
-        requestError
-      ) {
-        setError(
-          requestError
-            ?.response
-            ?.data
-            ?.message ||
-            requestError
-              ?.message ||
-            "Unable to save user."
-        );
-      }
+    const data = {
+      fullName: form.fullName.trim(),
+      email: form.email.trim().toLowerCase(),
+      role: form.role,
+      department: form.department.trim() || null,
+      location: form.location.trim() || null,
+      branchId:
+        form.role === "OWNER"
+          ? Number(form.branchId)
+          : null,
     };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Not Open
-  |--------------------------------------------------------------------------
-  */
+    if (form.password) {
+      data.password = form.password;
+    }
 
-  if (!open) {
-    return null;
-  }
+    try {
+      if (isEditing) {
+        await updateMutation.mutateAsync({
+          userId: Number(user.id),
+          data,
+        });
+      } else {
+        await createMutation.mutateAsync({
+          ...data,
+          password: form.password,
+        });
+      }
+
+      onClose?.();
+    } catch (requestError) {
+      setError(
+        requestError?.response?.data?.message ||
+          requestError?.message ||
+          "Unable to save user."
+      );
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -542,541 +371,438 @@ const UserFormModal = ({
   |--------------------------------------------------------------------------
   */
 
-  return (
-    <div
-      className="modal-backdrop"
-      onMouseDown={(
-        event
-      ) => {
-        if (
-          event.target ===
-            event.currentTarget &&
-          !isSaving
-        ) {
-          handleClose();
-        }
-      }}
-    >
+  if (!open) return null;
+
+  const inputClass =
+    "gum-input w-full rounded-xl px-4 py-3 text-sm";
+
+  return createPortal(
+    <div className="gum-overlay">
       <section
-        className="tl-modal"
+        className="gum-modal flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="user-modal-title"
       >
-        {/* --------------------------------------------------------------- */}
-        {/* Header */}
-        {/* --------------------------------------------------------------- */}
+        {/* ========================================================= */}
+        {/* HEADER */}
+        {/* ========================================================= */}
 
-        <header className="modal-head">
-          <div>
-            <h2
-              id="user-modal-title"
-            >
-              {isEditing
-                ? "Edit user"
-                : "Add user"}
-            </h2>
+        <header className="gum-header flex shrink-0 items-center justify-between gap-4 px-6 py-5">
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="gum-brand flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl">
+              <Users size={23} />
+            </span>
 
-            <p>
-              Manage account access,
-              lead ownership and
-              primary branch.
-            </p>
+            <div className="min-w-0">
+              <p className="gum-eyebrow mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em]">
+                <Sparkles size={12} />
+                USER ACCESS MANAGEMENT
+              </p>
+
+              <h2
+                id="user-modal-title"
+                className="gum-title text-xl font-extrabold"
+              >
+                {isEditing ? "Edit User" : "Add User"}
+              </h2>
+
+              <p className="gum-muted mt-1 text-xs leading-5">
+                Manage account access, lead ownership, and
+                primary branch assignments.
+              </p>
+            </div>
           </div>
 
           <button
             type="button"
-            className="icon-control"
-            onClick={
-              handleClose
-            }
-            disabled={
-              isSaving
-            }
+            className="gum-close flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+            onClick={handleClose}
+            disabled={isSaving}
             aria-label="Close"
           >
-            <X
-              size={16}
-            />
+            <X size={19} />
           </button>
         </header>
 
-        {/* --------------------------------------------------------------- */}
-        {/* Body */}
-        {/* --------------------------------------------------------------- */}
+        {/* ========================================================= */}
+        {/* BODY */}
+        {/* ========================================================= */}
 
-        <div className="modal-body">
-          {/* ------------------------------------------------------------- */}
-          {/* API / Validation Error */}
-          {/* ------------------------------------------------------------- */}
+        <div className="gum-body min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+          {/* Validation / API Error */}
 
           {error && (
             <div
-              className="error-box"
               role="alert"
+              className="gum-error flex items-start gap-3 rounded-xl p-4 text-sm"
             >
-              {error}
+              <AlertCircle size={18} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
-          {/* ------------------------------------------------------------- */}
           {/* Options Error */}
-          {/* ------------------------------------------------------------- */}
 
           {optionsQuery.isError && (
             <div
-              className="error-box"
               role="alert"
+              className="gum-error flex flex-wrap items-center gap-3 rounded-xl p-4 text-sm"
             >
-              {optionsQuery.error
-                ?.response
-                ?.data
-                ?.message ||
-                "Unable to load user options."}
+              <AlertCircle size={18} />
+
+              <span>
+                {optionsQuery.error?.response?.data?.message ||
+                  "Unable to load user options."}
+              </span>
 
               <button
                 type="button"
-                className="tl-link"
-                onClick={() =>
-                  optionsQuery
-                    .refetch()
-                }
+                className="gum-retry ml-auto text-xs font-bold underline"
+                onClick={() => optionsQuery.refetch()}
               >
                 Retry
               </button>
             </div>
           )}
 
-          {/* ------------------------------------------------------------- */}
-          {/* User Information */}
-          {/* ------------------------------------------------------------- */}
+          {/* ======================================================= */}
+          {/* USER INFORMATION */}
+          {/* ======================================================= */}
 
-          <div className="form-section">
-            <h3>
-              User information
-            </h3>
+          <div className="gum-section rounded-2xl p-5">
+            <div className="gum-section-heading mb-5 flex items-center gap-3">
+              <span className="gum-section-icon flex h-10 w-10 items-center justify-center rounded-xl">
+                <UserRound size={19} />
+              </span>
 
-            <div className="form-grid2">
+              <div>
+                <h3 className="gum-title text-sm font-extrabold">
+                  User Information
+                </h3>
+
+                <p className="gum-muted mt-1 text-xs">
+                  Personal details and account identity
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               {/* Full Name */}
 
-              <label>
-                Full name *
-
+              <FormField label="Full Name" required>
                 <input
                   type="text"
-                  value={
-                    form.fullName
-                  }
+                  className={inputClass}
+                  value={form.fullName}
                   maxLength={150}
                   autoComplete="name"
-                  disabled={
-                    isSaving
+                  disabled={isSaving}
+                  onChange={(event) =>
+                    updateField("fullName", event.target.value)
                   }
-                  onChange={(
-                    event
-                  ) =>
-                    updateField(
-                      "fullName",
-                      event.target
-                        .value
-                    )
-                  }
+                  placeholder="Enter full name"
                 />
-              </label>
+              </FormField>
 
               {/* Email */}
 
-              <label>
-                Email *
-
+              <FormField label="Email Address" required>
                 <input
                   type="email"
-                  value={
-                    form.email
-                  }
+                  className={inputClass}
+                  value={form.email}
                   maxLength={190}
                   autoComplete="email"
-                  disabled={
-                    isSaving
+                  disabled={isSaving}
+                  onChange={(event) =>
+                    updateField("email", event.target.value)
                   }
-                  onChange={(
-                    event
-                  ) =>
-                    updateField(
-                      "email",
-                      event.target
-                        .value
-                    )
-                  }
+                  placeholder="name@company.com"
                 />
-              </label>
+              </FormField>
 
+              {/* Department */}
+
+              <FormField label="Department">
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={form.department}
+                  maxLength={120}
+                  disabled={isSaving}
+                  onChange={(event) =>
+                    updateField("department", event.target.value)
+                  }
+                  placeholder="e.g. Business Development"
+                />
+              </FormField>
+
+              {/* Location */}
+
+              <FormField label="Location">
+                <input
+                  type="text"
+                  className={inputClass}
+                  value={form.location}
+                  maxLength={120}
+                  disabled={isSaving}
+                  onChange={(event) =>
+                    updateField("location", event.target.value)
+                  }
+                  placeholder="e.g. Hyderabad"
+                />
+              </FormField>
+            </div>
+          </div>
+
+          {/* ======================================================= */}
+          {/* ACCESS & BRANCH */}
+          {/* ======================================================= */}
+
+          <div className="gum-section rounded-2xl p-5">
+            <div className="gum-section-heading mb-5 flex items-center gap-3">
+              <span className="gum-section-icon flex h-10 w-10 items-center justify-center rounded-xl">
+                <ShieldCheck size={19} />
+              </span>
+
+              <div>
+                <h3 className="gum-title text-sm font-extrabold">
+                  Role & Branch Access
+                </h3>
+
+                <p className="gum-muted mt-1 text-xs">
+                  Configure account permissions and branch
+                  visibility
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               {/* Role */}
 
-              <label>
-                Role *
-
+              <FormField label="User Role" required>
                 <select
-                  value={
-                    form.role
-                  }
-                  disabled={
-                    isSaving ||
-                    optionsQuery
-                      .isLoading
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    handleRoleChange(
-                      event.target
-                        .value
-                    )
+                  className={inputClass}
+                  value={form.role}
+                  disabled={isSaving || optionsQuery.isLoading}
+                  onChange={(event) =>
+                    handleRoleChange(event.target.value)
                   }
                 >
-                  {roles.map(
-                    (
-                      role
-                    ) => (
-                      <option
-                        key={
-                          role.value
-                        }
-                        value={
-                          role.value
-                        }
-                      >
-                        {
-                          role.label
-                        }
-                      </option>
-                    )
-                  )}
+                  {roles.map((role) => (
+                    <option
+                      key={role.value}
+                      value={role.value}
+                    >
+                      {role.label}
+                    </option>
+                  ))}
                 </select>
-              </label>
+              </FormField>
 
               {/* Branch */}
 
-              <label>
-                Primary branch
-                {form.role ===
-                "OWNER"
-                  ? " *"
-                  : ""}
-
+              <FormField
+                label="Primary Branch"
+                required={form.role === "OWNER"}
+              >
                 <select
-                  value={
-                    form.branchId
-                  }
+                  className={inputClass}
+                  value={form.branchId}
                   disabled={
                     isSaving ||
-                    optionsQuery
-                      .isLoading ||
-                    form.role ===
-                      "SUPER_ADMIN"
+                    optionsQuery.isLoading ||
+                    form.role === "SUPER_ADMIN"
                   }
-                  onChange={(
-                    event
-                  ) =>
-                    updateField(
-                      "branchId",
-                      event.target
-                        .value
-                    )
+                  onChange={(event) =>
+                    updateField("branchId", event.target.value)
                   }
                 >
                   <option value="">
-                    {form.role ===
-                    "SUPER_ADMIN"
+                    {form.role === "SUPER_ADMIN"
                       ? "Global access"
-                      : optionsQuery
-                            .isLoading
+                      : optionsQuery.isLoading
                         ? "Loading branches..."
                         : "Select branch"}
                   </option>
 
-                  {branches.map(
-                    (
-                      branch
-                    ) => (
-                      <option
-                        key={
-                          branch.id
-                        }
-                        value={
-                          String(
-                            branch.id
-                          )
-                        }
-                      >
-                        {
-                          branch.name
-                        }
-                      </option>
-                    )
-                  )}
+                  {branches.map((branch) => (
+                    <option
+                      key={branch.id}
+                      value={String(branch.id)}
+                    >
+                      {branch.name}
+                    </option>
+                  ))}
                 </select>
-              </label>
-
-              {/* Department */}
-
-              <label>
-                Department
-
-                <input
-                  type="text"
-                  value={
-                    form.department
-                  }
-                  maxLength={120}
-                  disabled={
-                    isSaving
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    updateField(
-                      "department",
-                      event.target
-                        .value
-                    )
-                  }
-                />
-              </label>
-
-              {/* Location */}
-
-              <label>
-                Location
-
-                <input
-                  type="text"
-                  value={
-                    form.location
-                  }
-                  maxLength={120}
-                  disabled={
-                    isSaving
-                  }
-                  placeholder="e.g. Hyderabad"
-                  onChange={(
-                    event
-                  ) =>
-                    updateField(
-                      "location",
-                      event.target
-                        .value
-                    )
-                  }
-                />
-              </label>
+              </FormField>
             </div>
-          </div>
 
-          {/* ------------------------------------------------------------- */}
-          {/* Branch Summary */}
-          {/* ------------------------------------------------------------- */}
+            {/* Branch Summary */}
 
-          {form.role ===
-            "OWNER" &&
-            selectedBranch && (
-              <div className="brief-clarification">
-                <b>
-                  Primary branch
-                </b>
+            {form.role === "OWNER" && selectedBranch && (
+              <div className="gum-info mt-5 flex items-start gap-3 rounded-xl p-4">
+                <Building2 size={18} className="mt-0.5 shrink-0" />
 
-                <span>
-                  {selectedBranch.name}
+                <div>
+                  <p className="text-xs font-bold">
+                    Primary Branch
+                  </p>
 
-                  {selectedBranch.code
-                    ? ` (${selectedBranch.code})`
-                    : ""}
-                </span>
+                  <p className="mt-1 text-xs leading-5">
+                    {selectedBranch.name}
+                    {selectedBranch.code
+                      ? ` (${selectedBranch.code})`
+                      : ""}
+                  </p>
+                </div>
               </div>
             )}
 
-          {/* ------------------------------------------------------------- */}
-          {/* Super Admin Notice */}
-          {/* ------------------------------------------------------------- */}
+            {/* Super Admin Notice */}
 
-          {form.role ===
-            "SUPER_ADMIN" && (
-            <div className="brief-clarification">
-              <b>
-                Global access
-              </b>
+            {form.role === "SUPER_ADMIN" && (
+              <div className="gum-info mt-5 flex items-start gap-3 rounded-xl p-4">
+                <ShieldCheck size={18} className="mt-0.5 shrink-0" />
 
-              <span>
-                Super Admin does not
-                require a primary
-                branch and can manage
-                records across all
-                branches.
+                <div>
+                  <p className="text-xs font-bold">
+                    Global Access
+                  </p>
+
+                  <p className="mt-1 text-xs leading-5">
+                    Super Admin does not require a primary
+                    branch and can manage records across all
+                    branches.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ======================================================= */}
+          {/* SECURITY */}
+          {/* ======================================================= */}
+
+          <div className="gum-section rounded-2xl p-5">
+            <div className="gum-section-heading mb-5 flex items-center gap-3">
+              <span className="gum-section-icon flex h-10 w-10 items-center justify-center rounded-xl">
+                <LockKeyhole size={19} />
               </span>
+
+              <div>
+                <h3 className="gum-title text-sm font-extrabold">
+                  Security
+                </h3>
+
+                <p className="gum-muted mt-1 text-xs">
+                  Set or update the account password
+                </p>
+              </div>
             </div>
-          )}
 
-          {/* ------------------------------------------------------------- */}
-          {/* Password */}
-          {/* ------------------------------------------------------------- */}
-
-          <div className="form-section">
-            <h3>
-              Security
-            </h3>
-
-            <div className="form-grid2">
-              <label>
-                {isEditing
-                  ? "New password"
-                  : "Password *"}
-
-                <div
-                  style={{
-                    position:
-                      "relative",
-                  }}
-                >
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <FormField
+                label={isEditing ? "New Password" : "Password"}
+                required={!isEditing}
+                hint={
+                  isEditing
+                    ? "Leave blank to keep the existing password."
+                    : "Minimum 8 characters."
+                }
+                full
+              >
+                <div className="relative">
                   <input
-                    type={
-                      showPassword
-                        ? "text"
-                        : "password"
-                    }
-                    value={
-                      form.password
-                    }
+                    type={showPassword ? "text" : "password"}
+                    className={`${inputClass} pr-12`}
+                    value={form.password}
                     maxLength={128}
-                    autoComplete={
-                      isEditing
-                        ? "new-password"
-                        : "new-password"
-                    }
-                    disabled={
-                      isSaving
+                    autoComplete="new-password"
+                    disabled={isSaving}
+                    onChange={(event) =>
+                      updateField("password", event.target.value)
                     }
                     placeholder={
                       isEditing
                         ? "Leave blank to keep current password"
-                        : "Minimum 8 characters"
-                    }
-                    style={{
-                      paddingRight:
-                        "42px",
-                    }}
-                    onChange={(
-                      event
-                    ) =>
-                      updateField(
-                        "password",
-                        event.target
-                          .value
-                      )
+                        : "Enter a secure password"
                     }
                   />
 
                   <button
                     type="button"
-                    className="icon-control"
-                    disabled={
-                      isSaving
-                    }
+                    className="gum-password-toggle absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg"
+                    disabled={isSaving}
                     aria-label={
                       showPassword
                         ? "Hide password"
                         : "Show password"
                     }
                     onClick={() =>
-                      setShowPassword(
-                        (
-                          previous
-                        ) =>
-                          !previous
-                      )
+                      setShowPassword((previous) => !previous)
                     }
-                    style={{
-                      position:
-                        "absolute",
-
-                      right:
-                        "6px",
-
-                      top:
-                        "50%",
-
-                      transform:
-                        "translateY(-50%)",
-
-                      width:
-                        "30px",
-
-                      height:
-                        "30px",
-                    }}
                   >
                     {showPassword ? (
-                      <EyeOff
-                        size={15}
-                      />
+                      <EyeOff size={17} />
                     ) : (
-                      <Eye
-                        size={15}
-                      />
+                      <Eye size={17} />
                     )}
                   </button>
                 </div>
-
-                {isEditing && (
-                  <small className="muted">
-                    Leave blank to
-                    keep the existing
-                    password.
-                  </small>
-                )}
-              </label>
+              </FormField>
             </div>
           </div>
         </div>
 
-        {/* --------------------------------------------------------------- */}
-        {/* Footer */}
-        {/* --------------------------------------------------------------- */}
+        {/* ========================================================= */}
+        {/* FOOTER */}
+        {/* ========================================================= */}
 
-        <footer className="modal-foot">
-          <button
-            type="button"
-            className="tl-secondary"
-            onClick={
-              handleClose
-            }
-            disabled={
-              isSaving
-            }
-          >
-            Cancel
-          </button>
+        <footer className="gum-footer flex shrink-0 items-center justify-between gap-3 px-6 py-4">
+          <p className="gum-muted hidden text-xs sm:block">
+            Changes are saved to your CRM.
+          </p>
 
-          <button
-            type="button"
-            className="tl-primary"
-            onClick={
-              submit
-            }
-            disabled={
-              isSaving ||
-              optionsQuery
-                .isLoading
-            }
-          >
-            {isSaving
-              ? "Saving..."
-              : isEditing
-                ? "Update user"
-                : "Create user"}
-          </button>
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              className="gum-secondary inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-bold"
+              onClick={handleClose}
+              disabled={isSaving}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              className="gum-primary inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold"
+              onClick={submit}
+              disabled={isSaving || optionsQuery.isLoading}
+            >
+              {isSaving ? (
+                <LoaderCircle
+                  size={17}
+                  className="animate-spin"
+                />
+              ) : isEditing ? (
+                <Save size={17} />
+              ) : (
+                <Check size={17} />
+              )}
+
+              {isSaving
+                ? "Saving..."
+                : isEditing
+                  ? "Update User"
+                  : "Create User"}
+            </button>
+          </div>
         </footer>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 };
 

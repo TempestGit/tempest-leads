@@ -1,964 +1,469 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
+  CalendarClock,
+  CalendarDays,
+  Check,
+  Clock3,
+  FileText,
+  Flag,
+  ListTodo,
+  LoaderCircle,
   X,
 } from "lucide-react";
 
-import {
-  useLeadsQuery,
-} from "../leads/leads.queries.js";
+import { useLeadsQuery } from "../leads/leads.queries.js";
+import { useCreateFollowupMutation } from "./followups.queries.js";
 
-import {
-  useCreateFollowupMutation,
-} from "./followups.queries.js";
+const pad2 = (value) => String(value).padStart(2, "0");
 
-/*
-|--------------------------------------------------------------------------
-| Date / Time Helpers
-|--------------------------------------------------------------------------
-*/
-
-const pad2 = (value) =>
-  String(value).padStart(2, "0");
-
-const getLocalDate = (
-  value = new Date()
-) =>
-  `${value.getFullYear()}-${pad2(
-    value.getMonth() + 1
-  )}-${pad2(value.getDate())}`;
-
-const getLocalTime = (
-  value = new Date()
-) =>
-  `${pad2(value.getHours())}:${pad2(
-    value.getMinutes()
+const getLocalDate = (value = new Date()) =>
+  `${value.getFullYear()}-${pad2(value.getMonth() + 1)}-${pad2(
+    value.getDate()
   )}`;
 
-/*
-|--------------------------------------------------------------------------
-| Schedule Follow-up Modal
-|--------------------------------------------------------------------------
-*/
+const getLocalTime = (value = new Date()) =>
+  `${pad2(value.getHours())}:${pad2(value.getMinutes())}`;
+
+const getApiError = (error, fallback) => {
+  const response = error?.response?.data;
+  const items = Array.isArray(response?.errors)
+    ? response.errors
+    : [];
+
+  const validation = items
+    .map((item) =>
+      typeof item === "string"
+        ? item
+        : item?.message || item?.msg || ""
+    )
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    validation ||
+    response?.message ||
+    error?.message ||
+    fallback
+  );
+};
 
 const ScheduleFollowupModal = ({
   open,
   lead = null,
   onClose,
 }) => {
-  const mutation =
-    useCreateFollowupMutation();
+  const mutation = useCreateFollowupMutation();
 
-  /*
-  |--------------------------------------------------------------------------
-  | Leads
-  |--------------------------------------------------------------------------
-  */
-
-  const params =
-    useMemo(
-      () => ({
-        page: 1,
-        limit: 100,
-        sort: "createdAt",
-        direction: "desc",
-      }),
-      []
-    );
-
-  const leadsQuery =
-    useLeadsQuery(
-      params
-    );
-
-  const leads =
-    leadsQuery.data
-      ?.data
-      ?.leads || [];
-
-  /*
-  |--------------------------------------------------------------------------
-  | State
-  |--------------------------------------------------------------------------
-  */
-
-  const [
-    selectedLeadId,
-    setSelectedLeadId,
-  ] = useState("");
-
-  const [
-    action,
-    setAction,
-  ] = useState("");
-
-  const [
-    date,
-    setDate,
-  ] = useState("");
-
-  const [
-    time,
-    setTime,
-  ] = useState("");
-
-  const [
-    priority,
-    setPriority,
-  ] = useState(
-    "Medium"
+  const params = useMemo(
+    () => ({
+      page: 1,
+      limit: 100,
+      sort: "createdAt",
+      direction: "desc",
+    }),
+    []
   );
 
-  const [
-    notes,
-    setNotes,
-  ] = useState("");
+  const leadsQuery = useLeadsQuery(params);
+  const leads = leadsQuery.data?.data?.leads || [];
 
-  const [
-    error,
-    setError,
-  ] = useState("");
-
-  /*
-  |--------------------------------------------------------------------------
-  | Reset Every Time Modal Opens
-  |--------------------------------------------------------------------------
-  */
+  const [selectedLeadId, setSelectedLeadId] = useState("");
+  const [action, setAction] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [priority, setPriority] = useState("Medium");
+  const [notes, setNotes] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
-    const now =
-      new Date();
+    const now = new Date();
 
-    setSelectedLeadId(
-      lead?.id
-        ? String(lead.id)
-        : ""
+    setSelectedLeadId(lead?.id ? String(lead.id) : "");
+    setAction(lead?.nextAction || "");
+    setDate(getLocalDate(now));
+    setTime(getLocalTime(now));
+
+    setPriority(
+      ["High", "Medium", "Low"].includes(lead?.priority)
+        ? lead.priority
+        : "Medium"
     );
-
-    setAction(
-      lead?.nextAction ||
-        ""
-    );
-
-    /*
-     * Use the actual current date/time.
-     *
-     * Nothing is silently scheduled
-     * for 10 AM.
-     */
-    setDate(
-      getLocalDate(now)
-    );
-
-    setTime(
-      getLocalTime(now)
-    );
-
-    /*
-     * Follow-up priority is independent
-     * from lead priority unless the lead
-     * already has a compatible value.
-     */
-    if (
-      [
-        "High",
-        "Medium",
-        "Low",
-      ].includes(
-        lead?.priority
-      )
-    ) {
-      setPriority(
-        lead.priority
-      );
-    } else {
-      setPriority(
-        "Medium"
-      );
-    }
 
     setNotes("");
     setError("");
-  }, [
-    open,
-    lead,
-  ]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Escape
-  |--------------------------------------------------------------------------
-  */
+  }, [open, lead]);
 
   useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
+    if (!open) return undefined;
 
-    const handler = (
-      event
-    ) => {
-      if (
-        event.key ===
-          "Escape" &&
-        !mutation.isPending
-      ) {
-        onClose();
-      }
-    };
-
-    window.addEventListener(
-      "keydown",
-      handler
-    );
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
     return () => {
-      window.removeEventListener(
-        "keydown",
-        handler
-      );
+      document.body.style.overflow = previousOverflow;
     };
-  }, [
-    open,
-    onClose,
-    mutation.isPending,
-  ]);
+  }, [open]);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Not Open
-  |--------------------------------------------------------------------------
-  */
+  if (!open) return null;
 
-  if (!open) {
-    return null;
-  }
-
-  /*
-  |--------------------------------------------------------------------------
-  | Current Date / Time
-  |--------------------------------------------------------------------------
-  */
-
-  const today =
-    getLocalDate();
-
-  const currentTime =
-    getLocalTime();
-
-  /*
-  |--------------------------------------------------------------------------
-  | Resolve Lead
-  |--------------------------------------------------------------------------
-  */
+  const today = getLocalDate();
+  const currentTime = getLocalTime();
 
   const resolvedLead =
     lead ||
     leads.find(
-      (item) =>
-        Number(
-          item.id
-        ) ===
-        Number(
-          selectedLeadId
-        )
+      (item) => Number(item.id) === Number(selectedLeadId)
     ) ||
     null;
 
-  /*
-  |--------------------------------------------------------------------------
-  | Date Change
-  |--------------------------------------------------------------------------
-  */
+  const busy = mutation.isPending;
 
-  const handleDateChange = (
-    event
-  ) => {
-    const selectedDate =
-      event.target.value;
+  const handleDateChange = (event) => {
+    const selectedDate = event.target.value;
 
     if (!selectedDate) {
       setDate("");
       setTime("");
       setError("");
-
       return;
     }
 
-    const nowDate =
-      getLocalDate();
+    const nowDate = getLocalDate();
+    const nowTime = getLocalTime();
 
-    const nowTime =
-      getLocalTime();
-
-    if (
-      selectedDate <
-      nowDate
-    ) {
-      setError(
-        "Follow-up date cannot be in the past."
-      );
-
+    if (selectedDate < nowDate) {
+      setError("Follow-up date cannot be in the past.");
       return;
     }
 
-    setDate(
-      selectedDate
-    );
+    setDate(selectedDate);
 
-    /*
-     * If user moves the date back to
-     * today and the selected time has
-     * already passed, clear the time.
-     *
-     * Do not manufacture a hidden
-     * replacement time.
-     */
-    if (
-      selectedDate ===
-        nowDate &&
-      time &&
-      time < nowTime
-    ) {
+    if (selectedDate === nowDate && time && time < nowTime) {
       setTime("");
     }
 
     setError("");
   };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Time Change
-  |--------------------------------------------------------------------------
-  */
-
-  const handleTimeChange = (
-    event
-  ) => {
-    const selectedTime =
-      event.target.value;
+  const handleTimeChange = (event) => {
+    const selectedTime = event.target.value;
 
     if (!selectedTime) {
       setTime("");
       setError("");
-
       return;
     }
-
-    const nowDate =
-      getLocalDate();
-
-    const nowTime =
-      getLocalTime();
 
     if (
-      date === nowDate &&
-      selectedTime <
-        nowTime
+      date === getLocalDate() &&
+      selectedTime < getLocalTime()
     ) {
-      setError(
-        "Follow-up time cannot be in the past."
-      );
-
+      setError("Follow-up time cannot be in the past.");
       return;
     }
 
-    setTime(
-      selectedTime
-    );
-
+    setTime(selectedTime);
     setError("");
   };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Submit
-  |--------------------------------------------------------------------------
-  */
+  const submit = async (event) => {
+    event.preventDefault();
 
-  const submit =
-    async () => {
-      setError("");
+    if (busy) return;
 
-      /*
-      |--------------------------------------------------------------------------
-      | Related Lead
-      |--------------------------------------------------------------------------
-      */
+    setError("");
 
-      if (
-        !resolvedLead?.id
-      ) {
-        setError(
-          "Related lead is required."
-        );
+    if (!resolvedLead?.id) {
+      setError("Related lead is required.");
+      return;
+    }
 
-        return;
-      }
+    const cleanAction = action.trim();
 
-      /*
-      |--------------------------------------------------------------------------
-      | Action
-      |--------------------------------------------------------------------------
-      |
-      | Backend:
-      | min 2
-      | max 500
-      |
-      */
+    if (cleanAction.length < 2) {
+      setError(
+        cleanAction
+          ? "Action must be at least 2 characters."
+          : "Action is required."
+      );
+      return;
+    }
 
-      const cleanAction =
-        action.trim();
+    if (cleanAction.length > 500) {
+      setError("Action cannot exceed 500 characters.");
+      return;
+    }
 
-      if (!cleanAction) {
-        setError(
-          "Action is required."
-        );
+    if (!date) {
+      setError("Follow-up date is required.");
+      return;
+    }
 
-        return;
-      }
+    if (!time) {
+      setError("Follow-up time is required.");
+      return;
+    }
 
-      if (
-        cleanAction.length <
-        2
-      ) {
-        setError(
-          "Action must be at least 2 characters."
-        );
+    const dueDate = new Date(`${date}T${time}:00`);
 
-        return;
-      }
+    if (Number.isNaN(dueDate.getTime())) {
+      setError("Enter a valid follow-up date and time.");
+      return;
+    }
 
-      if (
-        cleanAction.length >
-        500
-      ) {
-        setError(
-          "Action cannot exceed 500 characters."
-        );
+    if (dueDate.getTime() < Date.now() - 60 * 1000) {
+      setError("Follow-up date and time cannot be in the past.");
+      return;
+    }
 
-        return;
-      }
+    if (!["High", "Medium", "Low"].includes(priority)) {
+      setError("Select a valid priority.");
+      return;
+    }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Date / Time
-      |--------------------------------------------------------------------------
-      */
+    const cleanNotes = notes.trim();
 
-      if (!date) {
-        setError(
-          "Follow-up date is required."
-        );
+    if (cleanNotes.length > 5000) {
+      setError("Notes cannot exceed 5000 characters.");
+      return;
+    }
 
-        return;
-      }
+    try {
+      await mutation.mutateAsync({
+        leadId: Number(resolvedLead.id),
+        action: cleanAction,
+        dueAt: dueDate.toISOString(),
+        priority,
+        notes: cleanNotes || null,
+      });
 
-      if (!time) {
-        setError(
-          "Follow-up time is required."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Construct Local Date / Time
-      |--------------------------------------------------------------------------
-      */
-
-      const dueDate =
-        new Date(
-          `${date}T${time}:00`
-        );
-
-      if (
-        Number.isNaN(
-          dueDate.getTime()
+      onClose();
+    } catch (requestError) {
+      setError(
+        getApiError(
+          requestError,
+          "Unable to schedule follow-up."
         )
-      ) {
-        setError(
-          "Enter a valid follow-up date and time."
-        );
+      );
+    }
+  };
 
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Current / Future Validation
-      |--------------------------------------------------------------------------
-      |
-      | Backend allows a 60-second
-      | tolerance because browser time
-      | fields operate at minute precision.
-      |
-      */
-
-      const minimumAllowed =
-        Date.now() -
-        60 * 1000;
-
-      if (
-        dueDate.getTime() <
-        minimumAllowed
-      ) {
-        setError(
-          "Follow-up date and time cannot be in the past."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Priority
-      |--------------------------------------------------------------------------
-      */
-
-      if (
-        ![
-          "High",
-          "Medium",
-          "Low",
-        ].includes(
-          priority
-        )
-      ) {
-        setError(
-          "Select a valid priority."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Notes
-      |--------------------------------------------------------------------------
-      */
-
-      const cleanNotes =
-        notes.trim();
-
-      if (
-        cleanNotes.length >
-        5000
-      ) {
-        setError(
-          "Notes cannot exceed 5000 characters."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Create Follow-up
-      |--------------------------------------------------------------------------
-      |
-      | Backend createFollowupSchema expects:
-      |
-      | {
-      |   leadId,
-      |   action,
-      |   dueAt,
-      |   priority,
-      |   notes
-      | }
-      |
-      */
-
-      try {
-        await mutation.mutateAsync({
-          leadId:
-            Number(
-              resolvedLead.id
-            ),
-
-          action:
-            cleanAction,
-
-          dueAt:
-            dueDate.toISOString(),
-
-          priority,
-
-          notes:
-            cleanNotes ||
-            null,
-        });
-
-        onClose();
-      } catch (
-        requestError
-      ) {
-        const responseData =
-          requestError
-            ?.response
-            ?.data;
-
-        const errors =
-          Array.isArray(
-            responseData?.errors
-          )
-            ? responseData.errors
-            : [];
-
-        const validationMessage =
-          errors
-            .map(
-              (item) => {
-                if (
-                  typeof item ===
-                  "string"
-                ) {
-                  return item;
-                }
-
-                return (
-                  item?.message ||
-                  item?.msg ||
-                  null
-                );
-              }
-            )
-            .filter(Boolean)
-            .join(" ");
-
-        setError(
-          validationMessage ||
-            responseData
-              ?.message ||
-            requestError
-              ?.message ||
-            "Unable to schedule follow-up."
-        );
-      }
-    };
-
-  /*
-  |--------------------------------------------------------------------------
-  | Render
-  |--------------------------------------------------------------------------
-  */
-
-  return (
-    <div className="modal-backdrop">
+  return createPortal(
+    <div className="gfp-modal-overlay" role="presentation">
       <section
-        className="tl-modal"
+        className="gfp-modal"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="schedule-followup-title"
+        aria-labelledby="gfp-schedule-title"
       >
-        {/* Header */}
+        <header className="gfp-modal-header">
+          <div className="flex items-center gap-3">
+            <span className="gfp-modal-brand flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl">
+              <CalendarClock size={23} />
+            </span>
 
-        <header className="modal-head">
-          <div>
-            <h2 id="schedule-followup-title">
-              Schedule follow-up
-            </h2>
+            <div>
+              <h2
+                id="gfp-schedule-title"
+                className="text-lg font-extrabold"
+              >
+                Schedule Follow-up
+              </h2>
 
-            <p>
-              Schedule the next
-              action for this lead.
-            </p>
+              <p className="mt-1 text-xs">
+                Plan the next action for your lead.
+              </p>
+            </div>
           </div>
 
           <button
             type="button"
-            className="icon-control"
-            onClick={
-              onClose
-            }
-            disabled={
-              mutation.isPending
-            }
+            onClick={onClose}
+            disabled={busy}
             aria-label="Close"
+            className="gfp-modal-close flex h-9 w-9 items-center justify-center rounded-xl"
           >
-            <X
-              size={15}
-            />
+            <X size={18} />
           </button>
         </header>
 
-        {/* Body */}
+        <form onSubmit={submit} className="gfp-modal-form">
+          <div className="gfp-modal-body space-y-5">
+            {error && (
+              <div role="alert" className="gfp-modal-error rounded-xl px-4 py-3 text-sm">
+                {error}
+              </div>
+            )}
 
-        <div className="modal-body">
-          {error && (
-            <div className="error-box">
-              {error}
-            </div>
-          )}
+            {!lead ? (
+              <label className="gfp-field">
+                <span>Related Lead *</span>
 
-          <div className="form-section">
-            <div className="form-grid2">
-
-              {/* Related Lead */}
-
-              {!lead ? (
-                <label className="full">
-                  Related lead *
-
-                  <select
-                    value={
-                      selectedLeadId
-                    }
-                    disabled={
-                      mutation.isPending ||
-                      leadsQuery.isLoading
-                    }
-                    onChange={(
-                      event
-                    ) => {
-                      setSelectedLeadId(
-                        event
-                          .target
-                          .value
-                      );
-
-                      setError("");
-                    }}
-                  >
-                    <option value="">
-                      {leadsQuery.isLoading
-                        ? "Loading leads..."
-                        : "Select lead"}
-                    </option>
-
-                    {leads.map(
-                      (
-                        item
-                      ) => (
-                        <option
-                          key={
-                            item.id
-                          }
-                          value={
-                            item.id
-                          }
-                        >
-                          {
-                            item.companyName
-                          }
-
-                          {" · "}
-
-                          {
-                            item.leadCode
-                          }
-                        </option>
-                      )
-                    )}
-                  </select>
-                </label>
-              ) : (
-                <div className="activity-context full">
-                  <small>
-                    Related lead
-                  </small>
-
-                  <b>
-                    {
-                      lead.companyName
-                    }
-
-                    {" · "}
-
-                    {
-                      lead.leadCode
-                    }
-                  </b>
-                </div>
-              )}
-
-              {/* Action */}
-
-              <label className="full">
-                Action *
-
-                <input
-                  type="text"
-                  maxLength={500}
-                  value={
-                    action
-                  }
-                  disabled={
-                    mutation.isPending
-                  }
-                  placeholder="e.g. Call customer to discuss proposal"
-                  onChange={(
-                    event
-                  ) => {
-                    setAction(
-                      event
-                        .target
-                        .value
-                    );
-
+                <select
+                  value={selectedLeadId}
+                  disabled={busy || leadsQuery.isLoading}
+                  onChange={(event) => {
+                    setSelectedLeadId(event.target.value);
                     setError("");
                   }}
-                  autoFocus
-                />
+                >
+                  <option value="">
+                    {leadsQuery.isLoading
+                      ? "Loading leads..."
+                      : "Select lead"}
+                  </option>
+
+                  {leads.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.companyName} · {item.leadCode}
+                    </option>
+                  ))}
+                </select>
               </label>
+            ) : (
+              <div className="gfp-context rounded-2xl p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide">
+                  Related Lead
+                </p>
 
-              {/* Date */}
+                <p className="mt-2 text-sm font-bold">
+                  {lead.companyName || "Company"}
+                </p>
 
-              <label>
-                Date *
+                <p className="mt-1 text-xs">
+                  {lead.leadCode || ""}
+                </p>
+              </div>
+            )}
+
+            <label className="gfp-field">
+              <span className="flex items-center gap-2">
+                <ListTodo size={15} />
+                Action *
+              </span>
+
+              <input
+                type="text"
+                value={action}
+                maxLength={500}
+                disabled={busy}
+                autoFocus
+                placeholder="e.g. Call customer to discuss proposal"
+                onChange={(event) => {
+                  setAction(event.target.value);
+                  setError("");
+                }}
+              />
+            </label>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="gfp-field">
+                <span className="flex items-center gap-2">
+                  <CalendarDays size={15} />
+                  Date *
+                </span>
 
                 <input
                   type="date"
                   min={today}
-                  value={
-                    date
-                  }
-                  disabled={
-                    mutation.isPending
-                  }
-                  onChange={
-                    handleDateChange
-                  }
+                  value={date}
+                  disabled={busy}
+                  onChange={handleDateChange}
                 />
               </label>
 
-              {/* Time */}
-
-              <label>
-                Time *
+              <label className="gfp-field">
+                <span className="flex items-center gap-2">
+                  <Clock3 size={15} />
+                  Time *
+                </span>
 
                 <input
                   type="time"
-                  min={
-                    date === today
-                      ? currentTime
-                      : undefined
-                  }
-                  value={
-                    time
-                  }
-                  disabled={
-                    mutation.isPending ||
-                    !date
-                  }
-                  onChange={
-                    handleTimeChange
-                  }
-                />
-              </label>
-
-              {/* Priority */}
-
-              <label>
-                Priority *
-
-                <select
-                  value={
-                    priority
-                  }
-                  disabled={
-                    mutation.isPending
-                  }
-                  onChange={(
-                    event
-                  ) => {
-                    setPriority(
-                      event
-                        .target
-                        .value
-                    );
-
-                    setError("");
-                  }}
-                >
-                  <option value="High">
-                    High
-                  </option>
-
-                  <option value="Medium">
-                    Medium
-                  </option>
-
-                  <option value="Low">
-                    Low
-                  </option>
-                </select>
-              </label>
-
-              {/* Notes */}
-
-              <label className="full">
-                Notes
-
-                <textarea
-                  rows="4"
-                  maxLength={5000}
-                  value={
-                    notes
-                  }
-                  disabled={
-                    mutation.isPending
-                  }
-                  placeholder="Optional notes"
-                  onChange={(
-                    event
-                  ) => {
-                    setNotes(
-                      event
-                        .target
-                        .value
-                    );
-
-                    setError("");
-                  }}
+                  min={date === today ? currentTime : undefined}
+                  value={time}
+                  disabled={busy || !date}
+                  onChange={handleTimeChange}
                 />
               </label>
             </div>
+
+            <label className="gfp-field">
+              <span className="flex items-center gap-2">
+                <Flag size={15} />
+                Priority *
+              </span>
+
+              <select
+                value={priority}
+                disabled={busy}
+                onChange={(event) => {
+                  setPriority(event.target.value);
+                  setError("");
+                }}
+              >
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </label>
+
+            <label className="gfp-field">
+              <span className="flex items-center gap-2">
+                <FileText size={15} />
+                Notes
+              </span>
+
+              <textarea
+                rows={4}
+                maxLength={5000}
+                value={notes}
+                disabled={busy}
+                placeholder="Optional notes"
+                onChange={(event) => {
+                  setNotes(event.target.value);
+                  setError("");
+                }}
+              />
+            </label>
           </div>
-        </div>
 
-        {/* Footer */}
+          <footer className="gfp-modal-footer flex flex-wrap items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              className="gfp-modal-secondary rounded-xl px-5 py-2.5 text-sm font-bold"
+            >
+              Cancel
+            </button>
 
-        <footer className="modal-foot">
-          <button
-            type="button"
-            className="tl-secondary"
-            disabled={
-              mutation.isPending
-            }
-            onClick={
-              onClose
-            }
-          >
-            Cancel
-          </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="gfp-modal-primary inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold"
+            >
+              {busy ? (
+                <LoaderCircle
+                  size={16}
+                  className="animate-spin"
+                />
+              ) : (
+                <Check size={16} />
+              )}
 
-          <button
-            type="button"
-            className="tl-primary"
-            disabled={
-              mutation.isPending
-            }
-            onClick={
-              submit
-            }
-          >
-            {mutation.isPending
-              ? "Scheduling..."
-              : "Schedule"}
-          </button>
-        </footer>
+              {busy ? "Scheduling..." : "Schedule Follow-up"}
+            </button>
+          </footer>
+        </form>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 };
 

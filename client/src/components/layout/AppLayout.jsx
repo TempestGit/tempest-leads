@@ -1,61 +1,89 @@
-import {
-  useState,
-} from "react";
 
-import {
-  Outlet,
-} from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 
-const AppLayout = () => {
-  const [
-    collapsed,
-    setCollapsed,
-  ] = useState(false);
+const STORAGE_KEY = "tempest-sidebar-collapsed";
 
-  const [
-    mobileOpen,
-    setMobileOpen,
-  ] = useState(false);
+function getSavedCollapseState() {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export default function AppLayout() {
+  const location = useLocation();
+
+  const [collapsed, setCollapsed] = useState(
+    getSavedCollapseState
+  );
+
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        String(collapsed)
+      );
+    } catch {
+      // Continue when browser storage is unavailable.
+    }
+  }, [collapsed]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const onEscape = (event) => {
+      if (event.key === "Escape") {
+        setMobileOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onEscape);
+
+    return () => {
+      window.removeEventListener("keydown", onEscape);
+    };
+  }, [mobileOpen]);
 
   return (
-    <div className="tl-shell">
+    <div
+      className={[
+        "tl-shell",
+        "glass-app-shell",
+        collapsed ? "is-collapsed" : "",
+      ].join(" ")}
+    >
       <Sidebar
-        collapsed={
-          collapsed
-        }
-        mobileOpen={
-          mobileOpen
-        }
+        collapsed={collapsed}
+        mobileOpen={mobileOpen}
         onToggleCollapse={() =>
-          setCollapsed(
-            (value) =>
-              !value
-          )
+          setCollapsed((current) => !current)
         }
-        onCloseMobile={() =>
-          setMobileOpen(false)
-        }
+        onCloseMobile={() => setMobileOpen(false)}
       />
 
-      <div className="tl-main">
+      <div className="tl-main glass-app-main">
         <Topbar
-          onOpenMobile={() =>
-            setMobileOpen(true)
-          }
+          onOpenMobile={() => setMobileOpen(true)}
         />
 
         <main
           id="page-content"
-          className="tl-page"
+          className="tl-page glass-app-content"
         >
           <Outlet />
         </main>
       </div>
     </div>
   );
-};
-
-export default AppLayout;
+}
