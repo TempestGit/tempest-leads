@@ -1,399 +1,281 @@
-import {
-  useState,
-} from "react";
+
+import { useState } from "react";
 
 import {
-  useNurtureLeadQuery,
-} from "./nurture.queries.js";
+  AlertCircle,
+  BriefcaseBusiness,
+  CalendarClock,
+  Clock3,
+  Globe2,
+  HeartHandshake,
+  Layers3,
+  MessageCircle,
+  RefreshCw,
+  Tag,
+  UserRound,
+  Users,
+} from "lucide-react";
 
+import { useNurtureLeadQuery } from "./nurture.queries.js";
 import ScheduleReconnectModal from "./ScheduleReconnectModal.jsx";
 
-/*
-|--------------------------------------------------------------------------
-| Date
-|--------------------------------------------------------------------------
-*/
+import "./nurture-glass.css";
 
-const formatDateTime = (
-  value
-) => {
-  if (!value) {
-    return "—";
-  }
+const formatDateTime = (value) => {
+  if (!value) return "—";
 
-  const date =
-    new Date(value);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
 
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-    return "—";
-  }
-
-  return date.toLocaleString(
-    "en-IN",
-    {
-      dateStyle:
-        "medium",
-
-      timeStyle:
-        "short",
-    }
-  );
+  return date.toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 };
 
-/*
-|--------------------------------------------------------------------------
-| Communication Label
-|--------------------------------------------------------------------------
-*/
-
-const communicationLabel = (
-  value
-) =>
-  String(
-    value ||
-      "NOT_CONTACTED"
-  )
-    .replaceAll(
-      "_",
-      " "
-    )
+const communicationLabel = (value) =>
+  String(value || "NOT_CONTACTED")
+    .replaceAll("_", " ")
     .toLowerCase()
-    .replace(
-      /^\w/,
-      (
-        character
-      ) =>
-        character.toUpperCase()
-    );
+    .replace(/^\w/, (character) => character.toUpperCase());
 
-/*
-|--------------------------------------------------------------------------
-| Lead Nurture Panel
-|--------------------------------------------------------------------------
-*/
+const DetailField = ({ icon: Icon, label, value }) => (
+  <div className="gn-detail-field rounded-xl p-4">
+    <div className="flex items-center gap-2">
+      <Icon size={16} className="gn-detail-icon" />
 
-const LeadNurturePanel = ({
-  lead,
-}) => {
-  const eligible =
-    [
-      "Nurture",
-      "Lost",
-    ].includes(
-      lead.stage
-    );
+      <span className="gn-muted text-xs font-semibold">
+        {label}
+      </span>
+    </div>
 
-  const [
-    reconnectOpen,
-    setReconnectOpen,
-  ] = useState(
-    false
-  );
+    <p className="gn-heading mt-3 break-words text-sm font-bold">
+      {value || "—"}
+    </p>
+  </div>
+);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Only Load When Lead Is Actually In Nurture / Lost
-  |--------------------------------------------------------------------------
-  */
+const LeadNurturePanel = ({ lead }) => {
+  const [reconnectOpen, setReconnectOpen] = useState(false);
 
-  const query =
-    useNurtureLeadQuery(
-      lead.id,
-      {
-        enabled:
-          eligible,
-      }
-    );
+  const eligible = ["Nurture", "Lost"].includes(lead?.stage);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Not Yet Nurture
-  |--------------------------------------------------------------------------
-  */
+  const query = useNurtureLeadQuery(lead?.id, {
+    enabled: Boolean(eligible && lead?.id),
+  });
+
+  const nurture = query.data?.data?.nurture;
 
   if (!eligible) {
     return (
-      <article className="tl-card">
-        <div className="tl-card-head">
-          <h2>
-            NURTURE
+      <article className="gn-panel rounded-3xl p-6">
+        <div className="flex items-center gap-3">
+          <HeartHandshake size={22} className="gn-detail-icon" />
+
+          <h2 className="gn-heading text-lg font-extrabold">
+            Nurture
           </h2>
         </div>
 
-        <p className="muted">
-          Lost, later and
-          no-response contacts
-          stay in the database and
-          can reconnect.
+        <div className="gn-empty mt-6 rounded-2xl p-8 text-center">
+          <HeartHandshake
+            size={36}
+            className="gn-detail-icon mx-auto mb-4"
+          />
+
+          <h3 className="gn-heading text-base font-bold">
+            Not in nurture
+          </h3>
+
+          <p className="gn-muted mt-2 text-sm leading-6">
+            This lead is currently in the{" "}
+            <strong>{lead?.stage || "unknown"}</strong> stage.
+            Lost, later and no-response contacts can be
+            managed through the nurture workflow.
+          </p>
+        </div>
+      </article>
+    );
+  }
+
+  if (query.isLoading) {
+    return (
+      <article className="gn-panel space-y-4 rounded-3xl p-6">
+        <div className="gn-skeleton h-10 w-1/3 rounded-xl" />
+        <div className="gn-skeleton h-24 rounded-xl" />
+        <div className="gn-skeleton h-24 rounded-xl" />
+      </article>
+    );
+  }
+
+  if (query.isError) {
+    return (
+      <article className="gn-panel rounded-3xl p-8 text-center">
+        <AlertCircle
+          size={32}
+          className="gn-detail-icon mx-auto mb-4"
+        />
+
+        <h3 className="gn-heading text-lg font-bold">
+          Unable to load nurture profile
+        </h3>
+
+        <p className="gn-muted mt-2 text-sm">
+          {query.error?.response?.data?.message ||
+            "Something went wrong."}
         </p>
 
-        <div className="empty-state">
-          <h2>
-            Not in nurture
-          </h2>
-
-          <p>
-            This lead is currently
-            in the{" "}
-            <b>
-              {lead.stage}
-            </b>{" "}
-            stage.
-          </p>
-        </div>
+        <button
+          type="button"
+          className="gn-action mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold"
+          onClick={() => query.refetch()}
+        >
+          <RefreshCw size={16} />
+          Try Again
+        </button>
       </article>
     );
   }
-
-  /*
-  |--------------------------------------------------------------------------
-  | Loading
-  |--------------------------------------------------------------------------
-  */
-
-  if (
-    query.isLoading
-  ) {
-    return (
-      <article className="tl-card">
-        <div className="empty-state">
-          <p>
-            Loading nurture
-            profile...
-          </p>
-        </div>
-      </article>
-    );
-  }
-
-  /*
-  |--------------------------------------------------------------------------
-  | Error
-  |--------------------------------------------------------------------------
-  */
-
-  if (
-    query.isError
-  ) {
-    return (
-      <article className="tl-card">
-        <div className="empty-state">
-          <h2>
-            Unable to load
-            nurture profile
-          </h2>
-
-          <p>
-            {query.error
-              ?.response
-              ?.data
-              ?.message ||
-              "Something went wrong."}
-          </p>
-
-          <button
-            type="button"
-            className="tl-secondary"
-            onClick={() =>
-              query.refetch()
-            }
-          >
-            Try again
-          </button>
-        </div>
-      </article>
-    );
-  }
-
-  const nurture =
-    query.data
-      ?.data
-      ?.nurture;
 
   if (!nurture) {
-    return null;
+    return (
+      <article className="gn-panel rounded-3xl p-8 text-center">
+        <HeartHandshake
+          size={32}
+          className="gn-detail-icon mx-auto mb-4"
+        />
+
+        <p className="gn-muted text-sm">
+          No nurture profile is available for this lead.
+        </p>
+      </article>
+    );
   }
+
+  const details = [
+    {
+      label: "Category",
+      value: nurture.categoryLabel,
+      icon: Tag,
+    },
+    {
+      label: "Reason",
+      value: nurture.reason,
+      icon: MessageCircle,
+    },
+    {
+      label: "Industry",
+      value: nurture.industry,
+      icon: BriefcaseBusiness,
+    },
+    {
+      label: "Designation",
+      value: nurture.designation,
+      icon: UserRound,
+    },
+    {
+      label: "Service Interest",
+      value: nurture.serviceInterest,
+      icon: Layers3,
+    },
+    {
+      label: "Geography",
+      value: nurture.geography,
+      icon: Globe2,
+    },
+    {
+      label: "Buying Stage",
+      value: nurture.buyingStage,
+      icon: BriefcaseBusiness,
+    },
+    {
+      label: "Communication Status",
+      value: communicationLabel(nurture.communicationStatus),
+      icon: MessageCircle,
+    },
+    {
+      label: "Owner",
+      value: nurture.ownerName,
+      icon: Users,
+    },
+    {
+      label: "Last Touch",
+      value: formatDateTime(nurture.lastTouchAt),
+      icon: Clock3,
+    },
+    {
+      label: "Reconnect",
+      value: formatDateTime(nurture.reconnectAt),
+      icon: CalendarClock,
+    },
+  ];
 
   return (
     <>
-      <article className="tl-card">
-        {/* Header */}
+      <article className="gn-panel overflow-hidden rounded-3xl">
+        <header className="gn-panel-header flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="gn-panel-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl">
+              <HeartHandshake size={23} />
+            </span>
 
-        <div className="tl-card-head">
-          <h2>
-            NURTURE
-          </h2>
+            <div>
+              <h2 className="gn-heading text-lg font-extrabold">
+                Nurture Profile
+              </h2>
+
+              <p className="gn-muted mt-1 text-xs">
+                Relationship context and reconnect planning
+              </p>
+            </div>
+          </div>
 
           <button
             type="button"
-            className="tl-primary"
-            onClick={() =>
-              setReconnectOpen(
-                true
-              )
-            }
+            className="gn-action inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold"
+            onClick={() => setReconnectOpen(true)}
           >
-            Reconnect
+            <CalendarClock size={17} />
+            Schedule Reconnect
           </button>
-        </div>
+        </header>
 
-        {/* Intro */}
+        <div className="space-y-5 p-5 sm:p-6">
+          <div className="gn-profile-banner flex items-start gap-4 rounded-2xl p-5">
+            <span className="gn-profile-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
+              <HeartHandshake size={22} />
+            </span>
 
-        <p className="muted">
-          Lost, later and
-          no-response contacts
-          stay in the database and
-          can reconnect.
-        </p>
+            <div>
+              <p className="gn-heading text-sm font-extrabold">
+                Relationship Continuity
+              </p>
 
-        {/* Details */}
-
-        <div className="info-grid">
-          <div className="info-field">
-            <small>
-              Category
-            </small>
-
-            <b>
-              {
-                nurture.categoryLabel
-              }
-            </b>
+              <p className="gn-muted mt-2 text-xs leading-6">
+                Lost, later and no-response contacts remain
+                available for future engagement and reconnects.
+              </p>
+            </div>
           </div>
 
-          <div className="info-field">
-            <small>
-              Reason
-            </small>
-
-            <b>
-              {nurture.reason ||
-                "—"}
-            </b>
-          </div>
-
-          <div className="info-field">
-            <small>
-              Industry
-            </small>
-
-            <b>
-              {nurture.industry ||
-                "—"}
-            </b>
-          </div>
-
-          <div className="info-field">
-            <small>
-              Designation
-            </small>
-
-            <b>
-              {nurture.designation ||
-                "—"}
-            </b>
-          </div>
-
-          <div className="info-field">
-            <small>
-              Service interest
-            </small>
-
-            <b>
-              {nurture.serviceInterest ||
-                "—"}
-            </b>
-          </div>
-
-          <div className="info-field">
-            <small>
-              Geography
-            </small>
-
-            <b>
-              {nurture.geography ||
-                "—"}
-            </b>
-          </div>
-
-          <div className="info-field">
-            <small>
-              Buying stage
-            </small>
-
-            <b>
-              {nurture.buyingStage ||
-                "—"}
-            </b>
-          </div>
-
-          <div className="info-field">
-            <small>
-              Communication status
-            </small>
-
-            <b>
-              {communicationLabel(
-                nurture.communicationStatus
-              )}
-            </b>
-          </div>
-
-          <div className="info-field">
-            <small>
-              Owner
-            </small>
-
-            <b>
-              {nurture.ownerName ||
-                "—"}
-            </b>
-          </div>
-
-          <div className="info-field">
-            <small>
-              Last touch
-            </small>
-
-            <b>
-              {formatDateTime(
-                nurture.lastTouchAt
-              )}
-            </b>
-          </div>
-
-          <div className="info-field">
-            <small>
-              Reconnect
-            </small>
-
-            <b>
-              {formatDateTime(
-                nurture.reconnectAt
-              )}
-            </b>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {details.map((item) => (
+              <DetailField
+                key={item.label}
+                icon={item.icon}
+                label={item.label}
+                value={item.value}
+              />
+            ))}
           </div>
         </div>
       </article>
 
-      {/* Reconnect Modal */}
-
       <ScheduleReconnectModal
-        open={
-          reconnectOpen
-        }
-        lead={
-          nurture
-        }
+        open={reconnectOpen}
+        nurture={nurture}
         onClose={() => {
-          setReconnectOpen(
-            false
-          );
-
+          setReconnectOpen(false);
           query.refetch();
         }}
       />

@@ -1,0 +1,396 @@
+
+/* ==========================================================
+   TEMPEST CRM — GLASS PREMIUM MARK LOST MODAL
+   ========================================================== */
+
+.gml-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483000 !important;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+
+  background: rgba(10, 22, 48, 0.62);
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.gml-modal {
+  width: 100%;
+  max-width: 680px;
+  max-height: calc(100dvh - 40px);
+
+  overflow: hidden;
+
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 26px;
+
+  background: rgba(255, 255, 255, 0.98);
+  color: #172849;
+
+  box-shadow:
+    0 36px 100px rgba(8, 22, 55, 0.32),
+    0 8px 30px rgba(8, 22, 55, 0.12);
+
+  animation: gml-enter 220ms ease-out;
+}
+
+@keyframes gml-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Header */
+
+.gml-header {
+  border-bottom: 1px solid rgba(112, 138, 192, 0.14);
+
+  background: linear-gradient(
+    115deg,
+    rgba(255, 239, 242, 0.98),
+    rgba(248, 243, 255, 0.98)
+  );
+}
+
+.gml-brand {
+  background: linear-gradient(135deg, #ef5268, #a34ff5);
+  color: #ffffff;
+
+  box-shadow: 0 8px 22px rgba(215, 69, 112, 0.2);
+}
+
+.gml-eyebrow {
+  color: #ae6888;
+}
+
+.gml-title {
+  color: #172849;
+}
+
+.gml-muted {
+  color: #7485a1;
+}
+
+.gml-close {
+  border: 1px solid #e9dce5;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.gml-close:hover:not(:disabled) {
+  background: #fff0f3;
+  color: #d33b55;
+}
+
+/* Scroll */
+
+.gml-body {
+  overscroll-behavior: contain;
+
+  scrollbar-width: thin;
+  scrollbar-color: #d7c8d7 transparent;
+}
+
+.gml-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.gml-body::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  background: #d7c8d7;
+}
+
+/* Lead Summary */
+
+.gml-summary {
+  border: 1px solid #f0dce5;
+
+  background: linear-gradient(
+    120deg,
+    #fff4f5,
+    #f9f2ff
+  );
+}
+
+.gml-summary-icon {
+  background: #ffe2e9;
+  color: #d84b65;
+}
+
+.gml-summary-eyebrow {
+  color: #c45d77;
+}
+
+/* Sections */
+
+.gml-section {
+  border: 1px solid #e4eaf6;
+
+  background: linear-gradient(
+    145deg,
+    #ffffff,
+    #f9fbff
+  );
+
+  box-shadow: 0 8px 28px rgba(55, 82, 141, 0.055);
+}
+
+.gml-section-heading {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e7edf8;
+}
+
+.gml-section-icon {
+  background: #ffe9ee;
+  color: #d84b65;
+}
+
+.gml-nurture-section-icon {
+  background: #e6f7f0;
+  color: #0f9d75;
+}
+
+/* Inputs */
+
+.gml-label {
+  color: #415779;
+}
+
+.gml-required {
+  color: #e04a62;
+}
+
+.gml-modal .gml-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+
+  padding: 12px 16px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #d9e2f2;
+  outline: none;
+
+  background: #f8faff;
+  color: #172849;
+
+  font-family: inherit;
+  font-weight: 500;
+
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.gml-modal .gml-input::placeholder {
+  color: #9aa8c0;
+}
+
+.gml-modal .gml-input:focus {
+  border-color: #d77b9e;
+  background: #ffffff;
+
+  box-shadow: 0 0 0 3px rgba(215, 91, 129, 0.12);
+}
+
+.gml-modal .gml-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gml-modal select.gml-input {
+  padding-right: 36px;
+}
+
+.gml-modal textarea.gml-input {
+  min-height: 110px;
+  line-height: 1.6;
+}
+
+/* Nurture */
+
+.gml-nurture-card {
+  border: 1px solid #d9eae4;
+  background: #f5fbf8;
+}
+
+.gml-nurture-icon {
+  background: #ddf5e9;
+  color: #0e9b72;
+}
+
+.gml-nurture-options {
+  padding: 4px;
+  border: 1px solid #d9eae4;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.gml-choice {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #7b8ca3;
+
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.gml-choice:hover:not(:disabled) {
+  background: #edf6f2;
+}
+
+.gml-choice.is-active {
+  background: linear-gradient(120deg, #0db487, #15a7a1);
+  color: #ffffff;
+
+  box-shadow: 0 4px 12px rgba(13, 180, 135, 0.17);
+}
+
+.gml-nurture-notice {
+  border: 1px solid #d9eae4;
+  background: #f0f9f5;
+  color: #3f826d;
+}
+
+/* Info */
+
+.gml-info {
+  border: 1px solid #dce6fa;
+  background: #eff5ff;
+  color: #4a648f;
+}
+
+.gml-info-icon {
+  background: #dfeaff;
+  color: #4273df;
+}
+
+/* Error */
+
+.gml-error {
+  border: 1px solid #f3cbd3;
+  background: #fff0f3;
+  color: #b93650;
+}
+
+/* Footer */
+
+.gml-footer {
+  border-top: 1px solid #e4eaf5;
+  background: #ffffff;
+}
+
+.gml-footer-note {
+  color: #0b9c74;
+}
+
+/* Buttons */
+
+.gml-danger,
+.gml-secondary {
+  border: 1px solid transparent;
+
+  transition:
+    transform 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.gml-danger {
+  background: linear-gradient(120deg, #e54d67, #b9488f);
+  color: #ffffff;
+
+  box-shadow: 0 8px 20px rgba(214, 70, 107, 0.23);
+}
+
+.gml-danger:hover:not(:disabled) {
+  transform: translateY(-1px);
+
+  box-shadow: 0 12px 26px rgba(214, 70, 107, 0.3);
+}
+
+.gml-secondary {
+  border-color: #d9e2f2;
+  background: #ffffff;
+  color: #526486;
+}
+
+.gml-secondary:hover:not(:disabled) {
+  background: #edf3ff;
+}
+
+.gml-danger:disabled,
+.gml-secondary:disabled,
+.gml-close:disabled,
+.gml-choice:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+
+@media (max-width: 640px) {
+  .gml-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .gml-modal {
+    max-height: 95dvh;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .gml-header {
+    padding: 18px 16px;
+  }
+
+  .gml-body {
+    padding: 16px;
+  }
+
+  .gml-section {
+    padding: 17px;
+  }
+
+  .gml-footer {
+    padding: 14px 16px;
+  }
+
+  .gml-danger,
+  .gml-secondary {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gml-danger,
+  .gml-secondary,
+  .gml-choice {
+    transition: none;
+  }
+
+  .gml-danger:hover {
+    transform: none;
+  }
+
+  .gml-modal {
+    animation: none;
+  }
+}

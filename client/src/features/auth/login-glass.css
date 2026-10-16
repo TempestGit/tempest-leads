@@ -1,0 +1,383 @@
+
+/* ==========================================================
+   TEMPEST LEADS — GLASS PREMIUM LOGIN
+   ========================================================== */
+
+.tgl-page {
+  isolation: isolate;
+  background:
+    radial-gradient(
+      circle at 12% 12%,
+      rgba(205, 218, 255, 0.65),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 90% 85%,
+      rgba(228, 211, 255, 0.7),
+      transparent 35%
+    ),
+    linear-gradient(135deg, #f3f7ff, #edf2fc 55%, #f7f3ff);
+}
+
+/* Background Orbs */
+
+.tgl-orb {
+  position: absolute;
+  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(12px);
+}
+
+.tgl-orb-one {
+  width: 320px;
+  height: 320px;
+  top: -110px;
+  left: -110px;
+  background: rgba(117, 150, 250, 0.15);
+}
+
+.tgl-orb-two {
+  width: 420px;
+  height: 420px;
+  bottom: -190px;
+  right: -130px;
+  background: rgba(162, 112, 237, 0.16);
+}
+
+.tgl-orb-three {
+  width: 150px;
+  height: 150px;
+  top: 30%;
+  right: 16%;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Main Shell */
+
+.tgl-shell {
+  min-height: 670px;
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.92);
+
+  box-shadow:
+    0 35px 100px rgba(39, 64, 128, 0.14),
+    0 10px 30px rgba(39, 64, 128, 0.07);
+
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+/* Login Panel */
+
+.tgl-login-panel {
+  background: rgba(255, 255, 255, 0.94);
+  min-width: 0;
+}
+
+.tgl-secure-badge {
+  border: 1px solid #dce8f8;
+  background: #f0f6ff;
+  color: #4e73b7;
+  white-space: nowrap;
+}
+
+.tgl-eyebrow {
+  border: 1px solid #e0e8ff;
+  background: #eef3ff;
+  color: #5775d5;
+}
+
+.tgl-title {
+  color: #192b4c;
+}
+
+.tgl-title-dot {
+  color: #8055e8;
+}
+
+.tgl-muted {
+  color: #798ba7;
+}
+
+.tgl-label {
+  color: #405678;
+}
+
+/* Inputs */
+
+.tgl-field {
+  min-width: 0;
+}
+
+.tgl-field-icon {
+  position: absolute;
+  top: 50%;
+  left: 17px;
+  z-index: 1;
+  transform: translateY(-50%);
+  color: #8597b4;
+  pointer-events: none;
+}
+
+.tgl-login-panel .tgl-input {
+  display: block;
+  width: 100%;
+  height: 52px;
+  min-width: 0;
+
+  padding: 0 16px 0 49px !important;
+
+  box-sizing: border-box;
+  border: 1px solid #dce5f4;
+  outline: none;
+
+  background: #f8faff;
+  color: #192b4c;
+  font-family: inherit;
+  font-weight: 500;
+
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.tgl-login-panel .tgl-input::placeholder {
+  color: #a1aec2;
+}
+
+.tgl-login-panel .tgl-input:focus {
+  border-color: #6689ee;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(76, 118, 235, 0.1);
+}
+
+.tgl-login-panel .tgl-input:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.tgl-login-panel .tgl-password-input {
+  padding-right: 55px !important;
+}
+
+.tgl-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  transform: translateY(-50%);
+
+  display: flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #8292ab;
+  cursor: pointer;
+}
+
+.tgl-password-toggle:hover:not(:disabled) {
+  background: #edf2ff;
+  color: #4b6ccf;
+}
+
+/* Submit */
+
+.tgl-submit {
+  min-height: 54px;
+  border: 1px solid transparent;
+  background: linear-gradient(120deg, #2469f5, #8055e8);
+  color: #ffffff;
+
+  box-shadow: 0 12px 25px rgba(63, 101, 217, 0.22);
+
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.tgl-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px rgba(63, 101, 217, 0.3);
+}
+
+.tgl-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Error */
+
+.tgl-error {
+  border: 1px solid #f1cbd5;
+  background: #fff1f4;
+  color: #b83e59;
+}
+
+/* Security Note */
+
+.tgl-security-note {
+  border: 1px solid #dce8fa;
+  background: #f0f6ff;
+  color: #4f6b9d;
+}
+
+.tgl-login-footer {
+  color: #99a7bd;
+}
+
+/* ==========================================================
+   SHOWCASE
+   ========================================================== */
+
+.tgl-showcase {
+  isolation: isolate;
+
+  background: linear-gradient(
+    145deg,
+    #1948b8 0%,
+    #5149bc 52%,
+    #8054cf 100%
+  );
+
+  color: #ffffff;
+}
+
+.tgl-showcase-glow {
+  position: absolute;
+  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.tgl-showcase-glow-one {
+  width: 440px;
+  height: 440px;
+  top: -210px;
+  right: -190px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.tgl-showcase-glow-two {
+  width: 380px;
+  height: 380px;
+  bottom: -230px;
+  left: -180px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tgl-showcase-badge {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.tgl-showcase-title {
+  color: #ffffff;
+}
+
+.tgl-showcase-title span {
+  color: #cbdcff;
+}
+
+.tgl-showcase-description {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+/* Bento Cards */
+
+.tgl-bento-card {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+
+  background: rgba(255, 255, 255, 0.11);
+
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+
+  box-shadow: 0 8px 24px rgba(10, 27, 91, 0.08);
+}
+
+.tgl-bento-icon {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.tgl-bento-description {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tgl-bento-wide {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.tgl-bento-highlight {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.tgl-showcase-footer {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Loading */
+
+.tgl-loading {
+  color: #4b68ad;
+}
+
+.tgl-loading-icon {
+  background: #e7efff;
+  color: #5879df;
+}
+
+/* Responsive */
+
+@media (max-width: 1023px) {
+  .tgl-shell {
+    max-width: 580px;
+    min-height: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .tgl-page {
+    padding: 14px;
+  }
+
+  .tgl-shell {
+    border-radius: 24px;
+  }
+
+  .tgl-login-panel {
+    padding: 26px 22px;
+  }
+
+  .tgl-brand img {
+    max-width: 145px;
+  }
+
+  .tgl-secure-badge {
+    font-size: 9px;
+    padding: 7px 9px;
+  }
+
+  .tgl-title {
+    font-size: 30px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tgl-submit,
+  .tgl-input {
+    transition: none;
+  }
+
+  .tgl-submit:hover {
+    transform: none;
+  }
+}

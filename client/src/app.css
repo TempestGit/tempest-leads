@@ -1988,7 +1988,7 @@ a {
   padding: 10px 14px;
   border: 1px solid transparent;
   border-radius: 11px;
-  background: transparent;
+  background: rgba(224, 234, 255, 0.75);
   color: #62779b;
   font-size: 12px;
   font-weight: 650;
@@ -1996,7 +1996,7 @@ a {
 }
 
 .gld-tab:hover:not(.is-active) {
-  background: rgba(224, 234, 255, 0.75);
+  background: rgba(224, 234, 255, 0.841);
   color: #2866dc;
 }
 
@@ -2697,6 +2697,7 @@ a {
 
 .gcm-search input {
   color: var(--gcm-text);
+  border: 0;
 }
 
 .gcm-search input::placeholder {
@@ -2706,6 +2707,7 @@ a {
 .gcm-filter-wrap select {
   color: var(--gcm-text);
   cursor: pointer;
+  border: 0;
 }
 
 .gcm-clear {
@@ -3425,6 +3427,7 @@ a {
 .gco-search input,
 .gco-filter select {
   color: var(--gco-text);
+  border: 0;
 }
 
 .gco-search input::placeholder { color: #93a0ba; }

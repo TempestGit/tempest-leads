@@ -1,10 +1,18 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
+  AlertCircle,
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  FileText,
+  HeartHandshake,
+  LoaderCircle,
+  MessageSquareText,
+  ShieldCheck,
+  UserRound,
   X,
 } from "lucide-react";
 
@@ -13,1058 +21,625 @@ import {
   useScheduleReconnectMutation,
 } from "./nurture.queries.js";
 
-/*
-|--------------------------------------------------------------------------
-| Date / Time Helpers
-|--------------------------------------------------------------------------
-*/
+import "./nurture-glass.css";
 
-const pad2 = (value) =>
-  String(value).padStart(2, "0");
+const pad2 = (value) => String(value).padStart(2, "0");
 
-const getLocalDate = (
-  value = new Date()
-) =>
-  `${value.getFullYear()}-${pad2(
-    value.getMonth() + 1
-  )}-${pad2(value.getDate())}`;
-
-const getLocalTime = (
-  value = new Date()
-) =>
-  `${pad2(value.getHours())}:${pad2(
-    value.getMinutes()
+const getLocalDate = (value = new Date()) =>
+  `${value.getFullYear()}-${pad2(value.getMonth() + 1)}-${pad2(
+    value.getDate()
   )}`;
 
-/*
-|--------------------------------------------------------------------------
-| Resolve Lead ID
-|--------------------------------------------------------------------------
-|
-| Nurture routes are lead-based:
-|
-| /nurture/:leadId
-| /nurture/:leadId/reconnect
-|
-| Depending on the list response, the lead
-| identifier may be exposed as leadId or id.
-|
-*/
+const getLocalTime = (value = new Date()) =>
+  `${pad2(value.getHours())}:${pad2(value.getMinutes())}`;
 
-const getLeadId = (
-  record
-) => {
-  if (!record) {
-    return null;
-  }
+const getLeadId = (record) => {
+  if (!record) return null;
 
-  const value =
-    record.leadId ??
-    record.id ??
-    null;
+  const parsed = Number(record.leadId ?? record.id);
 
-  const parsed =
-    Number(value);
-
-  if (
-    !Number.isInteger(
-      parsed
-    ) ||
-    parsed <= 0
-  ) {
-    return null;
-  }
-
-  return parsed;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
-/*
-|--------------------------------------------------------------------------
-| Schedule Reconnect Modal
-|--------------------------------------------------------------------------
-*/
+const getErrorMessage = (requestError) => {
+  const responseData = requestError?.response?.data;
+
+  const errors = Array.isArray(responseData?.errors)
+    ? responseData.errors
+    : [];
+
+  const validationMessage = errors
+    .map((item) =>
+      typeof item === "string"
+        ? item
+        : item?.message || item?.msg || null
+    )
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    validationMessage ||
+    responseData?.message ||
+    requestError?.message ||
+    "Unable to schedule reconnect."
+  );
+};
 
 const ScheduleReconnectModal = ({
   open,
   nurture = null,
   onClose,
 }) => {
-  const mutation =
-    useScheduleReconnectMutation();
+  const mutation = useScheduleReconnectMutation();
+  const submittingRef = useRef(false);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Nurture Records
-  |--------------------------------------------------------------------------
-  |
-  | Keep limit: 100 for Batch 2.
-  |
-  | Batch 3 will handle the global
-  | pagination/dropdown ceiling.
-  |
-  */
+  const [selectedLeadId, setSelectedLeadId] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [action, setAction] = useState("Reconnect");
+  const [priority, setPriority] = useState("Medium");
+  const [notes, setNotes] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [now, setNow] = useState(() => new Date());
 
-  const nurtureParams =
-    useMemo(
-      () => ({
-        page: 1,
-        limit: 100,
-      }),
-      []
-    );
+  const isBusy = isSubmitting || mutation.isPending;
 
-  const nurtureQuery =
-    useNurtureQuery(
-      nurtureParams
-    );
-
-  const nurtureRecords =
-    nurtureQuery.data
-      ?.data
-      ?.nurture ||
-    nurtureQuery.data
-      ?.data
-      ?.items ||
-    nurtureQuery.data
-      ?.data
-      ?.records ||
-    [];
-
-  /*
-  |--------------------------------------------------------------------------
-  | State
-  |--------------------------------------------------------------------------
-  */
-
-  const [
-    selectedLeadId,
-    setSelectedLeadId,
-  ] = useState("");
-
-  const [
-    date,
-    setDate,
-  ] = useState("");
-
-  const [
-    time,
-    setTime,
-  ] = useState("");
-
-  const [
-    action,
-    setAction,
-  ] = useState(
-    "Reconnect"
+  const nurtureParams = useMemo(
+    () => ({ page: 1, limit: 100 }),
+    []
   );
 
-  const [
-    priority,
-    setPriority,
-  ] = useState(
-    "Medium"
-  );
+  const nurtureQuery = useNurtureQuery(nurtureParams);
 
-  const [
-    notes,
-    setNotes,
-  ] = useState("");
+  const nurtureRecords = useMemo(() => {
+    const data = nurtureQuery.data?.data;
+    const records = data?.nurture || data?.items || data?.records;
 
-  const [
-    error,
-    setError,
-  ] = useState("");
-
-  /*
-  |--------------------------------------------------------------------------
-  | Reset When Modal Opens
-  |--------------------------------------------------------------------------
-  */
+    return Array.isArray(records) ? records : [];
+  }, [nurtureQuery.data]);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
-    /*
-     * Suggest approximately
-     * 30 days from now.
-     */
+    const suggested = new Date();
+    suggested.setDate(suggested.getDate() + 30);
+    suggested.setHours(10, 0, 0, 0);
 
-    const suggested =
-      new Date();
+    const initialLeadId = getLeadId(nurture);
 
-    suggested.setDate(
-      suggested.getDate() +
-        30
-    );
-
-    /*
-     * Visible default time.
-     */
-
-    suggested.setHours(
-      10,
-      0,
-      0,
-      0
-    );
-
-    const initialLeadId =
-      getLeadId(
-        nurture
-      );
-
-    setSelectedLeadId(
-      initialLeadId
-        ? String(
-            initialLeadId
-          )
-        : ""
-    );
-
-    setDate(
-      getLocalDate(
-        suggested
-      )
-    );
-
-    setTime(
-      getLocalTime(
-        suggested
-      )
-    );
-
-    setAction(
-      "Reconnect"
-    );
-
-    setPriority(
-      "Medium"
-    );
-
+    setSelectedLeadId(initialLeadId ? String(initialLeadId) : "");
+    setDate(getLocalDate(suggested));
+    setTime(getLocalTime(suggested));
+    setAction("Reconnect");
+    setPriority("Medium");
     setNotes("");
-
     setError("");
-  }, [
-    open,
-    nurture,
-  ]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Escape
-  |--------------------------------------------------------------------------
-  */
+    setNow(new Date());
+  }, [open, nurture]);
 
   useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
+    if (!open) return undefined;
 
-    const handler = (
-      event
-    ) => {
-      if (
-        event.key ===
-          "Escape" &&
-        !mutation.isPending
-      ) {
-        onClose();
-      }
-    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
-    window.addEventListener(
-      "keydown",
-      handler
-    );
+    const interval = window.setInterval(() => {
+      setNow(new Date());
+    }, 30000);
 
     return () => {
-      window.removeEventListener(
-        "keydown",
-        handler
-      );
+      document.body.style.overflow = previousOverflow;
+      window.clearInterval(interval);
     };
-  }, [
-    open,
-    onClose,
-    mutation.isPending,
-  ]);
+  }, [open]);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Closed
-  |--------------------------------------------------------------------------
-  */
+  const today = getLocalDate(now);
+  const currentTime = getLocalTime(now);
 
-  if (!open) {
-    return null;
-  }
-
-  /*
-  |--------------------------------------------------------------------------
-  | Current Date / Time
-  |--------------------------------------------------------------------------
-  */
-
-  const today =
-    getLocalDate();
-
-  const currentTime =
-    getLocalTime();
-
-  /*
-  |--------------------------------------------------------------------------
-  | Resolve Nurture Record
-  |--------------------------------------------------------------------------
-  */
-
-  const selectedLeadIdNumber =
-    Number(
-      selectedLeadId
-    );
-
-  const resolvedNurture =
-    nurture ||
+  const resolvedNurture = nurture ||
     nurtureRecords.find(
-      (item) =>
-        getLeadId(item) ===
-        selectedLeadIdNumber
+      (item) => getLeadId(item) === Number(selectedLeadId)
     ) ||
     null;
 
-  /*
-  |--------------------------------------------------------------------------
-  | Resolve Final Lead ID
-  |--------------------------------------------------------------------------
-  */
-
   const resolvedLeadId =
-    getLeadId(
-      resolvedNurture
-    ) ||
-    (
-      Number.isInteger(
-        selectedLeadIdNumber
-      ) &&
-      selectedLeadIdNumber > 0
-        ? selectedLeadIdNumber
-        : null
-    );
+    getLeadId(resolvedNurture) ||
+    (Number.isInteger(Number(selectedLeadId)) &&
+    Number(selectedLeadId) > 0
+      ? Number(selectedLeadId)
+      : null);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Date Change
-  |--------------------------------------------------------------------------
-  */
+  const handleClose = () => {
+    if (submittingRef.current || isBusy) return;
+    onClose?.();
+  };
 
-  const handleDateChange = (
-    event
-  ) => {
-    const selectedDate =
-      event.target.value;
+  const handleDateChange = (event) => {
+    const selectedDate = event.target.value;
+    const current = new Date();
+    const currentDate = getLocalDate(current);
+    const currentClock = getLocalTime(current);
+
+    if (selectedDate && selectedDate < currentDate) {
+      setDate("");
+      setTime("");
+      setError("Reconnect date cannot be in the past.");
+      return;
+    }
+
+    setDate(selectedDate);
 
     if (!selectedDate) {
-      setDate("");
       setTime("");
-      setError("");
-
-      return;
-    }
-
-    const now =
-      new Date();
-
-    const nowDate =
-      getLocalDate(
-        now
-      );
-
-    const nowTime =
-      getLocalTime(
-        now
-      );
-
-    /*
-     * Past dates are not allowed.
-     */
-
-    if (
-      selectedDate <
-      nowDate
-    ) {
-      setDate("");
-      setTime("");
-
-      setError(
-        "Reconnect date cannot be in the past."
-      );
-
-      return;
-    }
-
-    setDate(
-      selectedDate
-    );
-
-    /*
-     * If today is selected and the
-     * previously selected time is
-     * already past, clear it.
-     */
-
-    if (
-      selectedDate ===
-        nowDate &&
+    } else if (
+      selectedDate === currentDate &&
       time &&
-      time < nowTime
+      time < currentClock
     ) {
       setTime("");
     }
 
+    setNow(current);
     setError("");
   };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Time Change
-  |--------------------------------------------------------------------------
-  */
-
-  const handleTimeChange = (
-    event
-  ) => {
-    const selectedTime =
-      event.target.value;
-
-    if (!selectedTime) {
-      setTime("");
-      setError("");
-
-      return;
-    }
-
-    const now =
-      new Date();
-
-    const nowDate =
-      getLocalDate(
-        now
-      );
-
-    const nowTime =
-      getLocalTime(
-        now
-      );
-
-    /*
-     * When today is selected,
-     * past times are not allowed.
-     */
+  const handleTimeChange = (event) => {
+    const selectedTime = event.target.value;
+    const current = new Date();
 
     if (
-      date ===
-        nowDate &&
-      selectedTime <
-        nowTime
+      date === getLocalDate(current) &&
+      selectedTime &&
+      selectedTime < getLocalTime(current)
     ) {
       setTime("");
-
-      setError(
-        "Reconnect time cannot be in the past."
-      );
-
+      setError("Reconnect time cannot be in the past.");
       return;
     }
 
-    setTime(
-      selectedTime
-    );
-
+    setTime(selectedTime);
+    setNow(current);
     setError("");
   };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Submit
-  |--------------------------------------------------------------------------
-  */
+  const submit = async () => {
+    if (submittingRef.current) return;
 
-  const submit =
-    async () => {
-      setError("");
+    setError("");
 
-      /*
-      |--------------------------------------------------------------------------
-      | Lead
-      |--------------------------------------------------------------------------
-      */
+    if (!resolvedLeadId) {
+      setError("Select a nurture lead.");
+      return;
+    }
 
-      if (
-        !resolvedLeadId
-      ) {
-        setError(
-          "Select a nurture lead."
-        );
+    if (!date) {
+      setError("Reconnect date is required.");
+      return;
+    }
 
-        return;
-      }
+    if (!time) {
+      setError("Reconnect time is required.");
+      return;
+    }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Date
-      |--------------------------------------------------------------------------
-      */
+    const cleanAction = action.trim();
+    const cleanNotes = notes.trim();
 
-      if (!date) {
-        setError(
-          "Reconnect date is required."
-        );
+    if (cleanAction.length < 2) {
+      setError("Reconnect action must contain at least 2 characters.");
+      return;
+    }
 
-        return;
-      }
+    if (cleanAction.length > 500) {
+      setError("Reconnect action cannot exceed 500 characters.");
+      return;
+    }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Time
-      |--------------------------------------------------------------------------
-      */
+    if (!["High", "Medium", "Low"].includes(priority)) {
+      setError("Select a valid priority.");
+      return;
+    }
 
-      if (!time) {
-        setError(
-          "Reconnect time is required."
-        );
+    if (cleanNotes.length > 5000) {
+      setError("Notes cannot exceed 5000 characters.");
+      return;
+    }
 
-        return;
-      }
+    const dueAt = new Date(`${date}T${time}:00`);
 
-      /*
-      |--------------------------------------------------------------------------
-      | Action
-      |--------------------------------------------------------------------------
-      */
+    if (
+      Number.isNaN(dueAt.getTime()) ||
+      getLocalDate(dueAt) !== date ||
+      getLocalTime(dueAt) !== time
+    ) {
+      setError("Enter a valid reconnect date and time.");
+      return;
+    }
 
-      const cleanAction =
-        action.trim();
+    if (dueAt.getTime() < Date.now() - 60 * 1000) {
+      setError("Reconnect date and time cannot be in the past.");
+      return;
+    }
 
-      if (
-        cleanAction.length <
-        2
-      ) {
-        setError(
-          "Reconnect action is required."
-        );
+    submittingRef.current = true;
+    setIsSubmitting(true);
 
-        return;
-      }
+    try {
+      await mutation.mutateAsync({
+        leadId: resolvedLeadId,
+        data: {
+          action: cleanAction,
+          dueAt: dueAt.toISOString(),
+          priority,
+          notes: cleanNotes || null,
+        },
+      });
 
-      if (
-        cleanAction.length >
-        500
-      ) {
-        setError(
-          "Reconnect action cannot exceed 500 characters."
-        );
+      onClose?.();
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  };
 
-        return;
-      }
+  if (!open) return null;
 
-      /*
-      |--------------------------------------------------------------------------
-      | Priority
-      |--------------------------------------------------------------------------
-      */
-
-      const allowedPriorities = [
-        "High",
-        "Medium",
-        "Low",
-      ];
-
-      if (
-        !allowedPriorities.includes(
-          priority
-        )
-      ) {
-        setError(
-          "Select a valid priority."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Notes
-      |--------------------------------------------------------------------------
-      */
-
-      const cleanNotes =
-        notes.trim();
-
-      if (
-        cleanNotes.length >
-        5000
-      ) {
-        setError(
-          "Notes cannot exceed 5000 characters."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Construct Timestamp
-      |--------------------------------------------------------------------------
-      */
-
-      const dueAt =
-        new Date(
-          `${date}T${time}:00`
-        );
-
-      if (
-        Number.isNaN(
-          dueAt.getTime()
-        )
-      ) {
-        setError(
-          "Enter a valid reconnect date and time."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Present / Future Validation
-      |--------------------------------------------------------------------------
-      |
-      | Same 60-second tolerance as
-      | the backend schema.
-      |
-      */
-
-      const minimumAllowed =
-        Date.now() -
-        60 * 1000;
-
-      if (
-        dueAt.getTime() <
-        minimumAllowed
-      ) {
-        setError(
-          "Reconnect date and time cannot be in the past."
-        );
-
-        return;
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Request
-      |--------------------------------------------------------------------------
-      |
-      | nurture.api.js:
-      |
-      | scheduleReconnectRequest({
-      |   leadId,
-      |   data
-      | })
-      |
-      */
-
-      try {
-        await mutation.mutateAsync({
-          leadId:
-            resolvedLeadId,
-
-          data: {
-            action:
-              cleanAction,
-
-            dueAt:
-              dueAt.toISOString(),
-
-            priority,
-
-            notes:
-              cleanNotes ||
-              null,
-          },
-        });
-
-        onClose();
-      } catch (
-        requestError
-      ) {
-        const responseData =
-          requestError
-            ?.response
-            ?.data;
-
-        const errors =
-          Array.isArray(
-            responseData?.errors
-          )
-            ? responseData.errors
-            : [];
-
-        const validationMessage =
-          errors
-            .map(
-              (item) => {
-                if (
-                  typeof item ===
-                  "string"
-                ) {
-                  return item;
-                }
-
-                return (
-                  item?.message ||
-                  item?.msg ||
-                  null
-                );
-              }
-            )
-            .filter(Boolean)
-            .join(" ");
-
-        setError(
-          validationMessage ||
-            responseData
-              ?.message ||
-            requestError
-              ?.message ||
-            "Unable to schedule reconnect."
-        );
-      }
-    };
-
-  /*
-  |--------------------------------------------------------------------------
-  | Render
-  |--------------------------------------------------------------------------
-  */
-
-  return (
-    <div className="modal-backdrop">
+  return createPortal(
+    <div className="gnm-overlay">
       <section
-        className="tl-modal"
+        className="gnm-modal flex flex-col"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="schedule-reconnect-title"
+        aria-labelledby="gnm-title"
       >
-        {/* Header */}
+        <header className="gnm-header flex shrink-0 items-center justify-between gap-4 px-6 py-5">
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="gnm-brand flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl">
+              <CalendarClock size={23} />
+            </span>
 
-        <header className="modal-head">
-          <div>
-            <h2 id="schedule-reconnect-title">
-              Schedule reconnect
-            </h2>
+            <div className="min-w-0">
+              <p className="gnm-eyebrow mb-1 text-[11px] font-bold uppercase tracking-wider">
+                RELATIONSHIP RE-ENGAGEMENT
+              </p>
 
-            <p>
-              Choose when this
-              nurture lead should
-              return to your
-              attention.
-            </p>
+              <h2
+                id="gnm-title"
+                className="gnm-heading text-xl font-extrabold"
+              >
+                Schedule Reconnect
+              </h2>
+
+              <p className="gnm-muted mt-1 text-xs leading-5">
+                Plan when this prospect should return to your attention.
+              </p>
+            </div>
           </div>
 
           <button
             type="button"
-            className="icon-control"
-            disabled={
-              mutation.isPending
-            }
-            onClick={
-              onClose
-            }
+            className="gnm-close flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+            onClick={handleClose}
+            disabled={isBusy}
             aria-label="Close"
           >
-            <X
-              size={15}
-            />
+            <X size={19} />
           </button>
         </header>
 
-        {/* Body */}
-
-        <div className="modal-body">
+        <div className="gnm-body min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
           {error && (
-            <div className="error-box mb-2">
-              {error}
+            <div
+              role="alert"
+              className="gnm-error flex items-start gap-3 rounded-xl p-4 text-sm"
+            >
+              <AlertCircle size={18} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
-          <div className="form-section">
-            <div className="form-grid2">
+          <div className="gnm-section rounded-2xl p-5">
+            <div className="gnm-section-heading mb-5 flex items-center gap-3">
+              <span className="gnm-section-icon flex h-10 w-10 items-center justify-center rounded-xl">
+                <UserRound size={19} />
+              </span>
 
-              {/* Nurture Lead */}
+              <div>
+                <h3 className="gnm-heading text-sm font-extrabold">
+                  Nurture Lead
+                </h3>
 
-              {!nurture ? (
-                <label className="full">
-                  Nurture lead *
+                <p className="gnm-muted mt-1 text-xs">
+                  Select the prospect to reconnect with
+                </p>
+              </div>
+            </div>
 
-                  <select
-                    value={
-                      selectedLeadId
-                    }
-                    disabled={
-                      nurtureQuery.isLoading ||
-                      mutation.isPending
-                    }
-                    onChange={(
-                      event
-                    ) => {
-                      setSelectedLeadId(
-                        event
-                          .target
-                          .value
-                      );
-
-                      setError("");
-                    }}
-                  >
-                    <option value="">
-                      {nurtureQuery.isLoading
-                        ? "Loading nurture leads..."
-                        : "Select nurture lead"}
-                    </option>
-
-                    {nurtureRecords.map(
-                      (item) => {
-                        const itemLeadId =
-                          getLeadId(
-                            item
-                          );
-
-                        if (
-                          !itemLeadId
-                        ) {
-                          return null;
-                        }
-
-                        return (
-                          <option
-                            key={
-                              itemLeadId
-                            }
-                            value={
-                              itemLeadId
-                            }
-                          >
-                            {item.companyName ||
-                              item.leadName ||
-                              item.name ||
-                              `Lead #${itemLeadId}`}
-
-                            {item.leadCode
-                              ? ` · ${item.leadCode}`
-                              : ""}
-                          </option>
-                        );
-                      }
-                    )}
-                  </select>
+            {!nurture ? (
+              <>
+                <label
+                  htmlFor="gnm-lead"
+                  className="gnm-label mb-2 block text-xs font-bold"
+                >
+                  Nurture Lead <span className="gnm-required">*</span>
                 </label>
-              ) : (
-                <div className="activity-context full">
-                  <small>
-                    Nurture lead
-                  </small>
-
-                  <b>
-                    {nurture.companyName ||
-                      nurture.leadName ||
-                      nurture.name ||
-                      (
-                        resolvedLeadId
-                          ? `Lead #${resolvedLeadId}`
-                          : "Nurture lead"
-                      )}
-
-                    {nurture.leadCode
-                      ? ` · ${nurture.leadCode}`
-                      : ""}
-                  </b>
-                </div>
-              )}
-
-              {/* Action */}
-
-              <label className="full">
-                Reconnect action *
-
-                <input
-                  type="text"
-                  maxLength={500}
-                  value={action}
-                  disabled={
-                    mutation.isPending
-                  }
-                  placeholder="Reconnect"
-                  onChange={(
-                    event
-                  ) => {
-                    setAction(
-                      event
-                        .target
-                        .value
-                    );
-
-                    setError("");
-                  }}
-                />
-              </label>
-
-              {/* Date */}
-
-              <label>
-                Reconnect date *
-
-                <input
-                  type="date"
-                  min={today}
-                  value={date}
-                  disabled={
-                    mutation.isPending
-                  }
-                  onChange={
-                    handleDateChange
-                  }
-                  autoFocus={
-                    Boolean(
-                      nurture
-                    )
-                  }
-                />
-              </label>
-
-              {/* Time */}
-
-              <label>
-                Reconnect time *
-
-                <input
-                  type="time"
-                  min={
-                    date === today
-                      ? currentTime
-                      : undefined
-                  }
-                  value={time}
-                  disabled={
-                    mutation.isPending ||
-                    !date
-                  }
-                  onChange={
-                    handleTimeChange
-                  }
-                />
-              </label>
-
-              {/* Priority */}
-
-              <label>
-                Priority *
 
                 <select
-                  value={priority}
-                  disabled={
-                    mutation.isPending
-                  }
-                  onChange={(
-                    event
-                  ) => {
-                    setPriority(
-                      event
-                        .target
-                        .value
-                    );
-
+                  id="gnm-lead"
+                  className="gnm-input w-full rounded-xl text-sm"
+                  value={selectedLeadId}
+                  disabled={nurtureQuery.isLoading || isBusy}
+                  onChange={(event) => {
+                    setSelectedLeadId(event.target.value);
                     setError("");
                   }}
                 >
-                  <option value="High">
-                    High
+                  <option value="">
+                    {nurtureQuery.isLoading
+                      ? "Loading nurture leads..."
+                      : "Select nurture lead"}
                   </option>
 
-                  <option value="Medium">
-                    Medium
-                  </option>
+                  {nurtureRecords.map((item) => {
+                    const itemLeadId = getLeadId(item);
+                    if (!itemLeadId) return null;
 
-                  <option value="Low">
-                    Low
-                  </option>
-                </select>
-              </label>
-
-              {/* Notes */}
-
-              <label className="full">
-                Notes
-
-                <textarea
-                  rows="4"
-                  maxLength={5000}
-                  value={notes}
-                  disabled={
-                    mutation.isPending
-                  }
-                  placeholder="Optional reconnect context"
-                  onChange={(
-                    event
-                  ) => {
-                    setNotes(
-                      event
-                        .target
-                        .value
+                    return (
+                      <option key={itemLeadId} value={itemLeadId}>
+                        {item.companyName ||
+                          item.leadName ||
+                          item.name ||
+                          `Lead #${itemLeadId}`}
+                        {item.leadCode ? ` · ${item.leadCode}` : ""}
+                      </option>
                     );
+                  })}
+                </select>
 
+                {nurtureQuery.isError && (
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <p className="gnm-error-text text-xs">
+                      {nurtureQuery.error?.response?.data?.message ||
+                        "Unable to load nurture leads."}
+                    </p>
+
+                    <button
+                      type="button"
+                      className="gnm-retry text-xs font-bold"
+                      onClick={() => nurtureQuery.refetch()}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="gnm-lead-summary flex items-center gap-3 rounded-xl p-4">
+                <HeartHandshake size={21} className="shrink-0" />
+
+                <div className="min-w-0">
+                  <p className="gnm-muted text-xs">Selected Prospect</p>
+
+                  <p className="gnm-heading mt-1 break-words text-sm font-extrabold">
+                    {nurture.companyName ||
+                      nurture.leadName ||
+                      nurture.name ||
+                      `Lead #${resolvedLeadId}`}
+                    {nurture.leadCode
+                      ? ` · ${nurture.leadCode}`
+                      : ""}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="gnm-section rounded-2xl p-5">
+            <div className="gnm-section-heading mb-5 flex items-center gap-3">
+              <span className="gnm-section-icon flex h-10 w-10 items-center justify-center rounded-xl">
+                <CalendarClock size={19} />
+              </span>
+
+              <div>
+                <h3 className="gnm-heading text-sm font-extrabold">
+                  Reconnect Schedule
+                </h3>
+
+                <p className="gnm-muted mt-1 text-xs">
+                  Choose a present or future date and time
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="gnm-date"
+                  className="gnm-label mb-2 block text-xs font-bold"
+                >
+                  Reconnect Date <span className="gnm-required">*</span>
+                </label>
+
+                <div className="gnm-field-icon-wrap relative">
+                  <CalendarClock
+                    size={17}
+                    className="gnm-field-icon"
+                  />
+
+                  <input
+                    id="gnm-date"
+                    type="date"
+                    className="gnm-input gnm-input-with-icon w-full rounded-xl text-sm"
+                    min={today}
+                    value={date}
+                    disabled={isBusy}
+                    onChange={handleDateChange}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="gnm-time"
+                  className="gnm-label mb-2 block text-xs font-bold"
+                >
+                  Reconnect Time <span className="gnm-required">*</span>
+                </label>
+
+                <div className="gnm-field-icon-wrap relative">
+                  <Clock3 size={17} className="gnm-field-icon" />
+
+                  <input
+                    id="gnm-time"
+                    type="time"
+                    className="gnm-input gnm-input-with-icon w-full rounded-xl text-sm"
+                    min={date === today ? currentTime : undefined}
+                    value={time}
+                    disabled={isBusy || !date}
+                    onChange={handleTimeChange}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="gnm-section rounded-2xl p-5">
+            <div className="gnm-section-heading mb-5 flex items-center gap-3">
+              <span className="gnm-section-icon flex h-10 w-10 items-center justify-center rounded-xl">
+                <MessageSquareText size={19} />
+              </span>
+
+              <div>
+                <h3 className="gnm-heading text-sm font-extrabold">
+                  Reconnect Details
+                </h3>
+
+                <p className="gnm-muted mt-1 text-xs">
+                  Describe the next engagement
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label
+                  htmlFor="gnm-action"
+                  className="gnm-label mb-2 block text-xs font-bold"
+                >
+                  Reconnect Action <span className="gnm-required">*</span>
+                </label>
+
+                <input
+                  id="gnm-action"
+                  type="text"
+                  maxLength={500}
+                  className="gnm-input w-full rounded-xl text-sm"
+                  value={action}
+                  disabled={isBusy}
+                  placeholder="Reconnect"
+                  onChange={(event) => {
+                    setAction(event.target.value);
                     setError("");
                   }}
                 />
-              </label>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="gnm-priority"
+                  className="gnm-label mb-2 block text-xs font-bold"
+                >
+                  Priority <span className="gnm-required">*</span>
+                </label>
+
+                <select
+                  id="gnm-priority"
+                  className="gnm-input w-full rounded-xl text-sm"
+                  value={priority}
+                  disabled={isBusy}
+                  onChange={(event) => {
+                    setPriority(event.target.value);
+                    setError("");
+                  }}
+                >
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="gnm-notes"
+                  className="gnm-label mb-2 block text-xs font-bold"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <FileText size={15} />
+                    Notes
+                  </span>
+                  <span className="gnm-muted ml-2 font-normal">
+                    Optional
+                  </span>
+                </label>
+
+                <textarea
+                  id="gnm-notes"
+                  rows={4}
+                  maxLength={5000}
+                  className="gnm-input gnm-textarea w-full resize-y rounded-xl text-sm"
+                  value={notes}
+                  disabled={isBusy}
+                  placeholder="Optional reconnect context"
+                  onChange={(event) => {
+                    setNotes(event.target.value);
+                    setError("");
+                  }}
+                />
+              </div>
             </div>
+          </div>
+
+          <div className="gnm-info flex items-start gap-3 rounded-xl p-4">
+            <ShieldCheck size={19} className="mt-0.5 shrink-0" />
+
+            <p className="text-xs leading-5">
+              Reconnect scheduling is saved to the selected lead.
+              Past dates and times are not permitted.
+            </p>
           </div>
         </div>
 
-        {/* Footer */}
-
-        <footer className="modal-foot">
+        <footer className="gnm-footer flex shrink-0 items-center justify-end gap-3 px-6 py-4">
           <button
             type="button"
-            className="tl-secondary"
-            disabled={
-              mutation.isPending
-            }
-            onClick={
-              onClose
-            }
+            className="gnm-secondary inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-bold"
+            disabled={isBusy}
+            onClick={handleClose}
           >
             Cancel
           </button>
 
           <button
             type="button"
-            className="tl-primary"
-            disabled={
-              mutation.isPending
-            }
-            onClick={
-              submit
-            }
+            className="gnm-primary inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold"
+            disabled={isBusy}
+            onClick={submit}
           >
-            {mutation.isPending
-              ? "Scheduling..."
-              : "Schedule reconnect"}
+            {isBusy ? (
+              <LoaderCircle size={17} className="animate-spin" />
+            ) : (
+              <CheckCircle2 size={17} />
+            )}
+
+            {isBusy ? "Scheduling..." : "Schedule Reconnect"}
           </button>
         </footer>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 };
 

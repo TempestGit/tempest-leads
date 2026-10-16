@@ -1145,7 +1145,7 @@ export default function LeadDetailPage() {
               }
               onClick={() => setActiveTab(tab)}
             >
-              <Icon size={15} />
+              {/* <Icon size={10} /> */}
               {tab}
             </button>
           );
