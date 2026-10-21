@@ -478,7 +478,7 @@ const CompleteFollowupModal = ({
               {busy ? (
                 <LoaderCircle size={16} className="animate-spin" />
               ) : (
-                <Check size={16} />
+                <Check size={0} />
               )}
 
               {busy ? "Completing..." : "Complete Follow-up"}

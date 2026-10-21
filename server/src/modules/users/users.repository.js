@@ -380,7 +380,8 @@ export const insertUser =
             department,
             location,
             status,
-            branch_id
+            branch_id,
+            must_change_password
           )
 
           VALUES (
@@ -392,7 +393,8 @@ export const insertUser =
             ?,
             ?,
             'ACTIVE',
-            ?
+            ?,
+            1
           )
         `,
         [

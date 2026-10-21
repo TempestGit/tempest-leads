@@ -263,7 +263,7 @@ const FollowupsTable = ({
                         disabled={!onComplete}
                         className="gfp-complete-action inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-bold disabled:opacity-50"
                       >
-                        <Check size={15} />
+                        {/* <Check size={15} /> */}
                         Complete
                       </button>
 

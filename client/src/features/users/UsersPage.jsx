@@ -492,7 +492,7 @@ const UsersPage = () => {
               <thead>
                 <tr>
                   <th>User</th>
-                  <th>User ID</th>
+                  {/* <th>User ID</th> */}
                   <th>Role</th>
                   <th>Department</th>
                   <th>Branch</th>
@@ -514,9 +514,9 @@ const UsersPage = () => {
                     <tr key={user.id}>
                       <td>
                         <div className="flex min-w-[200px] items-center gap-3">
-                          <span className="gup-avatar flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold">
+                          {/* <span className="gup-avatar flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold">
                             {getInitials(user.fullName)}
-                          </span>
+                          </span> */}
 
                           <div className="min-w-0">
                             <p className="gup-user-name flex flex-wrap items-center gap-2 text-sm font-bold">
@@ -542,11 +542,11 @@ const UsersPage = () => {
                         </div>
                       </td>
 
-                      <td>
+                      {/* <td>
                         <span className="gup-user-code text-xs font-bold">
                           {user.userCode || "—"}
                         </span>
-                      </td>
+                      </td> */}
 
                       <td>
                         <span

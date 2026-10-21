@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState } from "react";
+
 import {
   useNavigate,
   useSearchParams,
@@ -7,42 +8,52 @@ import {
 
 import {
   ArrowRight,
-  ArrowUpRight,
-  Building2,
   CalendarClock,
-  Check,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
   Download,
-  Filter,
   GripVertical,
   IndianRupee,
   KanbanSquare,
   Layers3,
-  LayoutGrid,
   List,
   Plus,
   RefreshCw,
   Search,
   SlidersHorizontal,
   Sparkles,
-  TrendingUp,
   UserRound,
   Users,
   X,
 } from "lucide-react";
 
 import useAuth from "../auth/useAuth.js";
+
 import { useLeadsQuery } from "./leads.queries.js";
 import { LEAD_STAGES } from "./leads.schema.js";
+
+import { useFollowupsQuery } from "../followups/followups.queries.js";
 
 import LeadFormModal from "./LeadFormModal.jsx";
 import AssignOwnerModal from "./AssignOwnerModal.jsx";
 import ChangeStageModal from "./ChangeStageModal.jsx";
 
+/*
+|--------------------------------------------------------------------------
+| Constants
+|--------------------------------------------------------------------------
+*/
+
 const VIEW_KEY = "tempest-leads-view";
 const PAGE_SIZE = 20;
+const EMPTY_LIST = [];
+
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+*/
 
 const readSavedView = () => {
   try {
@@ -152,6 +163,54 @@ const getLeadValue = (lead) =>
 const getLeadDate = (lead) =>
   lead?.createdAt || lead?.created_at || null;
 
+/*
+|--------------------------------------------------------------------------
+| Follow-up Helpers
+|--------------------------------------------------------------------------
+|
+| Only PENDING follow-ups can be overdue.
+|
+| RESCHEDULED:
+|   Historical record, never overdue.
+|
+| COMPLETED:
+|   Finished record, never overdue.
+|
+| CANCELLED:
+|   Inactive record, never overdue.
+|
+|--------------------------------------------------------------------------
+*/
+
+const normalizeFollowupStatus = (value) =>
+  String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+const getFollowupDueDate = (followup) => {
+  if (!followup) return null;
+
+  const value =
+    followup.dueAt ??
+    followup.followUpAt ??
+    followup.followupAt ??
+    followup.scheduledAt ??
+    null;
+
+  if (!value) return null;
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Metric Card
+|--------------------------------------------------------------------------
+*/
+
 function MetricCard({
   label,
   value,
@@ -200,6 +259,12 @@ function MetricCard({
   );
 }
 
+/*
+|--------------------------------------------------------------------------
+| Stage Badge
+|--------------------------------------------------------------------------
+*/
+
 function StageBadge({ stage }) {
   return (
     <span
@@ -212,6 +277,12 @@ function StageBadge({ stage }) {
   );
 }
 
+/*
+|--------------------------------------------------------------------------
+| Priority Badge
+|--------------------------------------------------------------------------
+*/
+
 function PriorityBadge({ priority }) {
   return (
     <span
@@ -222,6 +293,12 @@ function PriorityBadge({ priority }) {
     </span>
   );
 }
+
+/*
+|--------------------------------------------------------------------------
+| Empty State
+|--------------------------------------------------------------------------
+*/
 
 function EmptyState({ onAdd, filtered }) {
   return (
@@ -255,6 +332,12 @@ function EmptyState({ onAdd, filtered }) {
     </div>
   );
 }
+
+/*
+|--------------------------------------------------------------------------
+| Leads Table
+|--------------------------------------------------------------------------
+*/
 
 function LeadsTable({
   leads,
@@ -359,6 +442,7 @@ function LeadsTable({
                 </td>
 
                 <td>{lead.industry || "—"}</td>
+
                 <td>{lead.source || "—"}</td>
 
                 <td>
@@ -427,6 +511,12 @@ function LeadsTable({
   );
 }
 
+/*
+|--------------------------------------------------------------------------
+| Kanban Card
+|--------------------------------------------------------------------------
+*/
+
 function KanbanCard({
   lead,
   onOpen,
@@ -442,10 +532,12 @@ function KanbanCard({
       aria-label={`Open ${lead.companyName || "lead"}`}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = "move";
+
         event.dataTransfer.setData(
           "text/plain",
           String(lead.id)
         );
+
         onDragStart(lead);
       }}
       onDragEnd={onDragEnd}
@@ -522,6 +614,12 @@ function KanbanCard({
   );
 }
 
+/*
+|--------------------------------------------------------------------------
+| Kanban Board
+|--------------------------------------------------------------------------
+*/
+
 function KanbanBoard({
   leads,
   draggedLead,
@@ -542,7 +640,8 @@ function KanbanBoard({
             );
 
             const stageValue = stageLeads.reduce(
-              (sum, lead) => sum + getLeadValue(lead),
+              (sum, lead) =>
+                sum + getLeadValue(lead),
               0
             );
 
@@ -645,17 +744,33 @@ function KanbanBoard({
   );
 }
 
+/*
+|--------------------------------------------------------------------------
+| Leads Page
+|--------------------------------------------------------------------------
+*/
+
 export default function LeadsPage() {
   const navigate = useNavigate();
+
   const [searchParams] = useSearchParams();
 
   const { user } = useAuth();
+
   const isAdmin = user?.role === "SUPER_ADMIN";
 
+  /*
+  |--------------------------------------------------------------------------
+  | State
+  |--------------------------------------------------------------------------
+  */
+
   const [view, setView] = useState(readSavedView);
+
   const [search, setSearch] = useState(
     () => searchParams.get("search") || ""
   );
+
   const [stage, setStage] = useState("");
   const [priority, setPriority] = useState("");
   const [owner, setOwner] = useState("");
@@ -664,6 +779,7 @@ export default function LeadsPage() {
 
   const [filtersOpen, setFiltersOpen] =
     useState(false);
+
   const [selected, setSelected] = useState([]);
 
   const [addOpen, setAddOpen] = useState(false);
@@ -672,12 +788,21 @@ export default function LeadsPage() {
 
   const [draggedLead, setDraggedLead] =
     useState(null);
+
   const [dragOverStage, setDragOverStage] =
     useState(null);
+
   const [droppedStage, setDroppedStage] =
     useState("New");
+
   const [dropNotice, setDropNotice] =
     useState("");
+
+  /*
+  |--------------------------------------------------------------------------
+  | Persist Table / Kanban View
+  |--------------------------------------------------------------------------
+  */
 
   useEffect(() => {
     try {
@@ -695,6 +820,12 @@ export default function LeadsPage() {
     setSelected([]);
     setPage(1);
   }, [search, stage, priority, owner, sort]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Leads Query
+  |--------------------------------------------------------------------------
+  */
 
   const params = useMemo(
     () => ({
@@ -717,15 +848,58 @@ export default function LeadsPage() {
     isFetching,
   } = useLeadsQuery(params);
 
-  const leads = data?.data?.leads || [];
+  const leads = data?.data?.leads || EMPTY_LIST;
+
+  /*
+  |--------------------------------------------------------------------------
+  | Follow-ups Query
+  |--------------------------------------------------------------------------
+  |
+  | Use actual follow-up records for the overdue metric.
+  | Do not use lead.followUpAt to determine status.
+  |
+  |--------------------------------------------------------------------------
+  */
+
+  const followupParams = useMemo(
+    () => ({
+      view: "ALL",
+      page: 1,
+      limit: 100,
+    }),
+    []
+  );
+
+  const followupsQuery =
+    useFollowupsQuery(followupParams);
+
+  const followups =
+    followupsQuery.data?.data?.followups ||
+    EMPTY_LIST;
+
+  /*
+  |--------------------------------------------------------------------------
+  | Owners
+  |--------------------------------------------------------------------------
+  */
 
   const owners = useMemo(
     () =>
-      [...new Set(
-        leads.map((lead) => lead.ownerName).filter(Boolean)
-      )].sort(),
+      [
+        ...new Set(
+          leads
+            .map((lead) => lead.ownerName)
+            .filter(Boolean)
+        ),
+      ].sort(),
     [leads]
   );
+
+  /*
+  |--------------------------------------------------------------------------
+  | Filtered Leads
+  |--------------------------------------------------------------------------
+  */
 
   const filteredLeads = useMemo(() => {
     const items = leads.filter((lead) => {
@@ -741,7 +915,9 @@ export default function LeadsPage() {
 
     return [...items].sort((a, b) => {
       if (sort === "company") {
-        return String(a.companyName || "").localeCompare(
+        return String(
+          a.companyName || ""
+        ).localeCompare(
           String(b.companyName || "")
         );
       }
@@ -760,6 +936,12 @@ export default function LeadsPage() {
     });
   }, [leads, priority, owner, sort]);
 
+  /*
+  |--------------------------------------------------------------------------
+  | Pagination
+  |--------------------------------------------------------------------------
+  */
+
   const totalPages = Math.max(
     1,
     Math.ceil(filteredLeads.length / PAGE_SIZE)
@@ -769,6 +951,12 @@ export default function LeadsPage() {
     (page - 1) * PAGE_SIZE,
     page * PAGE_SIZE
   );
+
+  /*
+  |--------------------------------------------------------------------------
+  | Selected Leads
+  |--------------------------------------------------------------------------
+  */
 
   const selectedLeads = leads.filter((lead) =>
     selected.includes(lead.id)
@@ -790,14 +978,35 @@ export default function LeadsPage() {
       selected.includes(lead.id)
     );
 
+  /*
+  |--------------------------------------------------------------------------
+  | Pipeline Metrics
+  |--------------------------------------------------------------------------
+  |
+  | FIX:
+  |
+  | Overdue follow-ups are calculated using actual
+  | follow-up records.
+  |
+  | Only status PENDING and due date < current time
+  | will be counted.
+  |
+  | RESCHEDULED records are excluded.
+  |
+  |--------------------------------------------------------------------------
+  */
+
   const metrics = useMemo(() => {
     const active = filteredLeads.filter(
       (lead) =>
-        !["Lost", "Active Client"].includes(lead.stage)
+        !["Lost", "Active Client"].includes(
+          lead.stage
+        )
     );
 
     const pipelineValue = active.reduce(
-      (sum, lead) => sum + getLeadValue(lead),
+      (sum, lead) =>
+        sum + getLeadValue(lead),
       0
     );
 
@@ -805,29 +1014,58 @@ export default function LeadsPage() {
       (lead) => lead.stage === "New"
     );
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const activeLeadIds = new Set(
+      active.map((lead) => String(lead.id))
+    );
 
-    const overdue = filteredLeads.filter((lead) => {
-      if (
-        !lead.followUpAt ||
-        ["Lost", "Active Client"].includes(lead.stage)
-      ) {
-        return false;
+    const now = Date.now();
+
+    const overdueFollowups = followups.filter(
+      (followup) => {
+        const status = normalizeFollowupStatus(
+          followup.status
+        );
+
+        // Only active pending follow-ups.
+        if (status !== "PENDING") {
+          return false;
+        }
+
+        // Only follow-ups belonging to visible
+        // filtered active leads.
+        if (
+          !activeLeadIds.has(
+            String(followup.leadId)
+          )
+        ) {
+          return false;
+        }
+
+        const dueDate =
+          getFollowupDueDate(followup);
+
+        if (!dueDate) {
+          return false;
+        }
+
+        return dueDate.getTime() < now;
       }
-
-      const due = new Date(lead.followUpAt);
-      return !Number.isNaN(due.getTime()) && due < today;
-    });
+    );
 
     return {
       total: filteredLeads.length,
       active: active.length,
       new: newLeads.length,
-      overdue: overdue.length,
+      overdue: overdueFollowups.length,
       value: pipelineValue,
     };
-  }, [filteredLeads]);
+  }, [filteredLeads, followups]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Selection Actions
+  |--------------------------------------------------------------------------
+  */
 
   const toggleLead = (id) => {
     setSelected((current) =>
@@ -851,12 +1089,35 @@ export default function LeadsPage() {
     );
   };
 
+  /*
+  |--------------------------------------------------------------------------
+  | Change View
+  |--------------------------------------------------------------------------
+  */
+
   const changeView = (nextView) => {
     setView(nextView);
     setDraggedLead(null);
     setDragOverStage(null);
     setDropNotice("");
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Refresh
+  |--------------------------------------------------------------------------
+  */
+
+  const refreshAll = () => {
+    refetch();
+    followupsQuery.refetch();
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | CSV Export
+  |--------------------------------------------------------------------------
+  */
 
   const exportLeads = () => {
     if (!filteredLeads.length) return;
@@ -893,15 +1154,20 @@ export default function LeadsPage() {
     ];
 
     const csv = rows
-      .map((row) => row.map(csvValue).join(","))
+      .map((row) =>
+        row.map(csvValue).join(",")
+      )
       .join("\r\n");
 
     const blob = new Blob(
       ["\uFEFF", csv],
-      { type: "text/csv;charset=utf-8;" }
+      {
+        type: "text/csv;charset=utf-8;",
+      }
     );
 
     const url = URL.createObjectURL(blob);
+
     const anchor = document.createElement("a");
 
     anchor.href = url;
@@ -913,6 +1179,12 @@ export default function LeadsPage() {
 
     URL.revokeObjectURL(url);
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Kanban Drop
+  |--------------------------------------------------------------------------
+  */
 
   const handleDrop = (targetStage) => {
     setDragOverStage(null);
@@ -929,6 +1201,7 @@ export default function LeadsPage() {
       setDropNotice(
         'To mark a lead as Lost, open its details and use "Mark lost".'
       );
+
       setDraggedLead(null);
       return;
     }
@@ -940,24 +1213,45 @@ export default function LeadsPage() {
     setStageOpen(true);
   };
 
+  /*
+  |--------------------------------------------------------------------------
+  | Reset Filters
+  |--------------------------------------------------------------------------
+  */
+
   const resetFilters = () => {
     setSearch("");
     setStage("");
     setPriority("");
     setOwner("");
     setSort("newest");
-    navigate("/leads", { replace: true });
+
+    navigate("/leads", {
+      replace: true,
+    });
   };
 
   const filtersActive = Boolean(
-    search || stage || priority || owner ||
-    sort !== "newest"
+    search ||
+      stage ||
+      priority ||
+      owner ||
+      sort !== "newest"
   );
+
+  /*
+  |--------------------------------------------------------------------------
+  | Render
+  |--------------------------------------------------------------------------
+  */
 
   return (
     <>
       <div className="glass-leads space-y-5">
+
+        {/* ========================================================= */}
         {/* HEADER */}
+        {/* ========================================================= */}
 
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -967,6 +1261,7 @@ export default function LeadsPage() {
 
             <h1 className="mt-2 flex items-center gap-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
               Leads & Pipeline
+
               <Sparkles
                 size={21}
                 className="glass-leads-heading-icon"
@@ -983,15 +1278,22 @@ export default function LeadsPage() {
             <button
               type="button"
               className="glass-leads-button"
-              disabled={isFetching}
-              onClick={() => refetch()}
+              disabled={
+                isFetching ||
+                followupsQuery.isFetching
+              }
+              onClick={refreshAll}
             >
               <RefreshCw
                 size={16}
                 className={
-                  isFetching ? "animate-spin" : ""
+                  isFetching ||
+                  followupsQuery.isFetching
+                    ? "animate-spin"
+                    : ""
                 }
               />
+
               Refresh
             </button>
 
@@ -1016,9 +1318,14 @@ export default function LeadsPage() {
           </div>
         </header>
 
+        {/* ========================================================= */}
         {/* BENTO KPI CARDS */}
+        {/* ========================================================= */}
 
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
+          {/* Total Leads */}
+
           <MetricCard
             label="Total Leads"
             value={metrics.total.toLocaleString("en-IN")}
@@ -1027,17 +1334,22 @@ export default function LeadsPage() {
             featured
           >
             <div className="mt-3 flex h-7 items-end gap-1">
-              {[35, 60, 44, 78, 53, 95, 74, 100].map(
-                (height, index) => (
-                  <span
-                    key={index}
-                    className="glass-leads-spark-bar"
-                    style={{ height: `${height}%` }}
-                  />
-                )
-              )}
+              {[
+                35, 60, 44, 78,
+                53, 95, 74, 100,
+              ].map((height, index) => (
+                <span
+                  key={index}
+                  className="glass-leads-spark-bar"
+                  style={{
+                    height: `${height}%`,
+                  }}
+                />
+              ))}
             </div>
           </MetricCard>
+
+          {/* Open Opportunities */}
 
           <MetricCard
             label="Open Opportunities"
@@ -1047,6 +1359,8 @@ export default function LeadsPage() {
             tone="green"
           />
 
+          {/* Pipeline Value */}
+
           <MetricCard
             label="Pipeline Value"
             value={compactMoney(metrics.value)}
@@ -1055,18 +1369,35 @@ export default function LeadsPage() {
             tone="violet"
           />
 
+          {/* Overdue Follow-ups — FIXED */}
+
           <MetricCard
             label="Overdue Follow-ups"
-            value={metrics.overdue.toLocaleString("en-IN")}
-            subtitle="Follow-ups requiring attention"
+            value={
+              followupsQuery.isLoading
+                ? "—"
+                : followupsQuery.isError
+                  ? "Unavailable"
+                  : metrics.overdue.toLocaleString(
+                      "en-IN"
+                    )
+            }
+            subtitle={
+              followupsQuery.isError
+                ? "Unable to load follow-up records"
+                : "Pending follow-ups requiring attention"
+            }
             icon={CalendarClock}
             tone="rose"
           />
         </section>
 
+        {/* ========================================================= */}
         {/* MAIN WORKSPACE */}
+        {/* ========================================================= */}
 
         <section className="glass-leads-workspace overflow-hidden rounded-3xl">
+
           <div className="flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
               <h2 className="text-base font-bold">
@@ -1078,6 +1409,8 @@ export default function LeadsPage() {
                 records
               </p>
             </div>
+
+            {/* Table / Kanban Toggle */}
 
             <div
               className="glass-leads-toggle"
@@ -1110,9 +1443,14 @@ export default function LeadsPage() {
             </div>
           </div>
 
+          {/* ======================================================= */}
           {/* FILTER TOOLBAR */}
+          {/* ======================================================= */}
 
           <div className="glass-leads-toolbar flex flex-wrap items-center gap-3 px-5 pb-5">
+
+            {/* Search */}
+
             <label className="glass-leads-search">
               <Search size={17} />
 
@@ -1137,6 +1475,8 @@ export default function LeadsPage() {
               )}
             </label>
 
+            {/* Stage */}
+
             <select
               className="glass-leads-select"
               value={stage}
@@ -1154,6 +1494,8 @@ export default function LeadsPage() {
               ))}
             </select>
 
+            {/* Priority */}
+
             <select
               className="glass-leads-select"
               value={priority}
@@ -1167,6 +1509,8 @@ export default function LeadsPage() {
               <option value="medium">Medium</option>
               <option value="low">Low</option>
             </select>
+
+            {/* More Filters */}
 
             <button
               type="button"
@@ -1191,8 +1535,15 @@ export default function LeadsPage() {
             )}
           </div>
 
+          {/* ======================================================= */}
+          {/* ADVANCED FILTERS */}
+          {/* ======================================================= */}
+
           {filtersOpen && (
             <div className="glass-leads-filter-panel flex flex-wrap items-end gap-4 px-5 py-4">
+
+              {/* Owner */}
+
               <label className="flex flex-col gap-2">
                 <span className="glass-leads-eyebrow">
                   Owner
@@ -1208,12 +1559,17 @@ export default function LeadsPage() {
                   <option value="">All owners</option>
 
                   {owners.map((item) => (
-                    <option key={item} value={item}>
+                    <option
+                      key={item}
+                      value={item}
+                    >
                       {item}
                     </option>
                   ))}
                 </select>
               </label>
+
+              {/* Sort */}
 
               <label className="flex flex-col gap-2">
                 <span className="glass-leads-eyebrow">
@@ -1243,7 +1599,9 @@ export default function LeadsPage() {
             </div>
           )}
 
+          {/* ======================================================= */}
           {/* BULK ACTIONS */}
+          {/* ======================================================= */}
 
           {selected.length > 0 && (
             <div className="glass-leads-bulk flex flex-wrap items-center gap-3 px-5 py-3">
@@ -1251,22 +1609,29 @@ export default function LeadsPage() {
                 {selected.length} selected
               </span>
 
+              {/* Assign Owner */}
+
               <button
                 type="button"
                 className="glass-leads-button"
                 title={
-                  selected.length && !sharedBranchId
+                  selected.length &&
+                  !sharedBranchId
                     ? "Select leads belonging to one branch."
                     : undefined
                 }
                 disabled={
                   !isAdmin || !sharedBranchId
                 }
-                onClick={() => setOwnerOpen(true)}
+                onClick={() =>
+                  setOwnerOpen(true)
+                }
               >
                 <UserRound size={15} />
                 Assign Owner
               </button>
+
+              {/* Change Stage */}
 
               <button
                 type="button"
@@ -1280,17 +1645,23 @@ export default function LeadsPage() {
                 Change Stage
               </button>
 
+              {/* Clear */}
+
               <button
                 type="button"
                 className="glass-leads-text-button"
-                onClick={() => setSelected([])}
+                onClick={() =>
+                  setSelected([])
+                }
               >
                 Clear selection
               </button>
             </div>
           )}
 
-          {/* QUERY STATES */}
+          {/* ======================================================= */}
+          {/* LOADING */}
+          {/* ======================================================= */}
 
           {isLoading && (
             <div
@@ -1300,6 +1671,10 @@ export default function LeadsPage() {
               Loading pipeline records...
             </div>
           )}
+
+          {/* ======================================================= */}
+          {/* ERROR */}
+          {/* ======================================================= */}
 
           {!isLoading && isError && (
             <div className="px-6 py-12 text-center">
@@ -1327,129 +1702,145 @@ export default function LeadsPage() {
             </div>
           )}
 
-          {/* TABLE */}
+          {/* ======================================================= */}
+          {/* TABLE VIEW */}
+          {/* ======================================================= */}
 
-          {!isLoading && !isError && view === "table" && (
-            <>
-              <LeadsTable
-                leads={visibleLeads}
-                selected={selected}
-                toggleLead={toggleLead}
-                allSelected={allSelected}
-                toggleAll={toggleAll}
+          {!isLoading &&
+            !isError &&
+            view === "table" && (
+              <>
+                <LeadsTable
+                  leads={visibleLeads}
+                  selected={selected}
+                  toggleLead={toggleLead}
+                  allSelected={allSelected}
+                  toggleAll={toggleAll}
+                  onOpen={(id) =>
+                    navigate(`/leads/${id}`)
+                  }
+                  onAdd={() =>
+                    setAddOpen(true)
+                  }
+                  filtered={filtersActive}
+                />
+
+                {/* Pagination */}
+
+                <footer className="glass-leads-pagination flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                  <span className="glass-leads-muted text-xs">
+                    Showing{" "}
+                    {filteredLeads.length
+                      ? (page - 1) * PAGE_SIZE + 1
+                      : 0}
+                    –
+                    {Math.min(
+                      page * PAGE_SIZE,
+                      filteredLeads.length
+                    )}{" "}
+                    of {filteredLeads.length} loaded records
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="glass-leads-page-button"
+                      disabled={page <= 1}
+                      onClick={() =>
+                        setPage((current) =>
+                          Math.max(1, current - 1)
+                        )
+                      }
+                      aria-label="Previous page"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+
+                    <span className="glass-leads-muted px-2 text-xs font-semibold">
+                      Page {page} of {totalPages}
+                    </span>
+
+                    <button
+                      type="button"
+                      className="glass-leads-page-button"
+                      disabled={page >= totalPages}
+                      onClick={() =>
+                        setPage((current) =>
+                          Math.min(
+                            totalPages,
+                            current + 1
+                          )
+                        )
+                      }
+                      aria-label="Next page"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </footer>
+              </>
+            )}
+        </section>
+
+        {/* ========================================================= */}
+        {/* KANBAN VIEW */}
+        {/* ========================================================= */}
+
+        {!isLoading &&
+          !isError &&
+          view === "kanban" && (
+            <section className="glass-leads-kanban-section min-w-0 rounded-3xl p-5">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold">
+                    Pipeline Board
+                  </h2>
+
+                  <p className="glass-leads-muted mt-1 text-xs">
+                    Drag a card to change its pipeline stage.
+                  </p>
+                </div>
+
+                <span className="glass-leads-kanban-summary">
+                  {filteredLeads.length} leads ·{" "}
+                  {LEAD_STAGES.length} stages
+                </span>
+              </div>
+
+              {dropNotice && (
+                <div
+                  role="alert"
+                  className="glass-leads-notice mb-4"
+                >
+                  {dropNotice}
+                </div>
+              )}
+
+              <KanbanBoard
+                leads={filteredLeads}
+                draggedLead={draggedLead}
+                dragOverStage={dragOverStage}
+                setDraggedLead={setDraggedLead}
+                setDragOverStage={setDragOverStage}
+                setDropNotice={setDropNotice}
+                onDrop={handleDrop}
                 onOpen={(id) =>
                   navigate(`/leads/${id}`)
                 }
-                onAdd={() => setAddOpen(true)}
-                filtered={filtersActive}
               />
-
-              <footer className="glass-leads-pagination flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-                <span className="glass-leads-muted text-xs">
-                  Showing{" "}
-                  {filteredLeads.length
-                    ? (page - 1) * PAGE_SIZE + 1
-                    : 0}
-                  –
-                  {Math.min(
-                    page * PAGE_SIZE,
-                    filteredLeads.length
-                  )}{" "}
-                  of {filteredLeads.length} loaded records
-                </span>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="glass-leads-page-button"
-                    disabled={page <= 1}
-                    onClick={() =>
-                      setPage((current) =>
-                        Math.max(1, current - 1)
-                      )
-                    }
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-
-                  <span className="glass-leads-muted px-2 text-xs font-semibold">
-                    Page {page} of {totalPages}
-                  </span>
-
-                  <button
-                    type="button"
-                    className="glass-leads-page-button"
-                    disabled={page >= totalPages}
-                    onClick={() =>
-                      setPage((current) =>
-                        Math.min(
-                          totalPages,
-                          current + 1
-                        )
-                      )
-                    }
-                    aria-label="Next page"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </footer>
-            </>
+            </section>
           )}
-        </section>
-
-        {/* KANBAN */}
-
-        {!isLoading && !isError && view === "kanban" && (
-          <section className="glass-leads-kanban-section min-w-0 rounded-3xl p-5">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-bold">
-                  Pipeline Board
-                </h2>
-
-                <p className="glass-leads-muted mt-1 text-xs">
-                  Drag a card to change its pipeline stage.
-                </p>
-              </div>
-
-              <span className="glass-leads-kanban-summary">
-                {filteredLeads.length} leads ·{" "}
-                {LEAD_STAGES.length} stages
-              </span>
-            </div>
-
-            {dropNotice && (
-              <div
-                role="alert"
-                className="glass-leads-notice mb-4"
-              >
-                {dropNotice}
-              </div>
-            )}
-
-            <KanbanBoard
-              leads={filteredLeads}
-              draggedLead={draggedLead}
-              dragOverStage={dragOverStage}
-              setDraggedLead={setDraggedLead}
-              setDragOverStage={setDragOverStage}
-              setDropNotice={setDropNotice}
-              onDrop={handleDrop}
-              onOpen={(id) =>
-                navigate(`/leads/${id}`)
-              }
-            />
-          </section>
-        )}
       </div>
 
+      {/* =========================================================== */}
       {/* EXISTING MODALS */}
+      {/* =========================================================== */}
 
       <LeadFormModal
         open={addOpen}
-        onClose={() => setAddOpen(false)}
+        onClose={() =>
+          setAddOpen(false)
+        }
       />
 
       <AssignOwnerModal

@@ -6,13 +6,9 @@ import {
   AlertCircle,
   Building2,
   Check,
-  Eye,
-  EyeOff,
   KeyRound,
   LoaderCircle,
-  LockKeyhole,
   Mail,
-  MapPin,
   Save,
   ShieldCheck,
   Sparkles,
@@ -38,7 +34,6 @@ import "./users-glass.css";
 const EMPTY_FORM = {
   fullName: "",
   email: "",
-  password: "",
   role: "OWNER",
   department: "",
   location: "",
@@ -88,44 +83,19 @@ const UserFormModal = ({
   user = null,
   onClose,
 }) => {
-  /*
-  |--------------------------------------------------------------------------
-  | Queries / Mutations
-  |--------------------------------------------------------------------------
-  */
-
   const optionsQuery = useUserOptionsQuery(open);
 
   const createMutation = useCreateUserMutation();
   const updateMutation = useUpdateUserMutation();
 
-  /*
-  |--------------------------------------------------------------------------
-  | State
-  |--------------------------------------------------------------------------
-  */
-
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Mode
-  |--------------------------------------------------------------------------
-  */
 
   const isEditing = Boolean(user?.id);
 
   const isSaving =
     createMutation.isPending ||
     updateMutation.isPending;
-
-  /*
-  |--------------------------------------------------------------------------
-  | Options
-  |--------------------------------------------------------------------------
-  */
 
   const options = optionsQuery.data?.data || {};
 
@@ -143,12 +113,6 @@ const UserFormModal = ({
           label: "Super Admin",
         },
       ];
-
-  /*
-  |--------------------------------------------------------------------------
-  | Selected Branch
-  |--------------------------------------------------------------------------
-  */
 
   const selectedBranch = useMemo(
     () =>
@@ -169,13 +133,11 @@ const UserFormModal = ({
     if (!open) return;
 
     setError("");
-    setShowPassword(false);
 
     if (user) {
       setForm({
         fullName: user.fullName || "",
         email: user.email || "",
-        password: "",
         role: user.role || "OWNER",
         department: user.department || "",
         location: user.location || "",
@@ -199,7 +161,8 @@ const UserFormModal = ({
   useEffect(() => {
     if (!open) return undefined;
 
-    const previousOverflow = document.body.style.overflow;
+    const previousOverflow =
+      document.body.style.overflow;
 
     document.body.style.overflow = "hidden";
 
@@ -252,8 +215,6 @@ const UserFormModal = ({
     if (isSaving) return;
 
     setError("");
-    setShowPassword(false);
-
     onClose?.();
   };
 
@@ -275,34 +236,49 @@ const UserFormModal = ({
       return "Full name must contain at least 2 characters.";
     }
 
-    if (!email) {
-      return "Email is required.";
+    if (fullName.length > 150) {
+      return "Full name must not exceed 150 characters.";
     }
 
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) {
+      return "Email address is required.";
+    }
+
+    const emailPattern =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!emailPattern.test(email)) {
       return "Enter a valid email address.";
     }
 
+    if (email.length > 190) {
+      return "Email address must not exceed 190 characters.";
+    }
+
     if (!["OWNER", "SUPER_ADMIN"].includes(form.role)) {
-      return "Select a valid role.";
+      return "Select a valid user role.";
     }
 
     if (form.role === "OWNER" && !form.branchId) {
-      return "Branch is required for an Owner.";
+      return "Select a primary branch for this Owner.";
     }
 
-    if (!isEditing && !form.password) {
-      return "Password is required.";
+    if (
+      form.role === "OWNER" &&
+      !branches.some(
+        (branch) =>
+          Number(branch.id) === Number(form.branchId)
+      )
+    ) {
+      return "Select a valid primary branch.";
     }
 
-    if (form.password && form.password.length < 8) {
-      return "Password must contain at least 8 characters.";
+    if (form.department.trim().length > 120) {
+      return "Department must not exceed 120 characters.";
     }
 
-    if (form.password.length > 128) {
-      return "Password is too long.";
+    if (form.location.trim().length > 120) {
+      return "Location must not exceed 120 characters.";
     }
 
     return "";
@@ -338,10 +314,6 @@ const UserFormModal = ({
           : null,
     };
 
-    if (form.password) {
-      data.password = form.password;
-    }
-
     try {
       if (isEditing) {
         await updateMutation.mutateAsync({
@@ -349,10 +321,7 @@ const UserFormModal = ({
           data,
         });
       } else {
-        await createMutation.mutateAsync({
-          ...data,
-          password: form.password,
-        });
+        await createMutation.mutateAsync(data);
       }
 
       onClose?.();
@@ -360,7 +329,7 @@ const UserFormModal = ({
       setError(
         requestError?.response?.data?.message ||
           requestError?.message ||
-          "Unable to save user."
+          "Unable to save user. Please try again."
       );
     }
   };
@@ -384,9 +353,7 @@ const UserFormModal = ({
         aria-modal="true"
         aria-labelledby="user-modal-title"
       >
-        {/* ========================================================= */}
         {/* HEADER */}
-        {/* ========================================================= */}
 
         <header className="gum-header flex shrink-0 items-center justify-between gap-4 px-6 py-5">
           <div className="flex min-w-0 items-center gap-4">
@@ -408,8 +375,8 @@ const UserFormModal = ({
               </h2>
 
               <p className="gum-muted mt-1 text-xs leading-5">
-                Manage account access, lead ownership, and
-                primary branch assignments.
+                Manage account access, lead ownership,
+                and primary branch assignments.
               </p>
             </div>
           </div>
@@ -425,24 +392,21 @@ const UserFormModal = ({
           </button>
         </header>
 
-        {/* ========================================================= */}
         {/* BODY */}
-        {/* ========================================================= */}
 
         <div className="gum-body min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          {/* Validation / API Error */}
-
           {error && (
             <div
               role="alert"
               className="gum-error flex items-start gap-3 rounded-xl p-4 text-sm"
             >
-              <AlertCircle size={18} className="mt-0.5 shrink-0" />
+              <AlertCircle
+                size={18}
+                className="mt-0.5 shrink-0"
+              />
               <span>{error}</span>
             </div>
           )}
-
-          {/* Options Error */}
 
           {optionsQuery.isError && (
             <div
@@ -466,9 +430,7 @@ const UserFormModal = ({
             </div>
           )}
 
-          {/* ======================================================= */}
           {/* USER INFORMATION */}
-          {/* ======================================================= */}
 
           <div className="gum-section rounded-2xl p-5">
             <div className="gum-section-heading mb-5 flex items-center gap-3">
@@ -488,8 +450,6 @@ const UserFormModal = ({
             </div>
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              {/* Full Name */}
-
               <FormField label="Full Name" required>
                 <input
                   type="text"
@@ -504,8 +464,6 @@ const UserFormModal = ({
                   placeholder="Enter full name"
                 />
               </FormField>
-
-              {/* Email */}
 
               <FormField label="Email Address" required>
                 <input
@@ -522,8 +480,6 @@ const UserFormModal = ({
                 />
               </FormField>
 
-              {/* Department */}
-
               <FormField label="Department">
                 <input
                   type="text"
@@ -537,8 +493,6 @@ const UserFormModal = ({
                   placeholder="e.g. Business Development"
                 />
               </FormField>
-
-              {/* Location */}
 
               <FormField label="Location">
                 <input
@@ -556,9 +510,7 @@ const UserFormModal = ({
             </div>
           </div>
 
-          {/* ======================================================= */}
-          {/* ACCESS & BRANCH */}
-          {/* ======================================================= */}
+          {/* ROLE & BRANCH */}
 
           <div className="gum-section rounded-2xl p-5">
             <div className="gum-section-heading mb-5 flex items-center gap-3">
@@ -572,15 +524,12 @@ const UserFormModal = ({
                 </h3>
 
                 <p className="gum-muted mt-1 text-xs">
-                  Configure account permissions and branch
-                  visibility
+                  Configure account permissions and branch visibility
                 </p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              {/* Role */}
-
               <FormField label="User Role" required>
                 <select
                   className={inputClass}
@@ -600,8 +549,6 @@ const UserFormModal = ({
                   ))}
                 </select>
               </FormField>
-
-              {/* Branch */}
 
               <FormField
                 label="Primary Branch"
@@ -639,11 +586,12 @@ const UserFormModal = ({
               </FormField>
             </div>
 
-            {/* Branch Summary */}
-
             {form.role === "OWNER" && selectedBranch && (
               <div className="gum-info mt-5 flex items-start gap-3 rounded-xl p-4">
-                <Building2 size={18} className="mt-0.5 shrink-0" />
+                <Building2
+                  size={18}
+                  className="mt-0.5 shrink-0"
+                />
 
                 <div>
                   <p className="text-xs font-bold">
@@ -660,11 +608,12 @@ const UserFormModal = ({
               </div>
             )}
 
-            {/* Super Admin Notice */}
-
             {form.role === "SUPER_ADMIN" && (
               <div className="gum-info mt-5 flex items-start gap-3 rounded-xl p-4">
-                <ShieldCheck size={18} className="mt-0.5 shrink-0" />
+                <ShieldCheck
+                  size={18}
+                  className="mt-0.5 shrink-0"
+                />
 
                 <div>
                   <p className="text-xs font-bold">
@@ -673,96 +622,93 @@ const UserFormModal = ({
 
                   <p className="mt-1 text-xs leading-5">
                     Super Admin does not require a primary
-                    branch and can manage records across all
-                    branches.
+                    branch and can manage records across
+                    all branches.
                   </p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* ======================================================= */}
           {/* SECURITY */}
-          {/* ======================================================= */}
 
           <div className="gum-section rounded-2xl p-5">
             <div className="gum-section-heading mb-5 flex items-center gap-3">
               <span className="gum-section-icon flex h-10 w-10 items-center justify-center rounded-xl">
-                <LockKeyhole size={19} />
+                <KeyRound size={19} />
               </span>
 
               <div>
                 <h3 className="gum-title text-sm font-extrabold">
-                  Security
+                  Security & Login Credentials
                 </h3>
 
                 <p className="gum-muted mt-1 text-xs">
-                  Set or update the account password
+                  Automatic password generation and email delivery
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <FormField
-                label={isEditing ? "New Password" : "Password"}
-                required={!isEditing}
-                hint={
-                  isEditing
-                    ? "Leave blank to keep the existing password."
-                    : "Minimum 8 characters."
-                }
-                full
-              >
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    className={`${inputClass} pr-12`}
-                    value={form.password}
-                    maxLength={128}
-                    autoComplete="new-password"
-                    disabled={isSaving}
-                    onChange={(event) =>
-                      updateField("password", event.target.value)
-                    }
-                    placeholder={
-                      isEditing
-                        ? "Leave blank to keep current password"
-                        : "Enter a secure password"
-                    }
+            <div className="gum-info flex items-start gap-3 rounded-xl p-4">
+              {isEditing ? (
+                <>
+                  <ShieldCheck
+                    size={19}
+                    className="mt-0.5 shrink-0"
                   />
 
-                  <button
-                    type="button"
-                    className="gum-password-toggle absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg"
-                    disabled={isSaving}
-                    aria-label={
-                      showPassword
-                        ? "Hide password"
-                        : "Show password"
-                    }
-                    onClick={() =>
-                      setShowPassword((previous) => !previous)
-                    }
-                  >
-                    {showPassword ? (
-                      <EyeOff size={17} />
-                    ) : (
-                      <Eye size={17} />
-                    )}
-                  </button>
-                </div>
-              </FormField>
+                  <div>
+                    <p className="text-xs font-bold">
+                      Password Management
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5">
+                      User passwords cannot be changed
+                      from this form. Users manage their
+                      passwords through the secure
+                      password-change process.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Mail
+                    size={19}
+                    className="mt-0.5 shrink-0"
+                  />
+
+                  <div>
+                    <p className="text-xs font-bold">
+                      Temporary Password Sent Automatically
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5">
+                      When you create this user, Tempest Leads
+                      will generate a secure temporary password
+                      and send it to the email address entered
+                      above using Resend.
+                    </p>
+
+                    <p className="mt-2 text-xs leading-5">
+                      The user must change their temporary
+                      password before accessing the CRM,
+                      once the first-login password-change
+                      feature is enabled on the backend.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        {/* ========================================================= */}
         {/* FOOTER */}
-        {/* ========================================================= */}
 
         <footer className="gum-footer flex shrink-0 items-center justify-between gap-3 px-6 py-4">
           <p className="gum-muted hidden text-xs sm:block">
-            Changes are saved to your CRM.
+            {isEditing
+              ? "Changes are saved to your CRM."
+              : "Login credentials will be emailed to the user."}
           </p>
 
           <div className="ml-auto flex items-center gap-3">
@@ -779,7 +725,11 @@ const UserFormModal = ({
               type="button"
               className="gum-primary inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold"
               onClick={submit}
-              disabled={isSaving || optionsQuery.isLoading}
+              disabled={
+                isSaving ||
+                optionsQuery.isLoading ||
+                optionsQuery.isError
+              }
             >
               {isSaving ? (
                 <LoaderCircle

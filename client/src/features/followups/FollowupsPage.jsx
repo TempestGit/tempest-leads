@@ -13,13 +13,11 @@ import {
   LoaderCircle,
   Plus,
   RefreshCw,
-  Timer,
 } from "lucide-react";
 
 import { useFollowupsQuery } from "./followups.queries.js";
 
 import FollowupsTable from "./FollowupsTable.jsx";
-
 import ScheduleFollowupModal from "./ScheduleFollowupModal.jsx";
 import CompleteFollowupModal from "./CompleteFollowupModal.jsx";
 import RescheduleFollowupModal from "./RescheduleFollowupModal.jsx";
@@ -33,7 +31,7 @@ import "./followups-page-glass.css";
 */
 
 const normalizeStatus = (value) =>
-  String(value || "").trim().toUpperCase();
+  String(value ?? "").trim().toUpperCase();
 
 const getDueDate = (followup) => {
   if (!followup?.dueAt) return null;
@@ -101,6 +99,20 @@ const FollowupsPage = () => {
   |--------------------------------------------------------------------------
   | Statistics
   |--------------------------------------------------------------------------
+  |
+  | Only PENDING follow-ups can be upcoming or overdue.
+  |
+  | COMPLETED:
+  |   Count under completed only.
+  |
+  | RESCHEDULED:
+  |   Preserve in history.
+  |   Never count as overdue or upcoming.
+  |
+  | PENDING:
+  |   Future due date -> Upcoming
+  |   Past due date   -> Overdue
+  |
   */
 
   const stats = useMemo(() => {
@@ -115,24 +127,25 @@ const FollowupsPage = () => {
 
     followups.forEach((item) => {
       const status = normalizeStatus(item.status);
-      const dueDate = getDueDate(item);
 
-      const isCompleted = status === "COMPLETED";
-
-      if (isCompleted) {
+      // Completed follow-ups are historical records.
+      if (status === "COMPLETED") {
         completed += 1;
         return;
       }
 
-      // Cancelled records are not active follow-ups.
-      if (
-        status === "CANCELLED" ||
-        status === "CANCELED"
-      ) {
+      // Only active pending records can become overdue.
+      // This excludes RESCHEDULED, CANCELLED and other
+      // inactive statuses automatically.
+      if (status !== "PENDING") {
         return;
       }
 
-      if (!dueDate) return;
+      const dueDate = getDueDate(item);
+
+      if (!dueDate) {
+        return;
+      }
 
       if (dueDate.getTime() < now) {
         overdue += 1;
@@ -145,12 +158,14 @@ const FollowupsPage = () => {
 
     upcomingItems.sort(
       (a, b) =>
-        getDueDate(a).getTime() - getDueDate(b).getTime()
+        getDueDate(a).getTime() -
+        getDueDate(b).getTime()
     );
 
     overdueItems.sort(
       (a, b) =>
-        getDueDate(a).getTime() - getDueDate(b).getTime()
+        getDueDate(a).getTime() -
+        getDueDate(b).getTime()
     );
 
     return {
@@ -179,6 +194,9 @@ const FollowupsPage = () => {
     navigate(`/leads/${leadId}`);
   };
 
+  const highlightedFollowup =
+    stats.oldestOverdue || stats.nextFollowup;
+
   /*
   |--------------------------------------------------------------------------
   | Render
@@ -187,6 +205,7 @@ const FollowupsPage = () => {
 
   return (
     <div className="gfp-page workflow-page workflow-followups min-w-0 space-y-6 p-4 sm:p-6 xl:p-8">
+
       {/* ============================================================= */}
       {/* HEADER */}
       {/* ============================================================= */}
@@ -227,7 +246,9 @@ const FollowupsPage = () => {
             >
               <RefreshCw
                 size={16}
-                className={query.isFetching ? "animate-spin" : ""}
+                className={
+                  query.isFetching ? "animate-spin" : ""
+                }
               />
               Refresh
             </button>
@@ -249,6 +270,7 @@ const FollowupsPage = () => {
       {/* ============================================================= */}
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
         {/* Total */}
 
         <article className="gfp-page-metric gfp-page-metric-primary relative overflow-hidden rounded-[22px] p-5">
@@ -354,7 +376,7 @@ const FollowupsPage = () => {
 
       {!query.isLoading &&
         !query.isError &&
-        (stats.oldestOverdue || stats.nextFollowup) && (
+        highlightedFollowup && (
           <section
             className={`gfp-page-highlight flex flex-col justify-between gap-4 rounded-[22px] p-5 sm:flex-row sm:items-center ${
               stats.oldestOverdue ? "is-overdue" : ""
@@ -377,35 +399,28 @@ const FollowupsPage = () => {
                 </p>
 
                 <h3 className="gfp-page-title mt-1 break-words text-sm font-extrabold sm:text-base">
-                  {(stats.oldestOverdue || stats.nextFollowup)
-                    ?.action || "Client Follow-up"}
+                  {highlightedFollowup.action ||
+                    "Client Follow-up"}
                 </h3>
 
                 <p className="gfp-page-muted mt-1 text-xs">
-                  {(stats.oldestOverdue || stats.nextFollowup)
-                    ?.companyName
-                    ? `${
-                        (stats.oldestOverdue || stats.nextFollowup)
-                          .companyName
-                      } · `
+                  {highlightedFollowup.companyName
+                    ? `${highlightedFollowup.companyName} · `
                     : ""}
                   {formatDateTime(
-                    (stats.oldestOverdue || stats.nextFollowup)
-                      ?.dueAt
+                    highlightedFollowup.dueAt
                   )}
                 </p>
               </div>
             </div>
 
-            {(stats.oldestOverdue || stats.nextFollowup)
-              ?.leadId && (
+            {highlightedFollowup.leadId && (
               <button
                 type="button"
                 className="gfp-page-secondary inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold"
                 onClick={() =>
                   handleOpenLead(
-                    (stats.oldestOverdue || stats.nextFollowup)
-                      .leadId
+                    highlightedFollowup.leadId
                   )
                 }
               >
@@ -483,7 +498,9 @@ const FollowupsPage = () => {
             >
               <RefreshCw
                 size={16}
-                className={query.isFetching ? "animate-spin" : ""}
+                className={
+                  query.isFetching ? "animate-spin" : ""
+                }
               />
               Try Again
             </button>

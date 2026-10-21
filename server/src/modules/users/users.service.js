@@ -1,3 +1,6 @@
+
+import crypto from "node:crypto";
+
 import bcrypt from "bcryptjs";
 
 import pool from "../../config/db.js";
@@ -7,6 +10,10 @@ import ApiError from "../../utils/ApiError.js";
 import {
   createAuditLog,
 } from "../../services/audit.service.js";
+
+import {
+  sendNewUserCredentialsEmail,
+} from "../../services/mail.service.js";
 
 import {
   countOwnedLeadsOutsideBranch,
@@ -21,8 +28,15 @@ import {
   setUserStatus,
   updateUserCode,
   updateUserDetails,
-  updateUserPassword,
 } from "./users.repository.js";
+
+/*
+|--------------------------------------------------------------------------
+| Password Configuration
+|--------------------------------------------------------------------------
+*/
+
+const PASSWORD_SALT_ROUNDS = 12;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,18 +44,35 @@ import {
 |--------------------------------------------------------------------------
 */
 
-const PASSWORD_SALT_ROUNDS =
-  12;
+const hashPassword = async (password) => {
+  return bcrypt.hash(
+    password,
+    PASSWORD_SALT_ROUNDS
+  );
+};
 
-const hashPassword =
-  async (
-    password
-  ) => {
-    return bcrypt.hash(
-      password,
-      PASSWORD_SALT_ROUNDS
-    );
-  };
+/*
+|--------------------------------------------------------------------------
+| Generate Strong Temporary Password
+|--------------------------------------------------------------------------
+|
+| Password is generated securely on the backend.
+|
+| - 32 characters
+| - Cryptographically secure
+| - Uses Node.js crypto
+| - Meets existing 8–128 character validation
+| - Never returned through API
+| - Never stored as plaintext
+|
+|--------------------------------------------------------------------------
+*/
+
+const generateStrongPassword = () => {
+  return crypto
+    .randomBytes(24)
+    .toString("base64url");
+};
 
 /*
 |--------------------------------------------------------------------------
@@ -49,22 +80,18 @@ const hashPassword =
 |--------------------------------------------------------------------------
 */
 
-const requireSuperAdmin =
-  (
-    currentUser
-  ) => {
-    if (
-      currentUser?.role !==
-      "SUPER_ADMIN"
-    ) {
-      throw new ApiError(
-        403,
-        "Only Super Admin can manage users.",
-        [],
-        "FORBIDDEN"
-      );
-    }
-  };
+const requireSuperAdmin = (currentUser) => {
+  if (
+    currentUser?.role !== "SUPER_ADMIN"
+  ) {
+    throw new ApiError(
+      403,
+      "Only Super Admin can manage users.",
+      [],
+      "FORBIDDEN"
+    );
+  }
+};
 
 /*
 |--------------------------------------------------------------------------
@@ -72,108 +99,101 @@ const requireSuperAdmin =
 |--------------------------------------------------------------------------
 */
 
-const resolveBranch =
-  async (
-    role,
+const resolveBranch = async (
+  role,
+  branchId,
+  connection
+) => {
+  /*
+   * Super Admin has global access
+   * and does not require a branch.
+   */
+
+  if (role === "SUPER_ADMIN") {
+    return null;
+  }
+
+  /*
+   * Owner must have a branch.
+   */
+
+  if (!branchId) {
+    throw new ApiError(
+      422,
+      "Branch is required for an Owner.",
+      [],
+      "USER_BRANCH_REQUIRED"
+    );
+  }
+
+  const branch = await findBranchById(
     branchId,
     connection
-  ) => {
-    /*
-     * Super Admin has global access
-     * and does not require a branch.
-     */
-    if (
-      role ===
-      "SUPER_ADMIN"
-    ) {
-      return null;
-    }
+  );
 
-    /*
-     * Owners must have a branch.
-     */
-    if (!branchId) {
-      throw new ApiError(
-        422,
-        "Branch is required for an Owner.",
-        [],
-        "USER_BRANCH_REQUIRED"
-      );
-    }
+  if (!branch) {
+    throw new ApiError(
+      404,
+      "Selected branch was not found or is inactive.",
+      [],
+      "BRANCH_NOT_FOUND"
+    );
+  }
 
-    const branch =
-      await findBranchById(
-        branchId,
-        connection
-      );
-
-    if (!branch) {
-      throw new ApiError(
-        404,
-        "Selected branch was not found.",
-        [],
-        "BRANCH_NOT_FOUND"
-      );
-    }
-
-    return branch.id;
-  };
+  return branch.id;
+};
 
 /*
 |--------------------------------------------------------------------------
-| Options
+| Safe Transaction Rollback
 |--------------------------------------------------------------------------
 */
 
-export const getUserOptionsService =
-  async (
-    currentUser
-  ) => {
-    requireSuperAdmin(
-      currentUser
-    );
+const rollbackSafely = async (connection) => {
+  try {
+    await connection.rollback();
+  } catch {
+    // Preserve the original error.
+  }
+};
 
-    return {
-      branches:
-        await listActiveBranches(),
+/*
+|--------------------------------------------------------------------------
+| User Options
+|--------------------------------------------------------------------------
+*/
 
-      roles: [
-        {
-          value:
-            "OWNER",
+export const getUserOptionsService = async (
+  currentUser
+) => {
+  requireSuperAdmin(currentUser);
 
-          label:
-            "User / Owner",
-        },
+  return {
+    branches: await listActiveBranches(),
 
-        {
-          value:
-            "SUPER_ADMIN",
+    roles: [
+      {
+        value: "OWNER",
+        label: "User / Owner",
+      },
+      {
+        value: "SUPER_ADMIN",
+        label: "Super Admin",
+      },
+    ],
 
-          label:
-            "Super Admin",
-        },
-      ],
-
-      statuses: [
-        {
-          value:
-            "ACTIVE",
-
-          label:
-            "Active",
-        },
-
-        {
-          value:
-            "INACTIVE",
-
-          label:
-            "Inactive",
-        },
-      ],
-    };
+    statuses: [
+      {
+        value: "ACTIVE",
+        label: "Active",
+      },
+      {
+        value: "INACTIVE",
+        label: "Inactive",
+      },
+    ],
   };
+};
 
 /*
 |--------------------------------------------------------------------------
@@ -181,61 +201,461 @@ export const getUserOptionsService =
 |--------------------------------------------------------------------------
 */
 
-export const listUsersService =
-  async (
-    query,
-    currentUser
-  ) => {
-    requireSuperAdmin(
-      currentUser
-    );
+export const listUsersService = async (
+  query,
+  currentUser
+) => {
+  requireSuperAdmin(currentUser);
 
-    const users =
-      await listUsers(
-        query
-      );
+  const users = await listUsers(query);
 
-    return {
-      users,
-    };
+  return {
+    users,
   };
+};
 
 /*
 |--------------------------------------------------------------------------
 | Create User
 |--------------------------------------------------------------------------
+|
+| 1. Verify Super Admin.
+| 2. Check duplicate email.
+| 3. Validate branch.
+| 4. Generate secure temporary password.
+| 5. Hash password using bcrypt.
+| 6. Insert user into MySQL.
+| 7. Generate user code.
+| 8. Create audit log.
+| 9. Commit database transaction.
+| 10. Send original temporary password via Resend.
+|
+| Important:
+| Email is sent AFTER transaction commit.
+|
+| If Resend fails, the created user remains saved.
+| The response reports emailSent: false.
+|
+|--------------------------------------------------------------------------
 */
 
-export const createUserService =
-  async ({
-    data,
-    currentUser,
-    ipAddress,
-    userAgent,
-  }) => {
-    requireSuperAdmin(
-      currentUser
+export const createUserService = async ({
+  data,
+  currentUser,
+  ipAddress,
+  userAgent,
+}) => {
+  requireSuperAdmin(currentUser);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Normalize Email
+  |--------------------------------------------------------------------------
+  */
+
+  const email = data.email
+    .trim()
+    .toLowerCase();
+
+  /*
+  |--------------------------------------------------------------------------
+  | Generate Password
+  |--------------------------------------------------------------------------
+  */
+
+  const temporaryPassword =
+    generateStrongPassword();
+
+  const passwordHash =
+    await hashPassword(
+      temporaryPassword
     );
 
-    const connection =
-      await pool.getConnection();
+  /*
+  |--------------------------------------------------------------------------
+  | Database Connection
+  |--------------------------------------------------------------------------
+  */
 
-    try {
-      await connection.beginTransaction();
+  const connection =
+    await pool.getConnection();
 
-      /*
-      |--------------------------------------------------------------------------
-      | Duplicate Email
-      |--------------------------------------------------------------------------
-      */
+  let createdUser = null;
 
-      const existingEmail =
+  try {
+    await connection.beginTransaction();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Duplicate Email
+    |--------------------------------------------------------------------------
+    */
+
+    const existingEmail =
+      await findUserByEmail(
+        email,
+        connection
+      );
+
+    if (existingEmail) {
+      throw new ApiError(
+        409,
+        "A user with this email already exists.",
+        [],
+        "EMAIL_ALREADY_EXISTS"
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Branch
+    |--------------------------------------------------------------------------
+    */
+
+    const branchId =
+      await resolveBranch(
+        data.role,
+        data.branchId,
+        connection
+      );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Insert User
+    |--------------------------------------------------------------------------
+    */
+
+    const userId =
+      await insertUser(
+        {
+          fullName: data.fullName,
+
+          email,
+
+          passwordHash,
+
+          role: data.role,
+
+          department:
+            data.department,
+
+          location:
+            data.location,
+
+          branchId,
+        },
+        connection
+      );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Generate User Code
+    |--------------------------------------------------------------------------
+    */
+
+    const userCode =
+      `USR-${1000 + userId}`;
+
+    await updateUserCode(
+      userId,
+      userCode,
+      connection
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Load Created User
+    |--------------------------------------------------------------------------
+    */
+
+    createdUser =
+      await findUserById(
+        userId,
+        connection
+      );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Audit Log
+    |--------------------------------------------------------------------------
+    |
+    | Do not include plaintext password
+    | in audit logs.
+    |--------------------------------------------------------------------------
+    */
+
+    await createAuditLog({
+      actorUserId:
+        currentUser.id,
+
+      entityType:
+        "USER",
+
+      entityId:
+        userId,
+
+      action:
+        "USER_CREATED",
+
+      previousValues:
+        null,
+
+      newValues:
+        createdUser,
+
+      metadata: {
+        branchId,
+
+        passwordGenerated:
+          true,
+
+        emailProvider:
+          "RESEND",
+      },
+
+      ipAddress,
+
+      userAgent,
+
+      connection,
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Commit Transaction
+    |--------------------------------------------------------------------------
+    */
+
+    await connection.commit();
+
+  } catch (error) {
+    await rollbackSafely(connection);
+
+    throw error;
+
+  } finally {
+    connection.release();
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Send Welcome Email Using Resend
+  |--------------------------------------------------------------------------
+  |
+  | Send only after successful database commit.
+  |
+  | Resend receives the original temporary password.
+  | The database stores only the bcrypt hash.
+  |
+  | If email sending fails, do not undo user creation.
+  |
+  |--------------------------------------------------------------------------
+  */
+
+  let emailSent = false;
+
+  try {
+    await sendNewUserCredentialsEmail({
+      fullName:
+        createdUser.fullName,
+
+      email:
+        createdUser.email,
+
+      password:
+        temporaryPassword,
+
+      role:
+        createdUser.role,
+    });
+
+    emailSent = true;
+
+  } catch (error) {
+    /*
+     * Never log temporary passwords,
+     * email contents or API keys.
+     */
+
+    console.error(
+      "Failed to send user credentials email:",
+      {
+        userId:
+          createdUser.id,
+
+        provider:
+          "RESEND",
+
+        errorCode:
+          error?.code ||
+          "EMAIL_SEND_FAILED",
+      }
+    );
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Return Safe Response
+  |--------------------------------------------------------------------------
+  |
+  | Never return temporaryPassword
+  | or passwordHash.
+  |
+  |--------------------------------------------------------------------------
+  */
+
+  return {
+    user: createdUser,
+
+    emailSent,
+  };
+};
+
+/*
+|--------------------------------------------------------------------------
+| Update User
+|--------------------------------------------------------------------------
+|
+| Preserve:
+| - Full name
+| - Email
+| - Role
+| - Department
+| - Location
+| - Branch
+| - Duplicate email validation
+| - Owned lead branch validation
+| - Audit logging
+|
+| Manual password editing is disabled.
+|
+|--------------------------------------------------------------------------
+*/
+
+export const updateUserService = async ({
+  userId,
+  data,
+  currentUser,
+  ipAddress,
+  userAgent,
+}) => {
+  requireSuperAdmin(currentUser);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Prevent Manual Password Assignment
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      data,
+      "password"
+    )
+  ) {
+    throw new ApiError(
+      422,
+      "Passwords cannot be assigned manually from User Management.",
+      [],
+      "MANUAL_PASSWORD_NOT_ALLOWED"
+    );
+  }
+
+  const connection =
+    await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Existing User
+    |--------------------------------------------------------------------------
+    */
+
+    const existing =
+      await findUserById(
+        userId,
+        connection
+      );
+
+    if (!existing) {
+      throw new ApiError(
+        404,
+        "User not found.",
+        [],
+        "USER_NOT_FOUND"
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Values
+    |--------------------------------------------------------------------------
+    */
+
+    const fullName =
+      data.fullName ??
+      existing.fullName;
+
+    const email =
+      data.email !== undefined
+        ? data.email.trim().toLowerCase()
+        : existing.email;
+
+    const role =
+      data.role ??
+      existing.role;
+
+    const department =
+      data.department !== undefined
+        ? data.department
+        : existing.department;
+
+    const location =
+      data.location !== undefined
+        ? data.location
+        : existing.location;
+
+    const requestedBranchId =
+      data.branchId !== undefined
+        ? data.branchId
+        : existing.branchId;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Branch
+    |--------------------------------------------------------------------------
+    */
+
+    const branchId =
+      await resolveBranch(
+        role,
+        requestedBranchId,
+        connection
+      );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Duplicate Email
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      email.toLowerCase() !==
+      existing.email.toLowerCase()
+    ) {
+      const duplicate =
         await findUserByEmail(
-          data.email,
+          email,
           connection
         );
 
-      if (existingEmail) {
+      if (
+        duplicate &&
+        Number(duplicate.id) !==
+          Number(userId)
+      ) {
         throw new ApiError(
           409,
           "A user with this email already exists.",
@@ -243,597 +663,314 @@ export const createUserService =
           "EMAIL_ALREADY_EXISTS"
         );
       }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Branch
-      |--------------------------------------------------------------------------
-      */
-
-      const branchId =
-        await resolveBranch(
-          data.role,
-          data.branchId,
-          connection
-        );
-
-      /*
-      |--------------------------------------------------------------------------
-      | Password
-      |--------------------------------------------------------------------------
-      */
-
-      const passwordHash =
-        await hashPassword(
-          data.password
-        );
-
-      /*
-      |--------------------------------------------------------------------------
-      | Insert
-      |--------------------------------------------------------------------------
-      */
-
-      const userId =
-        await insertUser(
-          {
-            fullName:
-              data.fullName,
-
-            email:
-              data.email,
-
-            passwordHash,
-
-            role:
-              data.role,
-
-            department:
-              data.department,
-
-            location:
-              data.location,
-
-            branchId,
-          },
-          connection
-        );
-
-      /*
-      |--------------------------------------------------------------------------
-      | User Code
-      |--------------------------------------------------------------------------
-      */
-
-      const userCode =
-        `USR-${1000 + userId}`;
-
-      await updateUserCode(
-        userId,
-        userCode,
-        connection
-      );
-
-      /*
-      |--------------------------------------------------------------------------
-      | Load Created User
-      |--------------------------------------------------------------------------
-      */
-
-      const created =
-        await findUserById(
-          userId,
-          connection
-        );
-
-      /*
-      |--------------------------------------------------------------------------
-      | Audit
-      |--------------------------------------------------------------------------
-      */
-
-      await createAuditLog({
-        actorUserId:
-          currentUser.id,
-
-        entityType:
-          "USER",
-
-        entityId:
-          userId,
-
-        action:
-          "USER_CREATED",
-
-        previousValues:
-          null,
-
-        newValues:
-          created,
-
-        metadata: {
-          branchId,
-        },
-
-        ipAddress,
-
-        userAgent,
-
-        connection,
-      });
-
-      await connection.commit();
-
-      return created;
-    } catch (
-      error
-    ) {
-      try {
-        await connection.rollback();
-      } catch {
-        // Ignore rollback errors.
-      }
-
-      throw error;
-    } finally {
-      connection.release();
     }
-  };
 
-/*
-|--------------------------------------------------------------------------
-| Update User
-|--------------------------------------------------------------------------
-*/
+    /*
+    |--------------------------------------------------------------------------
+    | Validate Existing Lead Branch
+    |--------------------------------------------------------------------------
+    */
 
-export const updateUserService =
-  async ({
-    userId,
-    data,
-    currentUser,
-    ipAddress,
-    userAgent,
-  }) => {
-    requireSuperAdmin(
-      currentUser
+    if (role === "OWNER") {
+      const outsideBranch =
+        await countOwnedLeadsOutsideBranch(
+          userId,
+          branchId,
+          connection
+        );
+
+      if (outsideBranch > 0) {
+        throw new ApiError(
+          409,
+          `${outsideBranch} owned lead(s) belong to another branch. Reassign those leads before changing this user's branch.`,
+          [],
+          "USER_BRANCH_HAS_LEADS"
+        );
+      }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Update Details
+    |--------------------------------------------------------------------------
+    */
+
+    await updateUserDetails(
+      userId,
+      {
+        fullName,
+
+        email,
+
+        role,
+
+        department,
+
+        location,
+
+        branchId,
+      },
+      connection
     );
 
-    const connection =
-      await pool.getConnection();
+    /*
+    |--------------------------------------------------------------------------
+    | Reload User
+    |--------------------------------------------------------------------------
+    */
 
-    try {
-      await connection.beginTransaction();
-
-      /*
-      |--------------------------------------------------------------------------
-      | Existing User
-      |--------------------------------------------------------------------------
-      */
-
-      const existing =
-        await findUserById(
-          userId,
-          connection
-        );
-
-      if (!existing) {
-        throw new ApiError(
-          404,
-          "User not found.",
-          [],
-          "USER_NOT_FOUND"
-        );
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Resolve Values
-      |--------------------------------------------------------------------------
-      */
-
-      const fullName =
-        data.fullName ??
-        existing.fullName;
-
-      const email =
-        data.email ??
-        existing.email;
-
-      const role =
-        data.role ??
-        existing.role;
-
-      const department =
-        data.department !==
-        undefined
-          ? data.department
-          : existing.department;
-
-      const location =
-        data.location !==
-        undefined
-          ? data.location
-          : existing.location;
-
-      const requestedBranchId =
-        data.branchId !==
-        undefined
-          ? data.branchId
-          : existing.branchId;
-
-      /*
-      |--------------------------------------------------------------------------
-      | Branch
-      |--------------------------------------------------------------------------
-      */
-
-      const branchId =
-        await resolveBranch(
-          role,
-          requestedBranchId,
-          connection
-        );
-
-      /*
-      |--------------------------------------------------------------------------
-      | Duplicate Email
-      |--------------------------------------------------------------------------
-      */
-
-      if (
-        email.toLowerCase() !==
-        existing.email.toLowerCase()
-      ) {
-        const duplicate =
-          await findUserByEmail(
-            email,
-            connection
-          );
-
-        if (
-          duplicate &&
-          Number(
-            duplicate.id
-          ) !==
-            Number(
-              userId
-            )
-        ) {
-          throw new ApiError(
-            409,
-            "A user with this email already exists.",
-            [],
-            "EMAIL_ALREADY_EXISTS"
-          );
-        }
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Existing Lead Branch Validation
-      |--------------------------------------------------------------------------
-      */
-
-      if (
-        role ===
-        "OWNER"
-      ) {
-        const outsideBranch =
-          await countOwnedLeadsOutsideBranch(
-            userId,
-            branchId,
-            connection
-          );
-
-        if (
-          outsideBranch >
-          0
-        ) {
-          throw new ApiError(
-            409,
-            `${outsideBranch} owned lead(s) belong to another branch. Reassign those leads before changing this user's branch.`,
-            [],
-            "USER_BRANCH_HAS_LEADS"
-          );
-        }
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Update Details
-      |--------------------------------------------------------------------------
-      */
-
-      await updateUserDetails(
+    const updated =
+      await findUserById(
         userId,
-        {
-          fullName,
-
-          email,
-
-          role,
-
-          department,
-
-          location,
-
-          branchId,
-        },
         connection
       );
 
-      /*
-      |--------------------------------------------------------------------------
-      | Update Password
-      |--------------------------------------------------------------------------
-      */
+    /*
+    |--------------------------------------------------------------------------
+    | Audit Log
+    |--------------------------------------------------------------------------
+    */
 
-      if (
-        data.password
-      ) {
-        const passwordHash =
-          await hashPassword(
-            data.password
-          );
+    await createAuditLog({
+      actorUserId:
+        currentUser.id,
 
-        await updateUserPassword(
-          userId,
-          passwordHash,
-          connection
-        );
-      }
+      entityType:
+        "USER",
 
-      /*
-      |--------------------------------------------------------------------------
-      | Reload User
-      |--------------------------------------------------------------------------
-      */
+      entityId:
+        userId,
 
-      const updated =
-        await findUserById(
-          userId,
-          connection
-        );
+      action:
+        "USER_UPDATED",
 
-      /*
-      |--------------------------------------------------------------------------
-      | Audit
-      |--------------------------------------------------------------------------
-      */
+      previousValues:
+        existing,
 
-      await createAuditLog({
-        actorUserId:
-          currentUser.id,
+      newValues:
+        updated,
 
-        entityType:
-          "USER",
+      metadata: {
+        branchId,
+      },
 
-        entityId:
-          userId,
+      ipAddress,
 
-        action:
-          "USER_UPDATED",
+      userAgent,
 
-        previousValues:
-          existing,
+      connection,
+    });
 
-        newValues:
-          updated,
+    /*
+    |--------------------------------------------------------------------------
+    | Commit
+    |--------------------------------------------------------------------------
+    */
 
-        metadata: {
-          branchId,
-        },
+    await connection.commit();
 
-        ipAddress,
+    return updated;
 
-        userAgent,
+  } catch (error) {
+    await rollbackSafely(connection);
 
-        connection,
-      });
+    throw error;
 
-      await connection.commit();
-
-      return updated;
-    } catch (
-      error
-    ) {
-      try {
-        await connection.rollback();
-      } catch {
-        // Ignore rollback errors.
-      }
-
-      throw error;
-    } finally {
-      connection.release();
-    }
-  };
+  } finally {
+    connection.release();
+  }
+};
 
 /*
 |--------------------------------------------------------------------------
 | Update User Status
 |--------------------------------------------------------------------------
+|
+| - Activate user
+| - Deactivate user
+| - Prevent self-deactivation
+| - Reassign owned leads to active Super Admin
+| - Preserve audit logging
+|
+|--------------------------------------------------------------------------
 */
 
-export const updateUserStatusService =
-  async ({
-    userId,
-    status,
-    currentUser,
-    ipAddress,
-    userAgent,
-  }) => {
-    requireSuperAdmin(
-      currentUser
+export const updateUserStatusService = async ({
+  userId,
+  status,
+  currentUser,
+  ipAddress,
+  userAgent,
+}) => {
+  requireSuperAdmin(currentUser);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Prevent Self Deactivation
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    Number(userId) ===
+      Number(currentUser.id) &&
+    status === "INACTIVE"
+  ) {
+    throw new ApiError(
+      422,
+      "You cannot deactivate your own account.",
+      [],
+      "CANNOT_DEACTIVATE_SELF"
     );
+  }
+
+  const connection =
+    await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
 
     /*
-     * Prevent Super Admin from
-     * disabling themselves.
-     */
-    if (
-      Number(
-        userId
-      ) ===
-        Number(
-          currentUser.id
-        ) &&
-      status ===
-        "INACTIVE"
-    ) {
-      throw new ApiError(
-        422,
-        "You cannot deactivate your own account.",
-        [],
-        "CANNOT_DEACTIVATE_SELF"
-      );
-    }
+    |--------------------------------------------------------------------------
+    | Existing User
+    |--------------------------------------------------------------------------
+    */
 
-    const connection =
-      await pool.getConnection();
-
-    try {
-      await connection.beginTransaction();
-
-      /*
-      |--------------------------------------------------------------------------
-      | Existing User
-      |--------------------------------------------------------------------------
-      */
-
-      const existing =
-        await findUserById(
-          userId,
-          connection
-        );
-
-      if (!existing) {
-        throw new ApiError(
-          404,
-          "User not found.",
-          [],
-          "USER_NOT_FOUND"
-        );
-      }
-
-      let reassignedLeads =
-        0;
-
-      /*
-      |--------------------------------------------------------------------------
-      | Lead Reassignment
-      |--------------------------------------------------------------------------
-      */
-
-      if (
-        status ===
-          "INACTIVE" &&
-        existing.status !==
-          "INACTIVE"
-      ) {
-        const superAdmin =
-          await findActiveSuperAdmin(
-            userId,
-            connection
-          );
-
-        if (!superAdmin) {
-          throw new ApiError(
-            422,
-            "An active Super Admin is required before this user can be deactivated.",
-            [],
-            "SUPER_ADMIN_REQUIRED"
-          );
-        }
-
-        reassignedLeads =
-          await reassignOwnedLeads(
-            userId,
-            superAdmin.id,
-            connection
-          );
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Status
-      |--------------------------------------------------------------------------
-      */
-
-      await setUserStatus(
+    const existing =
+      await findUserById(
         userId,
-        status,
         connection
       );
 
-      const updated =
-        await findUserById(
+    if (!existing) {
+      throw new ApiError(
+        404,
+        "User not found.",
+        [],
+        "USER_NOT_FOUND"
+      );
+    }
+
+    let reassignedLeads = 0;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lead Reassignment
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      status === "INACTIVE" &&
+      existing.status !== "INACTIVE"
+    ) {
+      const superAdmin =
+        await findActiveSuperAdmin(
           userId,
           connection
         );
 
-      /*
-      |--------------------------------------------------------------------------
-      | Audit
-      |--------------------------------------------------------------------------
-      */
-
-      await createAuditLog({
-        actorUserId:
-          currentUser.id,
-
-        entityType:
-          "USER",
-
-        entityId:
-          userId,
-
-        action:
-          status ===
-          "ACTIVE"
-            ? "USER_ACTIVATED"
-            : "USER_DEACTIVATED",
-
-        previousValues: {
-          status:
-            existing.status,
-        },
-
-        newValues: {
-          status:
-            updated.status,
-        },
-
-        metadata: {
-          reassignedLeads,
-        },
-
-        ipAddress,
-
-        userAgent,
-
-        connection,
-      });
-
-      await connection.commit();
-
-      return {
-        user:
-          updated,
-
-        reassignedLeads,
-      };
-    } catch (
-      error
-    ) {
-      try {
-        await connection.rollback();
-      } catch {
-        // Ignore rollback errors.
+      if (!superAdmin) {
+        throw new ApiError(
+          422,
+          "An active Super Admin is required before this user can be deactivated.",
+          [],
+          "SUPER_ADMIN_REQUIRED"
+        );
       }
 
-      throw error;
-    } finally {
-      connection.release();
+      reassignedLeads =
+        await reassignOwnedLeads(
+          userId,
+          superAdmin.id,
+          connection
+        );
     }
-  };
+
+    /*
+    |--------------------------------------------------------------------------
+    | Update Status
+    |--------------------------------------------------------------------------
+    */
+
+    await setUserStatus(
+      userId,
+      status,
+      connection
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reload Updated User
+    |--------------------------------------------------------------------------
+    */
+
+    const updated =
+      await findUserById(
+        userId,
+        connection
+      );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Audit Log
+    |--------------------------------------------------------------------------
+    */
+
+    await createAuditLog({
+      actorUserId:
+        currentUser.id,
+
+      entityType:
+        "USER",
+
+      entityId:
+        userId,
+
+      action:
+        status === "ACTIVE"
+          ? "USER_ACTIVATED"
+          : "USER_DEACTIVATED",
+
+      previousValues: {
+        status:
+          existing.status,
+      },
+
+      newValues: {
+        status:
+          updated.status,
+      },
+
+      metadata: {
+        reassignedLeads,
+      },
+
+      ipAddress,
+
+      userAgent,
+
+      connection,
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Commit
+    |--------------------------------------------------------------------------
+    */
+
+    await connection.commit();
+
+    return {
+      user: updated,
+
+      reassignedLeads,
+    };
+
+  } catch (error) {
+    await rollbackSafely(connection);
+
+    throw error;
+
+  } finally {
+    connection.release();
+  }
+};

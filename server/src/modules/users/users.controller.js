@@ -57,33 +57,26 @@ export const listUsersController =
     });
   };
 
-export const createUserController =
-  async (
-    req,
-    res
-  ) => {
-    const user =
-      await createUserService({
-        data:
-          req.validated.body,
+export const createUserController = async (req, res) => {
+  const result = await createUserService({
+    data: req.validated.body,
+    currentUser: req.user,
+    ...metadata(req),
+  });
 
-        currentUser:
-          req.user,
+  res.status(201).json({
+    success: true,
 
-        ...metadata(req),
-      });
+    message: result.emailSent
+      ? "User created successfully. Credentials email accepted by Resend."
+      : "User created successfully, but credentials email could not be sent.",
 
-    res.status(201).json({
-      success: true,
-
-      message:
-        "User created successfully.",
-
-      data: {
-        user,
-      },
-    });
-  };
+    data: {
+      user: result.user,
+      emailSent: result.emailSent,
+    },
+  });
+};
 
 export const updateUserController =
   async (

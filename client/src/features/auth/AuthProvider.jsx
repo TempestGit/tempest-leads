@@ -1,3 +1,4 @@
+
 import {
   useCallback,
   useEffect,
@@ -21,200 +22,96 @@ import {
 
 import AuthContext from "./AuthContext";
 
-const AuthProvider = ({
-  children,
-}) => {
-  const [
-    user,
-    setUser,
-  ] = useState(null);
+const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [initializing, setInitializing] = useState(true);
 
-  const [
-    initializing,
-    setInitializing,
-  ] = useState(true);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Restore Session
-  |--------------------------------------------------------------------------
-  |
-  | refreshSession() has a global lock.
-  |
-  | Therefore React StrictMode can call this more than once without creating
-  | multiple refresh-token rotations.
-  |
-  */
-
-  const restoreSession =
-    useCallback(async () => {
-      try {
-        const session =
-          await refreshSession();
-
-        setUser(
-          session?.user ||
-            null
-        );
-      } catch {
-        clearAccessToken();
-
-        setUser(null);
-      } finally {
-        setInitializing(
-          false
-        );
-      }
-    }, []);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Initial Session Restoration
-  |--------------------------------------------------------------------------
-  */
+  const restoreSession = useCallback(async () => {
+    try {
+      const session = await refreshSession();
+      setUser(session?.user || null);
+    } catch {
+      clearAccessToken();
+      setUser(null);
+    } finally {
+      setInitializing(false);
+    }
+  }, []);
 
   useEffect(() => {
     restoreSession();
   }, [restoreSession]);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Authentication Expired
-  |--------------------------------------------------------------------------
-  */
-
   useEffect(() => {
-    const handleExpired =
-      () => {
-        clearAccessToken();
+    const handleExpired = () => {
+      clearAccessToken();
+      setUser(null);
+    };
 
-        setUser(null);
-      };
-
-    window.addEventListener(
-      "auth:expired",
-      handleExpired
-    );
+    window.addEventListener("auth:expired", handleExpired);
 
     return () => {
-      window.removeEventListener(
-        "auth:expired",
-        handleExpired
-      );
+      window.removeEventListener("auth:expired", handleExpired);
     };
   }, []);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Login
-  |--------------------------------------------------------------------------
-  */
+  const login = useCallback(async ({ email, password }) => {
+    const response = await loginRequest({ email, password });
 
-  const login =
-    useCallback(
-      async ({
-        email,
-        password,
-      }) => {
-        const response =
-          await loginRequest({
-            email,
-            password,
-          });
+    const token = response?.data?.accessToken;
+    const authenticatedUser = response?.data?.user;
 
-        const token =
-          response?.data
-            ?.accessToken;
+    if (!token || !authenticatedUser) {
+      throw new Error("Invalid login response.");
+    }
 
-        const authenticatedUser =
-          response?.data?.user;
+    setAccessToken(token);
+    setUser(authenticatedUser);
 
-        if (
-          !token ||
-          !authenticatedUser
-        ) {
-          throw new Error(
-            "Invalid login response."
-          );
-        }
+    return authenticatedUser;
+  }, []);
 
-        setAccessToken(
-          token
-        );
+  const logout = useCallback(async () => {
+    try {
+      await logoutRequest();
+    } catch (error) {
+      console.error("Logout request failed:", error);
+    } finally {
+      clearAccessToken();
+      setUser(null);
+    }
+  }, []);
 
-        setUser(
-          authenticatedUser
-        );
+  // Used after a successful password change.
+  // The server has already revoked refresh sessions.
+  const clearSession = useCallback(() => {
+    clearAccessToken();
+    setUser(null);
+  }, []);
 
-        return authenticatedUser;
-      },
-      []
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | Logout
-  |--------------------------------------------------------------------------
-  */
-
-  const logout =
-    useCallback(
-      async () => {
-        try {
-          await logoutRequest();
-        } catch (error) {
-          /*
-           * Even if the server session has already expired,
-           * clear the local authentication state.
-           */
-          console.error(
-            "Logout request failed:",
-            error
-          );
-        } finally {
-          clearAccessToken();
-
-          setUser(null);
-        }
-      },
-      []
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | Context
-  |--------------------------------------------------------------------------
-  */
-
-  const value =
-    useMemo(
-      () => ({
-        user,
-
-        initializing,
-
-        authenticated:
-          Boolean(user),
-
-        login,
-
-        logout,
-
-        restoreSession,
-      }),
-      [
-        user,
-        initializing,
-        login,
-        logout,
-        restoreSession,
-      ]
-    );
+  const value = useMemo(
+    () => ({
+      user,
+      initializing,
+      authenticated: Boolean(user),
+      mustChangePassword: Boolean(user?.mustChangePassword),
+      login,
+      logout,
+      clearSession,
+      restoreSession,
+    }),
+    [
+      user,
+      initializing,
+      login,
+      logout,
+      clearSession,
+      restoreSession,
+    ]
+  );
 
   return (
-    <AuthContext.Provider
-      value={value}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

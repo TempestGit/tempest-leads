@@ -219,6 +219,7 @@
 
 .gup-search input {
   color: #172849;
+  border: 1px solid #dce5f300;
 }
 
 .gup-search input::placeholder {

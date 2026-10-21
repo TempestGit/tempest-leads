@@ -33,10 +33,13 @@ const normalizeStatus = (value) =>
     .replace(/[\s-]+/g, "_");
 
 const getFollowupDate = (followup) => {
+  if (!followup) return null;
+
+  // Match the backend's dueAt field first.
   const value =
+    followup.dueAt ??
     followup.followUpAt ??
     followup.followupAt ??
-    followup.dueAt ??
     followup.scheduledAt ??
     null;
 
@@ -93,7 +96,9 @@ const FollowupMetric = ({
 
 const LeadFollowupsPanel = ({ lead }) => {
   const [scheduleOpen, setScheduleOpen] = useState(false);
+
   const [completeItem, setCompleteItem] = useState(null);
+
   const [rescheduleItem, setRescheduleItem] = useState(null);
 
   /*
@@ -118,7 +123,28 @@ const LeadFollowupsPanel = ({ lead }) => {
 
   /*
   |--------------------------------------------------------------------------
-  | Summary
+  | Summary Statistics
+  |--------------------------------------------------------------------------
+  |
+  | Business rules:
+  |
+  | PENDING:
+  |   Future due date = Upcoming
+  |   Past due date   = Overdue
+  |
+  | COMPLETED:
+  |   Count only under Completed
+  |
+  | RESCHEDULED:
+  |   Keep in history
+  |   Do not count as Upcoming or Overdue
+  |
+  | CANCELLED / SKIPPED:
+  |   Keep in history
+  |   Do not count as Upcoming or Overdue
+  |
+  | This ensures that a rescheduled original follow-up
+  | cannot incorrectly appear in the overdue count.
   |--------------------------------------------------------------------------
   */
 
@@ -132,27 +158,31 @@ const LeadFollowupsPanel = ({ lead }) => {
     for (const followup of followups) {
       const status = normalizeStatus(followup.status);
 
-      const isCompleted = [
-        "COMPLETED",
-        "DONE",
-      ].includes(status);
-
-      if (isCompleted) {
+      // Completed follow-ups are historical records.
+      if (status === "COMPLETED" || status === "DONE") {
         completed += 1;
         continue;
       }
 
-      if (
-        ["CANCELLED", "CANCELED", "SKIPPED"].includes(status)
-      ) {
+      // Only active pending follow-ups can become
+      // upcoming or overdue.
+      //
+      // This automatically excludes:
+      // RESCHEDULED, CANCELLED, CANCELED, SKIPPED,
+      // and any other inactive status.
+      if (status !== "PENDING") {
         continue;
       }
 
-      const date = getFollowupDate(followup);
+      const dueDate = getFollowupDate(followup);
 
-      if (!date) continue;
+      // Invalid or missing dates must not be
+      // incorrectly counted.
+      if (!dueDate) {
+        continue;
+      }
 
-      if (date.getTime() < now) {
+      if (dueDate.getTime() < now) {
         overdue += 1;
       } else {
         upcoming += 1;
@@ -197,7 +227,10 @@ const LeadFollowupsPanel = ({ lead }) => {
   return (
     <>
       <section className="glass-followups space-y-5">
-        {/* Header */}
+
+        {/* ========================================================= */}
+        {/* HEADER */}
+        {/* ========================================================= */}
 
         <header className="gfp-panel rounded-[24px] p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -251,12 +284,15 @@ const LeadFollowupsPanel = ({ lead }) => {
           </div>
         </header>
 
-        {/* Summary Cards */}
+        {/* ========================================================= */}
+        {/* SUMMARY CARDS */}
+        {/* ========================================================= */}
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+
           <FollowupMetric
             title="Total Follow-ups"
-            value={stats.total}
+            value={query.isLoading ? "—" : stats.total}
             icon={ListTodo}
             tone="blue"
             description="Loaded records"
@@ -264,7 +300,7 @@ const LeadFollowupsPanel = ({ lead }) => {
 
           <FollowupMetric
             title="Upcoming"
-            value={stats.upcoming}
+            value={query.isLoading ? "—" : stats.upcoming}
             icon={CalendarClock}
             tone="violet"
             description="Scheduled for later"
@@ -272,7 +308,7 @@ const LeadFollowupsPanel = ({ lead }) => {
 
           <FollowupMetric
             title="Completed"
-            value={stats.completed}
+            value={query.isLoading ? "—" : stats.completed}
             icon={CheckCircle2}
             tone="green"
             description="Finished actions"
@@ -280,14 +316,17 @@ const LeadFollowupsPanel = ({ lead }) => {
 
           <FollowupMetric
             title="Overdue"
-            value={stats.overdue}
+            value={query.isLoading ? "—" : stats.overdue}
             icon={Clock3}
             tone="orange"
             description="Past due actions"
           />
+
         </div>
 
-        {/* Follow-ups Table */}
+        {/* ========================================================= */}
+        {/* FOLLOW-UP HISTORY */}
+        {/* ========================================================= */}
 
         <article className="gfp-panel overflow-hidden rounded-[24px]">
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-6">
@@ -335,6 +374,7 @@ const LeadFollowupsPanel = ({ lead }) => {
               <button
                 type="button"
                 onClick={() => query.refetch()}
+                disabled={query.isFetching}
                 className="gfp-primary mt-5 rounded-xl px-5 py-2.5 text-sm font-bold"
               >
                 Try Again
@@ -357,7 +397,9 @@ const LeadFollowupsPanel = ({ lead }) => {
         </article>
       </section>
 
-      {/* Schedule Modal */}
+      {/* =========================================================== */}
+      {/* SCHEDULE MODAL */}
+      {/* =========================================================== */}
 
       <ScheduleFollowupModal
         open={scheduleOpen}
@@ -365,7 +407,9 @@ const LeadFollowupsPanel = ({ lead }) => {
         onClose={closeSchedule}
       />
 
-      {/* Complete Modal */}
+      {/* =========================================================== */}
+      {/* COMPLETE MODAL */}
+      {/* =========================================================== */}
 
       <CompleteFollowupModal
         open={Boolean(completeItem)}
@@ -373,7 +417,9 @@ const LeadFollowupsPanel = ({ lead }) => {
         onClose={closeComplete}
       />
 
-      {/* Reschedule Modal */}
+      {/* =========================================================== */}
+      {/* RESCHEDULE MODAL */}
+      {/* =========================================================== */}
 
       <RescheduleFollowupModal
         open={Boolean(rescheduleItem)}

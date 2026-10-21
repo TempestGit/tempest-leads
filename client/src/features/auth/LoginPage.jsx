@@ -326,31 +326,10 @@ const LoginPage = () => {
               ) : (
                 <>
                   Sign In to Workspace
-                  <ArrowRight size={19} />
                 </>
               )}
             </button>
           </form>
-
-          {/* Security Note */}
-
-          <div className="tgl-security-note mt-7 flex items-start gap-3 rounded-xl p-4">
-            <Fingerprint
-              size={21}
-              className="mt-0.5 shrink-0"
-            />
-
-            <div>
-              <p className="text-xs font-extrabold">
-                Authorized Access Only
-              </p>
-
-              <p className="mt-1 text-xs leading-5">
-                Use your assigned Tempest Leads account
-                credentials to access this workspace.
-              </p>
-            </div>
-          </div>
 
           {/* Footer */}
 
