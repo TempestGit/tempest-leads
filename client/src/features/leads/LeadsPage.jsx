@@ -355,7 +355,7 @@ function LeadsTable({
         <table className="glass-leads-table w-full">
           <thead>
             <tr>
-              <th>
+              {/* <th>
                 <input
                   type="checkbox"
                   aria-label="Select all visible leads"
@@ -364,7 +364,7 @@ function LeadsTable({
                     toggleAll(event.target.checked)
                   }
                 />
-              </th>
+              </th> */}
 
               <th>Lead ID</th>
               <th>Company / Contact</th>
@@ -397,7 +397,7 @@ function LeadsTable({
                   }
                 }}
               >
-                <td>
+                {/* <td>
                   <input
                     type="checkbox"
                     aria-label={`Select ${
@@ -409,7 +409,7 @@ function LeadsTable({
                     }
                     onChange={() => toggleLead(lead.id)}
                   />
-                </td>
+                </td> */}
 
                 <td>
                   <span className="glass-leads-code">
@@ -423,9 +423,9 @@ function LeadsTable({
 
                 <td>
                   <div className="flex items-center gap-3">
-                    <span className="glass-leads-company-avatar">
+                    {/* <span className="glass-leads-company-avatar">
                       {getInitials(lead.companyName)}
-                    </span>
+                    </span> */}
 
                     <div className="min-w-0">
                       <p className="glass-leads-cell-title">
@@ -447,9 +447,9 @@ function LeadsTable({
 
                 <td>
                   <div className="flex items-center gap-2">
-                    <span className="glass-leads-avatar">
+                    {/* <span className="glass-leads-avatar">
                       {getInitials(lead.ownerName)}
-                    </span>
+                    </span> */}
 
                     <span className="max-w-[130px] truncate">
                       {lead.ownerName || "Unassigned"}
@@ -485,12 +485,12 @@ function LeadsTable({
                   </span>
                 </td>
 
-                <td>
+                {/* <td>
                   <ArrowRight
                     size={16}
                     className="glass-leads-row-arrow"
                   />
-                </td>
+                </td> */}
               </tr>
             ))}
 

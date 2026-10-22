@@ -141,9 +141,9 @@ const FollowupsTable = ({
               <tr key={followup.id}>
                 <td className="px-5 py-4 align-middle">
                   <div className="flex items-center gap-3">
-                    <span className="gfp-company-avatar flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold">
+                    {/* <span className="gfp-company-avatar flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold">
                       {getInitials(followup.companyName)}
-                    </span>
+                    </span> */}
 
                     <div className="min-w-0">
                       <button

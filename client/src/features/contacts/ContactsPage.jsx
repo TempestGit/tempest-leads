@@ -539,9 +539,9 @@ export default function ContactsPage() {
                     <tr key={contact.id}>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <span className="gcm-avatar flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xs font-extrabold">
+                          {/* <span className="gcm-avatar flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xs font-extrabold">
                             {initials(contactName)}
-                          </span>
+                          </span> */}
 
                           <div className="min-w-0">
                             <p className="gcm-heading max-w-[190px] truncate text-sm font-bold">

@@ -74,6 +74,32 @@ const authMiddleware = async (req, res, next) => {
       );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Invalidate Old Access Tokens
+    |--------------------------------------------------------------------------
+    */
+
+    const currentTokenVersion = Number(
+      user.token_version ?? 0
+    );
+
+    const presentedTokenVersion = Number(
+      payload.tokenVersion ?? 0
+    );
+
+    if (
+      !Number.isSafeInteger(presentedTokenVersion) ||
+      presentedTokenVersion !== currentTokenVersion
+    ) {
+      throw new ApiError(
+        401,
+        "Your session is no longer valid. Please sign in again.",
+        [],
+        "SESSION_REVOKED"
+      );
+    }
+
     req.user = {
       id: user.id,
       userCode: user.user_code,

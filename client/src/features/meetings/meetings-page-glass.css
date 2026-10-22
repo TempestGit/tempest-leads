@@ -4,9 +4,9 @@
    ========================================================== */
 
 .gmp-page {
-  --gmp-page-text: #172849;
-  --gmp-page-muted: #7485a1;
-  --gmp-page-border: rgba(112, 138, 192, 0.18);
+  --gmp-page-text: var(--gmp-page-palette-001);
+  --gmp-page-muted: var(--gmp-page-palette-002);
+  --gmp-page-border: var(--gmp-page-palette-003);
 
   color: var(--gmp-page-text);
 }
@@ -14,16 +14,16 @@
 /* Header */
 
 .gmp-page-header {
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--gmp-page-palette-004);
 
   background: linear-gradient(
     125deg,
-    rgba(255, 255, 255, 0.96),
-    rgba(238, 244, 255, 0.92) 55%,
-    rgba(247, 240, 255, 0.94)
+    var(--gmp-page-palette-005),
+    var(--gmp-page-palette-006) 55%,
+    var(--gmp-page-palette-007)
   );
 
-  box-shadow: 0 12px 38px rgba(59, 83, 148, 0.08);
+  box-shadow: 0 12px 38px var(--gmp-page-palette-008);
 
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
@@ -32,33 +32,37 @@
 .gmp-page-header-glow {
   background: radial-gradient(
     circle,
-    rgba(129, 105, 245, 0.14),
+    var(--gmp-page-palette-009),
     transparent 70%
   );
 }
 
 .gmp-page-header-icon {
-  background: linear-gradient(135deg, #1168fa, #9851f8);
-  color: #ffffff;
+  background: linear-gradient(
+    135deg,
+    var(--gmp-page-palette-010),
+    var(--gmp-page-palette-011)
+  );
+  color: var(--gmp-page-palette-012);
 
-  box-shadow: 0 9px 22px rgba(52, 105, 242, 0.22);
+  box-shadow: 0 9px 22px var(--gmp-page-palette-013);
 }
 
 .gmp-page-eyebrow {
-  color: #6382bb;
+  color: var(--gmp-page-palette-014);
 }
 
 .gmp-page-live-dot {
-  background: #16bd91;
-  box-shadow: 0 0 0 4px rgba(22, 189, 145, 0.12);
+  background: var(--gmp-page-palette-015);
+  box-shadow: 0 0 0 4px var(--gmp-page-palette-016);
 }
 
 .gmp-page-title {
-  color: #172849;
+  color: var(--gmp-page-palette-001);
 }
 
 .gmp-page-muted {
-  color: #7485a1;
+  color: var(--gmp-page-palette-002);
 }
 
 /* Buttons */
@@ -74,61 +78,65 @@
 }
 
 .gmp-page-primary {
-  background: linear-gradient(120deg, #1269fa, #9851f8);
-  color: #ffffff;
+  background: linear-gradient(
+    120deg,
+    var(--gmp-page-palette-017),
+    var(--gmp-page-palette-011)
+  );
+  color: var(--gmp-page-palette-012);
 
-  box-shadow: 0 8px 20px rgba(57, 103, 235, 0.23);
+  box-shadow: 0 8px 20px var(--gmp-page-palette-018);
 }
 
 .gmp-page-primary:hover:not(:disabled) {
   transform: translateY(-1px);
 
-  box-shadow: 0 12px 26px rgba(57, 103, 235, 0.3);
+  box-shadow: 0 12px 26px var(--gmp-page-palette-019);
 }
 
 .gmp-page-secondary {
-  border-color: #d9e2f2;
-  background: rgba(255, 255, 255, 0.9);
-  color: #4c6388;
+  border-color: var(--gmp-page-palette-020);
+  background: var(--gmp-page-palette-021);
+  color: var(--gmp-page-palette-022);
 }
 
 .gmp-page-secondary:hover:not(:disabled) {
-  background: #edf3ff;
+  background: var(--gmp-page-palette-023);
 }
 
 /* Lead filter */
 
 .gmp-page-filter {
-  border: 1px solid #dce6fa;
-  background: rgba(239, 245, 255, 0.88);
+  border: 1px solid var(--gmp-page-palette-024);
+  background: var(--gmp-page-palette-025);
 }
 
 .gmp-page-filter-icon {
-  background: #dce9ff;
-  color: #3168df;
+  background: var(--gmp-page-palette-026);
+  color: var(--gmp-page-palette-027);
 }
 
 .gmp-page-filter-title {
-  color: #2457ba;
+  color: var(--gmp-page-palette-028);
 }
 
 .gmp-page-filter-clear {
-  border: 1px solid #d3e1fa;
-  background: #ffffff;
-  color: #3168df;
+  border: 1px solid var(--gmp-page-palette-029);
+  background: var(--gmp-page-palette-012);
+  color: var(--gmp-page-palette-027);
 }
 
 .gmp-page-filter-clear:hover {
-  background: #e5efff;
+  background: var(--gmp-page-palette-030);
 }
 
 /* Metrics */
 
 .gmp-page-metric {
-  border: 1px solid rgba(255, 255, 255, 0.88);
-  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--gmp-page-palette-031);
+  background: var(--gmp-page-palette-031);
 
-  box-shadow: 0 10px 30px rgba(59, 83, 148, 0.075);
+  box-shadow: 0 10px 30px var(--gmp-page-palette-032);
 
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
@@ -140,24 +148,24 @@
 
 .gmp-page-metric:hover {
   transform: translateY(-3px);
-  box-shadow: 0 16px 34px rgba(59, 83, 148, 0.12);
+  box-shadow: 0 16px 34px var(--gmp-page-palette-033);
 }
 
 .gmp-page-metric-label {
-  color: #7485a1;
+  color: var(--gmp-page-palette-002);
 }
 
 .gmp-page-metric-value {
-  color: #172849;
+  color: var(--gmp-page-palette-001);
 }
 
 .gmp-page-metric-description {
-  color: #8b9ab4;
+  color: var(--gmp-page-palette-034);
 }
 
 .gmp-page-metric-icon {
-  background: #e9efff;
-  color: #3774ee;
+  background: var(--gmp-page-palette-035);
+  color: var(--gmp-page-palette-036);
 }
 
 /* Primary metric */
@@ -167,78 +175,82 @@
 
   background: linear-gradient(
     125deg,
-    #1269fa,
-    #477bff 50%,
-    #9851f8
+    var(--gmp-page-palette-017),
+    var(--gmp-page-palette-037) 50%,
+    var(--gmp-page-palette-011)
   );
 }
 
 .gmp-page-metric-primary .gmp-page-metric-label,
 .gmp-page-metric-primary .gmp-page-metric-value,
 .gmp-page-metric-primary .gmp-page-metric-description {
-  color: #ffffff;
+  color: var(--gmp-page-palette-012);
 }
 
 .gmp-page-metric-primary .gmp-page-metric-icon {
-  background: rgba(255, 255, 255, 0.17);
-  color: #ffffff;
+  background: var(--gmp-page-palette-038);
+  color: var(--gmp-page-palette-012);
 }
 
 .gmp-page-metric-decoration {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--gmp-page-palette-039);
 }
 
 /* Violet metric */
 
 .gmp-page-metric-violet .gmp-page-metric-icon {
-  background: #efe8ff;
-  color: #8758f6;
+  background: var(--gmp-page-palette-040);
+  color: var(--gmp-page-palette-041);
 }
 
 /* Green metric */
 
 .gmp-page-metric-green .gmp-page-metric-icon {
-  background: #ddf8ed;
-  color: #0da67b;
+  background: var(--gmp-page-palette-042);
+  color: var(--gmp-page-palette-043);
 }
 
 /* Orange metric */
 
 .gmp-page-metric-orange .gmp-page-metric-icon {
-  background: #fff0dc;
-  color: #d98a26;
+  background: var(--gmp-page-palette-044);
+  color: var(--gmp-page-palette-045);
 }
 
 /* Next meeting */
 
 .gmp-page-next {
-  border: 1px solid #dce6fa;
+  border: 1px solid var(--gmp-page-palette-024);
 
   background: linear-gradient(
     110deg,
-    rgba(239, 245, 255, 0.96),
-    rgba(246, 240, 255, 0.96)
+    var(--gmp-page-palette-046),
+    var(--gmp-page-palette-047)
   );
 
-  box-shadow: 0 10px 28px rgba(59, 83, 148, 0.06);
+  box-shadow: 0 10px 28px var(--gmp-page-palette-048);
 }
 
 .gmp-page-next-icon {
-  background: linear-gradient(135deg, #dce9ff, #eee2ff);
-  color: #4c6de2;
+  background: linear-gradient(
+    135deg,
+    var(--gmp-page-palette-026),
+    var(--gmp-page-palette-049)
+  );
+  color: var(--gmp-page-palette-050);
 }
 
 .gmp-page-next-eyebrow {
-  color: #647fba;
+  color: var(--gmp-page-palette-051);
 }
 
 /* Table panel */
 
 .gmp-page-panel {
-  border: 1px solid rgba(255, 255, 255, 0.88);
-  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--gmp-page-palette-031);
+  background: var(--gmp-page-palette-021);
 
-  box-shadow: 0 12px 38px rgba(59, 83, 148, 0.08);
+  box-shadow: 0 12px 38px var(--gmp-page-palette-008);
 
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
@@ -249,44 +261,48 @@
 
   background: linear-gradient(
     115deg,
-    rgba(250, 252, 255, 0.96),
-    rgba(242, 246, 255, 0.96)
+    var(--gmp-page-palette-052),
+    var(--gmp-page-palette-053)
   );
 }
 
 .gmp-page-section-icon {
-  background: linear-gradient(135deg, #e3efff, #eee6ff);
-  color: #426ee8;
+  background: linear-gradient(
+    135deg,
+    var(--gmp-page-palette-054),
+    var(--gmp-page-palette-055)
+  );
+  color: var(--gmp-page-palette-056);
 }
 
 .gmp-page-count {
-  border: 1px solid #dce6ff;
-  background: #edf3ff;
-  color: #3e6dd5;
+  border: 1px solid var(--gmp-page-palette-057);
+  background: var(--gmp-page-palette-023);
+  color: var(--gmp-page-palette-058);
 }
 
 .gmp-page-count-dot {
-  background: #3f7cff;
+  background: var(--gmp-page-palette-059);
 }
 
 .gmp-page-table {
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--gmp-page-palette-060);
 }
 
 .gmp-page-panel-footer {
   border-top: 1px solid var(--gmp-page-border);
-  background: #fbfcff;
+  background: var(--gmp-page-palette-061);
 }
 
 .gmp-page-footer-label {
-  color: #0c9b75;
+  color: var(--gmp-page-palette-062);
 }
 
 /* Error */
 
 .gmp-page-error-icon {
-  background: #fff0f3;
-  color: #d94b65;
+  background: var(--gmp-page-palette-063);
+  color: var(--gmp-page-palette-064);
 }
 
 /* Mobile */

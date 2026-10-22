@@ -9,6 +9,11 @@ import {
   changePassword,
 } from "./auth.service.js";
 
+import {
+  requestPasswordReset,
+  resetPassword,
+} from "./passwordReset.service.js";
+
 const REFRESH_COOKIE = "tempest_refresh_token";
 
 const getCookieOptions = (expiresAt = null) => {
@@ -80,10 +85,7 @@ export const refreshController = async (req, res) => {
 export const logoutController = async (req, res) => {
   await logout(req.cookies?.[REFRESH_COOKIE]);
 
-  res.clearCookie(
-    REFRESH_COOKIE,
-    getCookieOptions()
-  );
+  res.clearCookie(REFRESH_COOKIE, getCookieOptions());
 
   res.status(200).json({
     success: true,
@@ -103,19 +105,43 @@ export const meController = async (req, res) => {
 export const changePasswordController = async (req, res) => {
   const result = await changePassword({
     userId: req.user.id,
-    currentPassword: req.validated.body.currentPassword,
-    newPassword: req.validated.body.newPassword,
+    currentPassword: req.body.currentPassword,
+    newPassword: req.body.newPassword,
   });
 
-  res.clearCookie(
-    REFRESH_COOKIE,
-    getCookieOptions()
-  );
+  res.clearCookie(REFRESH_COOKIE, getCookieOptions());
 
   res.status(200).json({
     success: true,
     message:
       "Password changed successfully. Please sign in with your new password.",
+    data: result,
+  });
+};
+
+export const forgotPasswordController = async (req, res) => {
+  const result = await requestPasswordReset({
+    email: req.body.email,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: result.message,
+  });
+};
+
+export const resetPasswordController = async (req, res) => {
+  const result = await resetPassword({
+    token: req.body.token,
+    newPassword: req.body.newPassword,
+  });
+
+  res.clearCookie(REFRESH_COOKIE, getCookieOptions());
+
+  res.status(200).json({
+    success: true,
+    message:
+      "Your password has been reset successfully. Sign in with your new password.",
     data: result,
   });
 };

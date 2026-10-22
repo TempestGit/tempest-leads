@@ -12,6 +12,8 @@ import PagePlaceholder from "../components/common/PagePlaceholder";
 
 import LoginPage from "../features/auth/LoginPage";
 import ChangePasswordPage from "../features/auth/ChangePasswordPage";
+import ForgotPasswordPage from "../features/auth/ForgotPasswordPage";
+import ResetPasswordPage from "../features/auth/ResetPasswordPage";
 
 import CompaniesPage from "../features/companies/CompaniesPage";
 import ContactsPage from "../features/contacts/ContactsPage.jsx";
@@ -41,6 +43,14 @@ export const router = createBrowserRouter([
   {
     path: "/change-password",
     element: <ChangePasswordPage />,
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPasswordPage />,
+  },
+  {
+    path: "/reset-password",
+    element: <ResetPasswordPage />,
   },
   {
     element: <ProtectedRoute />,

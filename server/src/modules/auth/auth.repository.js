@@ -132,3 +132,62 @@ export const changeUserPassword = async ({
 
   return result.affectedRows;
 };
+
+/*
+|--------------------------------------------------------------------------
+| Password Reset Tokens
+|--------------------------------------------------------------------------
+*/
+
+export const createPasswordResetToken = async ({
+  userId,
+  tokenHash,
+  expiresAt,
+  connection = pool,
+}) => {
+  const [result] = await connection.query(
+    `INSERT INTO password_reset_tokens
+       (user_id, token_hash, expires_at)
+     VALUES (?, ?, ?)`,
+    [userId, tokenHash, expiresAt]
+  );
+
+  return result.insertId;
+};
+
+export const findPasswordResetTokenForUpdate = async (
+  tokenHash,
+  connection
+) => {
+  const [rows] = await connection.query(
+    `SELECT
+       prt.id,
+       prt.user_id,
+       prt.expires_at,
+       prt.used_at,
+       u.password_hash,
+       u.status
+     FROM password_reset_tokens prt
+     INNER JOIN users u ON u.id = prt.user_id
+     WHERE prt.token_hash = ?
+       AND u.deleted_at IS NULL
+     LIMIT 1
+     FOR UPDATE`,
+    [tokenHash]
+  );
+
+  return rows[0] || null;
+};
+
+export const invalidatePasswordResetTokens = async (
+  userId,
+  connection = pool
+) => {
+  await connection.query(
+    `UPDATE password_reset_tokens
+     SET used_at = UTC_TIMESTAMP()
+     WHERE user_id = ?
+       AND used_at IS NULL`,
+    [userId]
+  );
+};

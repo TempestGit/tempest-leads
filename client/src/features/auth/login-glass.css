@@ -1,6 +1,7 @@
 
 /* ==========================================================
    TEMPEST LEADS — GLASS PREMIUM LOGIN
+   Colors controlled by central app.css :root
    ========================================================== */
 
 .tgl-page {
@@ -8,15 +9,20 @@
   background:
     radial-gradient(
       circle at 12% 12%,
-      rgba(205, 218, 255, 0.65),
+      var(--tgl-page-glow-one),
       transparent 32%
     ),
     radial-gradient(
       circle at 90% 85%,
-      rgba(228, 211, 255, 0.7),
+      var(--tgl-page-glow-two),
       transparent 35%
     ),
-    linear-gradient(135deg, #f3f7ff, #edf2fc 55%, #f7f3ff);
+    linear-gradient(
+      135deg,
+      var(--tgl-page-base-one),
+      var(--tgl-page-base-two) 55%,
+      var(--tgl-page-base-three)
+    );
 }
 
 /* Background Orbs */
@@ -34,7 +40,7 @@
   height: 320px;
   top: -110px;
   left: -110px;
-  background: rgba(117, 150, 250, 0.15);
+  background: var(--tgl-orb-one);
 }
 
 .tgl-orb-two {
@@ -42,7 +48,7 @@
   height: 420px;
   bottom: -190px;
   right: -130px;
-  background: rgba(162, 112, 237, 0.16);
+  background: var(--tgl-orb-two);
 }
 
 .tgl-orb-three {
@@ -50,19 +56,19 @@
   height: 150px;
   top: 30%;
   right: 16%;
-  background: rgba(255, 255, 255, 0.4);
+  background: var(--tgl-orb-three);
 }
 
 /* Main Shell */
 
 .tgl-shell {
   min-height: 670px;
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--tgl-shell-border);
+  background: var(--tgl-shell-bg);
 
   box-shadow:
-    0 35px 100px rgba(39, 64, 128, 0.14),
-    0 10px 30px rgba(39, 64, 128, 0.07);
+    0 35px 100px var(--tgl-shell-shadow-one),
+    0 10px 30px var(--tgl-shell-shadow-two);
 
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
@@ -71,37 +77,37 @@
 /* Login Panel */
 
 .tgl-login-panel {
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--tgl-panel-bg);
   min-width: 0;
 }
 
 .tgl-secure-badge {
-  border: 1px solid #dce8f8;
-  background: #f0f6ff;
-  color: #4e73b7;
+  border: 1px solid var(--tgl-secure-border);
+  background: var(--tgl-secure-bg);
+  color: var(--tgl-secure-text);
   white-space: nowrap;
 }
 
 .tgl-eyebrow {
-  border: 1px solid #e0e8ff;
-  background: #eef3ff;
-  color: #5775d5;
+  border: 1px solid var(--tgl-eyebrow-border);
+  background: var(--tgl-eyebrow-bg);
+  color: var(--tgl-eyebrow-text);
 }
 
 .tgl-title {
-  color: #192b4c;
+  color: var(--tgl-text);
 }
 
 .tgl-title-dot {
-  color: #8055e8;
+  color: var(--tgl-accent);
 }
 
 .tgl-muted {
-  color: #798ba7;
+  color: var(--tgl-muted);
 }
 
 .tgl-label {
-  color: #405678;
+  color: var(--tgl-label);
 }
 
 /* Inputs */
@@ -116,7 +122,7 @@
   left: 17px;
   z-index: 1;
   transform: translateY(-50%);
-  color: #8597b4;
+  color: var(--tgl-field-icon);
   pointer-events: none;
 }
 
@@ -129,11 +135,11 @@
   padding: 0 16px 0 49px !important;
 
   box-sizing: border-box;
-  border: 1px solid #dce5f4;
+  border: 1px solid var(--tgl-input-border);
   outline: none;
 
-  background: #f8faff;
-  color: #192b4c;
+  background: var(--tgl-input-bg);
+  color: var(--tgl-text);
   font-family: inherit;
   font-weight: 500;
 
@@ -144,13 +150,14 @@
 }
 
 .tgl-login-panel .tgl-input::placeholder {
-  color: #a1aec2;
+  color: var(--tgl-placeholder);
 }
 
 .tgl-login-panel .tgl-input:focus {
-  border-color: #6689ee;
-  background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(76, 118, 235, 0.1);
+  border-color: var(--tgl-input-focus);
+  background: var(--tgl-white);
+  box-shadow:
+    0 0 0 4px var(--tgl-focus-shadow);
 }
 
 .tgl-login-panel .tgl-input:disabled {
@@ -177,13 +184,13 @@
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: #8292ab;
+  color: var(--tgl-toggle-text);
   cursor: pointer;
 }
 
 .tgl-password-toggle:hover:not(:disabled) {
-  background: #edf2ff;
-  color: #4b6ccf;
+  background: var(--tgl-toggle-hover-bg);
+  color: var(--tgl-toggle-hover-text);
 }
 
 /* Submit */
@@ -191,10 +198,17 @@
 .tgl-submit {
   min-height: 54px;
   border: 1px solid transparent;
-  background: linear-gradient(120deg, #2469f5, #8055e8);
-  color: #ffffff;
 
-  box-shadow: 0 12px 25px rgba(63, 101, 217, 0.22);
+  background: linear-gradient(
+    120deg,
+    var(--tgl-primary),
+    var(--tgl-accent)
+  );
+
+  color: var(--tgl-white);
+
+  box-shadow:
+    0 12px 25px var(--tgl-submit-shadow);
 
   transition:
     transform 180ms ease,
@@ -203,7 +217,9 @@
 
 .tgl-submit:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 16px 30px rgba(63, 101, 217, 0.3);
+
+  box-shadow:
+    0 16px 30px var(--tgl-submit-hover-shadow);
 }
 
 .tgl-submit:disabled {
@@ -214,21 +230,21 @@
 /* Error */
 
 .tgl-error {
-  border: 1px solid #f1cbd5;
-  background: #fff1f4;
-  color: #b83e59;
+  border: 1px solid var(--tgl-error-border);
+  background: var(--tgl-error-bg);
+  color: var(--tgl-error-text);
 }
 
 /* Security Note */
 
 .tgl-security-note {
-  border: 1px solid #dce8fa;
-  background: #f0f6ff;
-  color: #4f6b9d;
+  border: 1px solid var(--tgl-security-border);
+  background: var(--tgl-secure-bg);
+  color: var(--tgl-security-text);
 }
 
 .tgl-login-footer {
-  color: #99a7bd;
+  color: var(--tgl-footer-text);
 }
 
 /* ==========================================================
@@ -240,12 +256,12 @@
 
   background: linear-gradient(
     145deg,
-    #1948b8 0%,
-    #5149bc 52%,
-    #8054cf 100%
+    var(--tgl-showcase-one) 0%,
+    var(--tgl-showcase-two) 52%,
+    var(--tgl-showcase-three) 100%
   );
 
-  color: #ffffff;
+  color: var(--tgl-white);
 }
 
 .tgl-showcase-glow {
@@ -260,7 +276,7 @@
   height: 440px;
   top: -210px;
   right: -190px;
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--tgl-showcase-glow-one);
 }
 
 .tgl-showcase-glow-two {
@@ -268,71 +284,71 @@
   height: 380px;
   bottom: -230px;
   left: -180px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--tgl-showcase-glow-two);
 }
 
 .tgl-showcase-badge {
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  border: 1px solid var(--tgl-showcase-border);
+  background: var(--tgl-showcase-badge-bg);
+  color: var(--tgl-white);
 }
 
 .tgl-showcase-title {
-  color: #ffffff;
+  color: var(--tgl-white);
 }
 
 .tgl-showcase-title span {
-  color: #cbdcff;
+  color: var(--tgl-showcase-title-accent);
 }
 
 .tgl-showcase-description {
-  color: rgba(255, 255, 255, 0.76);
+  color: var(--tgl-showcase-description);
 }
 
 /* Bento Cards */
 
 .tgl-bento-card {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-
-  background: rgba(255, 255, 255, 0.11);
+  border: 1px solid var(--tgl-bento-border);
+  background: var(--tgl-bento-bg);
 
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 
-  box-shadow: 0 8px 24px rgba(10, 27, 91, 0.08);
+  box-shadow:
+    0 8px 24px var(--tgl-bento-shadow);
 }
 
 .tgl-bento-icon {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  background: var(--tgl-bento-icon-bg);
+  color: var(--tgl-white);
 }
 
 .tgl-bento-description {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--tgl-bento-description);
 }
 
 .tgl-bento-wide {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--tgl-bento-wide-bg);
 }
 
 .tgl-bento-highlight {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  background: var(--tgl-bento-icon-bg);
+  color: var(--tgl-white);
 }
 
 .tgl-showcase-footer {
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--tgl-showcase-footer);
 }
 
 /* Loading */
 
 .tgl-loading {
-  color: #4b68ad;
+  color: var(--tgl-loading-text);
 }
 
 .tgl-loading-icon {
-  background: #e7efff;
-  color: #5879df;
+  background: var(--tgl-loading-bg);
+  color: var(--tgl-loading-icon);
 }
 
 /* Responsive */

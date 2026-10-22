@@ -448,9 +448,9 @@ export default function CompaniesPage() {
                     <tr key={company.id}>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <span className="gco-avatar flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xs font-extrabold">
+                          {/* <span className="gco-avatar flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xs font-extrabold">
                             {getInitials(company.name)}
-                          </span>
+                          </span> */}
                           <div className="min-w-0">
                             <p className="gco-heading max-w-[190px] truncate text-sm font-bold">
                               {company.name || "Unnamed company"}

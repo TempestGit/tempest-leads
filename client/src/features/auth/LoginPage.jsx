@@ -2,11 +2,10 @@
 import { useState } from "react";
 
 import {
-  ArrowRight,
+  AlertCircle,
   CheckCircle2,
   Eye,
   EyeOff,
-  Fingerprint,
   LayoutDashboard,
   LoaderCircle,
   LockKeyhole,
@@ -15,12 +14,12 @@ import {
   Sparkles,
   TrendingUp,
   Users,
-  AlertCircle,
 } from "lucide-react";
 
 import branding from "../../assets/tempest-branding.png";
 
 import {
+  Link,
   Navigate,
   useLocation,
   useNavigate,
@@ -30,17 +29,12 @@ import useAuth from "./useAuth";
 
 import "./login-glass.css";
 
-/*
-|--------------------------------------------------------------------------
-| Login Page
-|--------------------------------------------------------------------------
-*/
-
 const LoginPage = () => {
   const {
     authenticated,
     initializing,
     login,
+    user,
   } = useAuth();
 
   const navigate = useNavigate();
@@ -51,12 +45,6 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-
-  /*
-  |--------------------------------------------------------------------------
-  | Authentication Loading
-  |--------------------------------------------------------------------------
-  */
 
   if (initializing) {
     return (
@@ -74,21 +62,14 @@ const LoginPage = () => {
     );
   }
 
-  /*
-  |--------------------------------------------------------------------------
-  | Already Authenticated
-  |--------------------------------------------------------------------------
-  */
-
   if (authenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return (
+      <Navigate
+        to={user?.mustChangePassword ? "/change-password" : "/dashboard"}
+        replace
+      />
+    );
   }
-
-  /*
-  |--------------------------------------------------------------------------
-  | Login
-  |--------------------------------------------------------------------------
-  */
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -117,17 +98,26 @@ const LoginPage = () => {
     setSubmitting(true);
 
     try {
-      await login({
+      const authenticatedUser = await login({
         email: cleanEmail,
         password,
       });
 
+      if (authenticatedUser?.mustChangePassword) {
+        navigate("/change-password", { replace: true });
+        return;
+      }
+
       const destination =
         location.state?.from?.pathname || "/dashboard";
 
-      navigate(destination, {
-        replace: true,
-      });
+      navigate(
+        destination === "/login" ||
+          destination === "/change-password"
+          ? "/dashboard"
+          : destination,
+        { replace: true }
+      );
     } catch (requestError) {
       setError(
         requestError?.response?.data?.message ||
@@ -138,28 +128,14 @@ const LoginPage = () => {
     }
   };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Render
-  |--------------------------------------------------------------------------
-  */
-
   return (
     <main className="tgl-page relative flex min-h-screen items-center justify-center overflow-hidden p-4 sm:p-6 lg:p-10">
-      {/* Background Effects */}
-
       <div className="tgl-orb tgl-orb-one" />
       <div className="tgl-orb tgl-orb-two" />
       <div className="tgl-orb tgl-orb-three" />
 
       <div className="tgl-shell relative z-10 grid w-full max-w-6xl overflow-hidden rounded-3xl lg:grid-cols-[1fr_1.05fr]">
-        {/* ======================================================= */}
-        {/* LOGIN PANEL */}
-        {/* ======================================================= */}
-
         <section className="tgl-login-panel flex flex-col px-6 py-8 sm:px-10 sm:py-10 lg:px-12 lg:py-12">
-          {/* Brand */}
-
           <div className="mb-12 flex items-center justify-between gap-4">
             <div className="tgl-brand flex items-center">
               <img
@@ -174,8 +150,6 @@ const LoginPage = () => {
               SECURE ACCESS
             </span>
           </div>
-
-          {/* Heading */}
 
           <div className="mb-8">
             <div className="tgl-eyebrow mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold">
@@ -194,7 +168,21 @@ const LoginPage = () => {
             </p>
           </div>
 
-          {/* Error */}
+          {location.state?.passwordChanged && (
+            <div
+              role="status"
+              className="tgl-field mb-6 flex items-start gap-3 rounded-xl p-4 text-sm"
+            >
+              <CheckCircle2
+                size={19}
+                className="mt-0.5 shrink-0"
+              />
+              <span className="tgl-muted">
+                Password changed successfully. Sign in with
+                your new password.
+              </span>
+            </div>
+          )}
 
           {error && (
             <div
@@ -212,14 +200,10 @@ const LoginPage = () => {
             </div>
           )}
 
-          {/* Form */}
-
           <form
             onSubmit={handleSubmit}
             className="space-y-5"
           >
-            {/* Email */}
-
             <div>
               <label
                 htmlFor="tgl-email"
@@ -253,15 +237,22 @@ const LoginPage = () => {
               </div>
             </div>
 
-            {/* Password */}
-
             <div>
-              <label
-                htmlFor="tgl-password"
-                className="tgl-label mb-2 block text-xs font-bold"
-              >
-                Password
-              </label>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <label
+                  htmlFor="tgl-password"
+                  className="tgl-label block text-xs font-bold"
+                >
+                  Password
+                </label>
+
+                <Link
+                  to="/forgot-password"
+                  className="tgl-muted text-xs font-bold underline underline-offset-4"
+                >
+                  Forgot Password?
+                </Link>
+              </div>
 
               <div className="tgl-field relative">
                 <LockKeyhole
@@ -308,8 +299,6 @@ const LoginPage = () => {
               </div>
             </div>
 
-            {/* Submit */}
-
             <button
               type="submit"
               disabled={submitting}
@@ -324,14 +313,10 @@ const LoginPage = () => {
                   Signing in...
                 </>
               ) : (
-                <>
-                  Sign In to Workspace
-                </>
+                "Sign In to Workspace"
               )}
             </button>
           </form>
-
-          {/* Footer */}
 
           <div className="tgl-login-footer mt-auto pt-10 text-center text-xs">
             © {new Date().getFullYear()} Tempest Leads.
@@ -339,15 +324,9 @@ const LoginPage = () => {
           </div>
         </section>
 
-        {/* ======================================================= */}
-        {/* BRAND / SHOWCASE PANEL */}
-        {/* ======================================================= */}
-
         <aside className="tgl-showcase relative hidden flex-col justify-between overflow-hidden p-10 lg:flex xl:p-12">
           <div className="tgl-showcase-glow tgl-showcase-glow-one" />
           <div className="tgl-showcase-glow tgl-showcase-glow-two" />
-
-          {/* Top Badge */}
 
           <div className="relative z-10">
             <span className="tgl-showcase-badge inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold">
@@ -355,8 +334,6 @@ const LoginPage = () => {
               TEMPEST LEADS CRM
             </span>
           </div>
-
-          {/* Headline */}
 
           <div className="relative z-10 mt-12">
             <h2 className="tgl-showcase-title max-w-lg text-4xl font-extrabold leading-tight tracking-tight xl:text-5xl">
@@ -373,8 +350,6 @@ const LoginPage = () => {
               long-term nurture.
             </p>
           </div>
-
-          {/* Bento Showcase */}
 
           <div className="relative z-10 mt-12 grid grid-cols-2 gap-4">
             <div className="tgl-bento-card rounded-2xl p-5">
@@ -421,8 +396,6 @@ const LoginPage = () => {
               </span>
             </div>
           </div>
-
-          {/* Bottom */}
 
           <div className="tgl-showcase-footer relative z-10 mt-10 flex items-center gap-2 text-xs">
             <CheckCircle2 size={16} />

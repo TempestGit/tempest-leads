@@ -9,11 +9,20 @@ import { loginSchema } from "./auth.schema.js";
 import { changePasswordSchema } from "./changePassword.schema.js";
 
 import {
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from "./passwordReset.schema.js";
+
+import { passwordResetRateLimit } from "./passwordReset.rateLimit.js";
+
+import {
   loginController,
   refreshController,
   logoutController,
   meController,
   changePasswordController,
+  forgotPasswordController,
+  resetPasswordController,
 } from "./auth.controller.js";
 
 const router = express.Router();
@@ -32,6 +41,20 @@ router.post(
 router.post(
   "/logout",
   asyncHandler(logoutController)
+);
+
+router.post(
+  "/forgot-password",
+  passwordResetRateLimit,
+  validateMiddleware({ body: forgotPasswordSchema }),
+  asyncHandler(forgotPasswordController)
+);
+
+router.post(
+  "/reset-password",
+  passwordResetRateLimit,
+  validateMiddleware({ body: resetPasswordSchema }),
+  asyncHandler(resetPasswordController)
 );
 
 router.get(

@@ -1,7 +1,14 @@
+
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 
 import { env } from "../config/env.js";
+
+/*
+|--------------------------------------------------------------------------
+| Access Token
+|--------------------------------------------------------------------------
+*/
 
 export const generateAccessToken = (user) => {
   return jwt.sign(
@@ -9,6 +16,7 @@ export const generateAccessToken = (user) => {
       sub: String(user.id),
       role: user.role,
       type: "access",
+      tokenVersion: Number(user.token_version ?? 0),
     },
     env.JWT_ACCESS_SECRET,
     {
@@ -16,6 +24,12 @@ export const generateAccessToken = (user) => {
     }
   );
 };
+
+/*
+|--------------------------------------------------------------------------
+| Refresh Token
+|--------------------------------------------------------------------------
+*/
 
 export const generateRefreshToken = (user) => {
   const token = jwt.sign(
@@ -31,15 +45,19 @@ export const generateRefreshToken = (user) => {
 
   const decoded = jwt.decode(token);
 
-  const expiresAt = new Date(
-    decoded.exp * 1000
-  );
+  const expiresAt = new Date(decoded.exp * 1000);
 
   return {
     token,
     expiresAt,
   };
 };
+
+/*
+|--------------------------------------------------------------------------
+| Verification
+|--------------------------------------------------------------------------
+*/
 
 export const verifyAccessToken = (token) => {
   return jwt.verify(
@@ -54,6 +72,12 @@ export const verifyRefreshToken = (token) => {
     env.JWT_REFRESH_SECRET
   );
 };
+
+/*
+|--------------------------------------------------------------------------
+| Token Hashing
+|--------------------------------------------------------------------------
+*/
 
 export const hashToken = (token) => {
   return crypto

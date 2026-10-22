@@ -1,6 +1,7 @@
 
 /* ==========================================================
    TEMPEST CRM — GLASS PREMIUM ADD ACTIVITY MODAL
+   Colors managed centrally through app.css :root
    ========================================================== */
 
 .aag-overlay {
@@ -14,7 +15,7 @@
 
   padding: 20px;
 
-  background: rgba(10, 22, 48, 0.62);
+  background: var(--aag-overlay-bg);
 
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -27,15 +28,15 @@
 
   overflow: hidden;
 
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--aag-modal-border);
   border-radius: 26px;
 
-  background: rgba(255, 255, 255, 0.98);
-  color: #172849;
+  background: var(--aag-modal-bg);
+  color: var(--aag-title-color);
 
   box-shadow:
-    0 36px 100px rgba(8, 22, 55, 0.32),
-    0 8px 30px rgba(8, 22, 55, 0.12);
+    0 36px 100px var(--aag-shadow-strong),
+    0 8px 30px var(--aag-shadow-soft);
 
   animation: aag-enter 220ms ease-out;
 }
@@ -55,38 +56,33 @@
 /* Header */
 
 .aag-header {
-  border-bottom: 1px solid rgba(112, 138, 192, 0.14);
-
-  background: linear-gradient(
-    115deg,
-    rgba(235, 243, 255, 0.97),
-    rgba(246, 240, 255, 0.97)
-  );
+  border-bottom: 1px solid var(--aag-header-border);
+  background: var(--aag-header-gradient);
 }
 
 .aag-brand {
-  background: linear-gradient(135deg, #1269fa, #9651f6);
-  color: #ffffff;
+  background: var(--aag-brand-gradient);
+  color: var(--aag-on-brand);
 
-  box-shadow: 0 8px 22px rgba(71, 105, 231, 0.23);
+  box-shadow: 0 8px 22px var(--aag-brand-shadow);
 }
 
 .aag-eyebrow {
-  color: #657fae;
+  color: var(--aag-eyebrow-color);
 }
 
 .aag-title {
-  color: #172849;
+  color: var(--aag-title-color);
 }
 
 .aag-muted {
-  color: #7485a1;
+  color: var(--aag-muted-color);
 }
 
 .aag-close {
-  border: 1px solid #dbe4f3;
-  background: #ffffff;
-  color: #64748b;
+  border: 1px solid var(--aag-close-border);
+  background: var(--aag-close-bg);
+  color: var(--aag-close-color);
 
   transition:
     background 180ms ease,
@@ -94,8 +90,8 @@
 }
 
 .aag-close:hover:not(:disabled) {
-  background: #fff0f3;
-  color: #d33b55;
+  background: var(--aag-close-hover-bg);
+  color: var(--aag-close-hover-color);
 }
 
 /* Scrollable body */
@@ -104,7 +100,7 @@
   overscroll-behavior: contain;
 
   scrollbar-width: thin;
-  scrollbar-color: #c7d4ec transparent;
+  scrollbar-color: var(--aag-scrollbar-color) transparent;
 }
 
 .aag-body::-webkit-scrollbar {
@@ -113,56 +109,51 @@
 
 .aag-body::-webkit-scrollbar-thumb {
   border-radius: 10px;
-  background: #c7d4ec;
+  background: var(--aag-scrollbar-color);
 }
 
 /* Form sections */
 
 .aag-section {
-  border: 1px solid #e4eaf6;
+  border: 1px solid var(--aag-section-border);
+  background: var(--aag-section-gradient);
 
-  background: linear-gradient(
-    145deg,
-    #ffffff,
-    #f9fbff
-  );
-
-  box-shadow: 0 8px 28px rgba(55, 82, 141, 0.055);
+  box-shadow: 0 8px 28px var(--aag-section-shadow);
 }
 
 .aag-section-heading {
   padding-bottom: 16px;
-  border-bottom: 1px solid #e7edf8;
+  border-bottom: 1px solid var(--aag-section-heading-border);
 }
 
 .aag-section-icon {
-  background: linear-gradient(135deg, #e3efff, #eee6ff);
-  color: #426ee8;
+  background: var(--aag-section-icon-bg);
+  color: var(--aag-section-icon-color);
 }
 
 /* Form inputs */
 
 .aag-label {
-  color: #415779;
+  color: var(--aag-label-color);
 }
 
 .aag-required {
-  color: #e04a62;
+  color: var(--aag-required-color);
 }
 
 .aag-hint {
-  color: #8b9ab4;
+  color: var(--aag-hint-color);
 }
 
 .aag-input {
   display: block;
   min-height: 46px;
 
-  border: 1px solid #d9e2f2;
+  border: 1px solid var(--aag-input-border);
   outline: none;
 
-  background: #f8faff;
-  color: #172849;
+  background: var(--aag-input-bg);
+  color: var(--aag-title-color);
 
   font-family: inherit;
   font-weight: 500;
@@ -174,14 +165,14 @@
 }
 
 .aag-input::placeholder {
-  color: #9aa8c0;
+  color: var(--aag-placeholder-color);
 }
 
 .aag-input:focus {
-  border-color: #6289f6;
-  background: #ffffff;
+  border-color: var(--aag-input-focus-border);
+  background: var(--aag-input-focus-bg);
 
-  box-shadow: 0 0 0 3px rgba(67, 113, 238, 0.12);
+  box-shadow: 0 0 0 3px var(--aag-input-focus-shadow);
 }
 
 textarea.aag-input {
@@ -198,44 +189,44 @@ textarea.aag-input {
 /* Lead context */
 
 .aag-lead-context {
-  border: 1px solid #dce6fa;
-  background: #eff5ff;
+  border: 1px solid var(--aag-context-border);
+  background: var(--aag-context-bg);
 }
 
 .aag-lead-avatar {
-  background: #dce9ff;
-  color: #3168df;
+  background: var(--aag-avatar-bg);
+  color: var(--aag-avatar-color);
 }
 
 .aag-lead-code {
-  color: #3168df;
+  color: var(--aag-avatar-color);
 }
 
 .aag-check {
-  color: #0caa81;
+  color: var(--aag-check-color);
 }
 
 /* Follow-up info */
 
 .aag-info {
-  border: 1px solid #dce6fa;
-  background: #eff5ff;
-  color: #4a648f;
+  border: 1px solid var(--aag-context-border);
+  background: var(--aag-context-bg);
+  color: var(--aag-info-color);
 }
 
 /* Error */
 
 .aag-error {
-  border: 1px solid #f3cbd3;
-  background: #fff0f3;
-  color: #b93650;
+  border: 1px solid var(--aag-error-border);
+  background: var(--aag-error-bg);
+  color: var(--aag-error-color);
 }
 
 /* Footer */
 
 .aag-footer {
-  border-top: 1px solid #e4eaf5;
-  background: #ffffff;
+  border-top: 1px solid var(--aag-footer-border);
+  background: var(--aag-footer-bg);
 }
 
 /* Buttons */
@@ -251,26 +242,26 @@ textarea.aag-input {
 }
 
 .aag-primary {
-  background: linear-gradient(120deg, #1269fa, #9851f8);
-  color: #ffffff;
+  background: var(--aag-primary-gradient);
+  color: var(--aag-on-brand);
 
-  box-shadow: 0 8px 20px rgba(57, 103, 235, 0.23);
+  box-shadow: 0 8px 20px var(--aag-primary-shadow);
 }
 
 .aag-primary:hover:not(:disabled) {
   transform: translateY(-1px);
 
-  box-shadow: 0 12px 26px rgba(57, 103, 235, 0.3);
+  box-shadow: 0 12px 26px var(--aag-primary-hover-shadow);
 }
 
 .aag-secondary {
-  border-color: #d9e2f2;
-  background: #ffffff;
-  color: #526486;
+  border-color: var(--aag-input-border);
+  background: var(--aag-secondary-bg);
+  color: var(--aag-secondary-color);
 }
 
 .aag-secondary:hover:not(:disabled) {
-  background: #edf3ff;
+  background: var(--aag-secondary-hover-bg);
 }
 
 .aag-primary:disabled,

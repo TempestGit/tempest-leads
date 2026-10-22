@@ -217,9 +217,9 @@ const MeetingsTable = ({
                 <tr key={meeting.id}>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <span className="gmp-company-avatar flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold">
+                      {/* <span className="gmp-company-avatar flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold">
                         {getInitials(meeting.companyName)}
-                      </span>
+                      </span> */}
 
                       <div className="min-w-0">
                         {onOpenLead ? (
