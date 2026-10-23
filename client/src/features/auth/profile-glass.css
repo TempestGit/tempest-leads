@@ -1,0 +1,735 @@
+
+/* ==========================================================
+   TEMPEST LEADS CRM
+   Profile, Account Settings & Topbar Account Dropdown
+   Glass Premium Modern Bento Grid
+
+   Layout and spacing: Tailwind CSS
+   Theme colors: client/src/app.css
+   ========================================================== */
+
+/* ==========================================================
+   1. THEME VARIABLES
+   ========================================================== */
+
+.tlp-page,
+.glass-topbar-profile-dropdown {
+  --tlp-text: var(
+    --gp-text,
+    var(--text-primary, var(--text))
+  );
+
+  --tlp-muted: var(
+    --gp-muted,
+    var(--text-muted, var(--muted-foreground))
+  );
+
+  --tlp-primary: var(
+    --gp-blue,
+    var(--primary, var(--accent))
+  );
+
+  --tlp-secondary: var(
+    --gp-violet,
+    var(--primary, var(--accent))
+  );
+
+  --tlp-line: var(
+    --gp-line,
+    var(--border-color, var(--border))
+  );
+
+  --tlp-surface: var(
+    --gp-surface,
+    var(--surface, var(--card))
+  );
+
+  --tlp-surface-strong: var(
+    --gp-surface-strong,
+    var(--surface, var(--card))
+  );
+
+  --tlp-shadow: var(
+    --gp-shadow,
+    var(--shadow-card, var(--shadow-sm))
+  );
+
+  --tlp-gradient: var(
+    --gp-gradient,
+    linear-gradient(
+      120deg,
+      var(--tlp-primary),
+      var(--tlp-secondary)
+    )
+  );
+
+  --tlp-soft-primary: color-mix(
+    in srgb,
+    var(--tlp-primary) 9%,
+    var(--tlp-surface-strong)
+  );
+
+  --tlp-soft-secondary: color-mix(
+    in srgb,
+    var(--tlp-secondary) 8%,
+    var(--tlp-surface-strong)
+  );
+
+  --tlp-hover: color-mix(
+    in srgb,
+    var(--tlp-primary) 7%,
+    var(--tlp-surface-strong)
+  );
+
+  --tlp-border-strong: color-mix(
+    in srgb,
+    var(--tlp-primary) 30%,
+    var(--tlp-line)
+  );
+
+  --tlp-focus-ring: color-mix(
+    in srgb,
+    var(--tlp-primary) 18%,
+    transparent
+  );
+
+  color: var(--tlp-text);
+}
+
+/* ==========================================================
+   2. PROFILE PAGE
+   ========================================================== */
+
+.tlp-page {
+  position: relative;
+  isolation: isolate;
+  color: var(--tlp-text);
+}
+
+.tlp-page *,
+.tlp-page *::before,
+.tlp-page *::after {
+  box-sizing: border-box;
+}
+
+/* ==========================================================
+   3. GLASS CARDS
+   ========================================================== */
+
+.tlp-page .tlp-glass-card {
+  position: relative;
+
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(
+        in srgb,
+        var(--tlp-surface-strong) 85%,
+        transparent
+      ),
+      color-mix(
+        in srgb,
+        var(--tlp-surface) 92%,
+        transparent
+      )
+    );
+
+  color: var(--tlp-text);
+
+  border: 1px solid var(--tlp-line);
+  border-radius: 24px;
+
+  box-shadow: var(--tlp-shadow);
+
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.tlp-page .tlp-glass-card:hover {
+  border-color: var(--tlp-border-strong);
+}
+
+/* ==========================================================
+   4. TYPOGRAPHY
+   ========================================================== */
+
+.tlp-page .tlp-eyebrow {
+  color: var(--tlp-primary);
+
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tlp-page .tlp-page-title {
+  color: var(--tlp-text);
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+
+.tlp-page .tlp-profile-name {
+  color: var(--tlp-text);
+  letter-spacing: -0.025em;
+}
+
+.tlp-page .tlp-card-heading {
+  color: var(--tlp-text);
+  letter-spacing: -0.015em;
+}
+
+.tlp-page .tlp-muted,
+.tlp-page .tlp-page-description,
+.tlp-page .tlp-info-label,
+.tlp-page .tlp-field-help {
+  color: var(--tlp-muted);
+}
+
+.tlp-page .tlp-info-value,
+.tlp-page .tlp-label {
+  color: var(--tlp-text);
+}
+
+/* ==========================================================
+   5. PROFILE HERO
+   ========================================================== */
+
+.tlp-page .tlp-profile-avatar {
+  position: relative;
+
+  background: var(--tlp-gradient);
+
+  color: var(
+    --primary-foreground,
+    var(--on-primary, #ffffff)
+  );
+
+  border: 1px solid var(--tlp-border-strong);
+  border-radius: 24px;
+
+  box-shadow:
+    0 12px 28px
+      color-mix(
+        in srgb,
+        var(--tlp-primary) 20%,
+        transparent
+      );
+
+  user-select: none;
+}
+
+.tlp-page .tlp-profile-badge {
+  display: inline-flex;
+  align-items: center;
+
+  background: var(--tlp-soft-primary);
+
+  color: var(--tlp-text);
+
+  border: 1px solid var(--tlp-line);
+  border-radius: 999px;
+}
+
+.tlp-page .tlp-profile-badge-success {
+  color: var(--success, var(--tlp-primary));
+
+  background: color-mix(
+    in srgb,
+    var(--success, var(--tlp-primary)) 10%,
+    var(--tlp-surface-strong)
+  );
+
+  border-color: color-mix(
+    in srgb,
+    var(--success, var(--tlp-primary)) 25%,
+    var(--tlp-line)
+  );
+}
+
+/* ==========================================================
+   6. PERSONAL INFORMATION ITEMS
+   ========================================================== */
+
+.tlp-page .tlp-info-item {
+  min-width: 0;
+
+  background:
+    linear-gradient(
+      145deg,
+      var(--tlp-soft-primary),
+      var(--tlp-soft-secondary)
+    );
+
+  color: var(--tlp-text);
+
+  border: 1px solid var(--tlp-line);
+  border-radius: 16px;
+
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.tlp-page .tlp-info-item:hover {
+  background: var(--tlp-hover);
+  border-color: var(--tlp-border-strong);
+  transform: translateY(-1px);
+}
+
+.tlp-page .tlp-info-icon {
+  background: var(--tlp-surface-strong);
+
+  color: var(--tlp-primary);
+
+  border: 1px solid var(--tlp-line);
+  border-radius: 12px;
+
+  box-shadow: 0 4px 12px
+    color-mix(
+      in srgb,
+      var(--tlp-primary) 6%,
+      transparent
+    );
+}
+
+.tlp-page .tlp-info-label {
+  color: var(--tlp-muted);
+  font-weight: 600;
+}
+
+.tlp-page .tlp-info-value {
+  color: var(--tlp-text);
+  overflow-wrap: anywhere;
+}
+
+/* ==========================================================
+   7. SECTION HEADING ICONS
+   ========================================================== */
+
+.tlp-page .tlp-heading-icon {
+  flex-shrink: 0;
+
+  background: var(--tlp-soft-primary);
+
+  color: var(--tlp-primary);
+
+  border: 1px solid var(--tlp-line);
+  border-radius: 13px;
+}
+
+/* ==========================================================
+   8. BUTTONS
+   ========================================================== */
+
+.tlp-page .tlp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  border-radius: 12px;
+
+  font-weight: 700;
+  text-decoration: none;
+
+  cursor: pointer;
+
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.tlp-page .tlp-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.tlp-page .tlp-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.tlp-page .tlp-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.tlp-page .tlp-btn-primary {
+  background: var(--tlp-gradient);
+
+  color: var(
+    --primary-foreground,
+    var(--on-primary, #ffffff)
+  );
+
+  border: 1px solid var(--tlp-border-strong);
+
+  box-shadow:
+    0 8px 20px
+      color-mix(
+        in srgb,
+        var(--tlp-primary) 18%,
+        transparent
+      );
+}
+
+.tlp-page .tlp-btn-primary:hover:not(:disabled) {
+  box-shadow:
+    0 12px 26px
+      color-mix(
+        in srgb,
+        var(--tlp-primary) 25%,
+        transparent
+      );
+}
+
+.tlp-page .tlp-btn-secondary {
+  background: var(--tlp-surface-strong);
+
+  color: var(--tlp-text);
+
+  border: 1px solid var(--tlp-line);
+
+  box-shadow:
+    0 4px 12px
+      color-mix(
+        in srgb,
+        var(--tlp-primary) 5%,
+        transparent
+      );
+}
+
+.tlp-page .tlp-btn-secondary:hover:not(:disabled) {
+  background: var(--tlp-soft-primary);
+  border-color: var(--tlp-border-strong);
+}
+
+/* ==========================================================
+   9. ACCOUNT SETTINGS TABS
+   ========================================================== */
+
+.tlp-page .tlp-tab {
+  background: var(--tlp-surface-strong);
+
+  color: var(--tlp-muted);
+
+  border: 1px solid var(--tlp-line);
+  border-radius: 12px;
+
+  cursor: pointer;
+
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.tlp-page .tlp-tab:hover {
+  background: var(--tlp-soft-primary);
+  color: var(--tlp-text);
+  border-color: var(--tlp-border-strong);
+}
+
+.tlp-page .tlp-tab-active,
+.tlp-page .tlp-tab[aria-pressed="true"] {
+  background: var(--tlp-gradient);
+
+  color: var(
+    --primary-foreground,
+    var(--on-primary, #ffffff)
+  );
+
+  border-color: var(--tlp-border-strong);
+
+  box-shadow:
+    0 6px 16px
+      color-mix(
+        in srgb,
+        var(--tlp-primary) 16%,
+        transparent
+      );
+}
+
+/* ==========================================================
+   10. FORM INPUTS
+   ========================================================== */
+
+.tlp-page .tlp-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+
+  background: var(--tlp-surface-strong);
+
+  color: var(--tlp-text);
+
+  border: 1px solid var(--tlp-line);
+  border-radius: 12px;
+
+  outline: none;
+
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.tlp-page .tlp-input::placeholder {
+  color: var(--tlp-muted);
+}
+
+.tlp-page .tlp-input:hover:not(:disabled) {
+  border-color: var(--tlp-border-strong);
+}
+
+.tlp-page .tlp-input:focus {
+  background: var(--tlp-surface-strong);
+
+  border-color: var(--tlp-primary);
+
+  box-shadow:
+    0 0 0 3px var(--tlp-focus-ring);
+}
+
+.tlp-page .tlp-input:disabled,
+.tlp-page .tlp-input[readonly] {
+  background: var(--tlp-soft-primary);
+
+  color: var(--tlp-muted);
+
+  cursor: not-allowed;
+}
+
+/* ==========================================================
+   11. READ-ONLY FIELDS
+   ========================================================== */
+
+.tlp-page .tlp-readonly-value {
+  background: var(--tlp-soft-primary);
+
+  color: var(--tlp-muted);
+
+  border: 1px solid var(--tlp-line);
+  border-radius: 12px;
+
+  overflow-wrap: anywhere;
+}
+
+/* ==========================================================
+   12. SECURITY PANEL
+   ========================================================== */
+
+.tlp-page .tlp-security-note {
+  background:
+    linear-gradient(
+      135deg,
+      var(--tlp-soft-primary),
+      var(--tlp-soft-secondary)
+    );
+
+  color: var(--tlp-muted);
+
+  border: 1px solid var(--tlp-line);
+  border-radius: 14px;
+}
+
+.tlp-page .tlp-security-note svg {
+  color: var(--tlp-primary);
+}
+
+/* ==========================================================
+   13. VALIDATION FEEDBACK
+   ========================================================== */
+
+.tlp-page .tlp-alert,
+.glass-topbar-profile-dropdown .tlp-alert {
+  border-radius: 12px;
+  border: 1px solid var(--tlp-line);
+}
+
+.tlp-page .tlp-alert-success,
+.glass-topbar-profile-dropdown .tlp-alert-success {
+  color: var(--success, var(--tlp-primary));
+
+  border-color: color-mix(
+    in srgb,
+    var(--success, var(--tlp-primary)) 35%,
+    var(--tlp-line)
+  );
+
+  background: color-mix(
+    in srgb,
+    var(--success, var(--tlp-primary)) 9%,
+    var(--tlp-surface-strong)
+  );
+}
+
+.tlp-page .tlp-alert-error,
+.glass-topbar-profile-dropdown .tlp-alert-error {
+  color: var(
+    --danger,
+    var(--error, var(--tlp-text))
+  );
+
+  border-color: color-mix(
+    in srgb,
+    var(--danger, var(--error, var(--tlp-text))) 35%,
+    var(--tlp-line)
+  );
+
+  background: color-mix(
+    in srgb,
+    var(--danger, var(--error, var(--tlp-text))) 8%,
+    var(--tlp-surface-strong)
+  );
+}
+
+/* ==========================================================
+   14. LINKS
+   ========================================================== */
+
+.tlp-page .tlp-link {
+  color: var(--tlp-primary);
+
+  text-decoration: none;
+
+  transition:
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.tlp-page .tlp-link:hover {
+  color: var(--tlp-secondary);
+
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* ==========================================================
+   15. TOPBAR PROFILE DROPDOWN
+   ========================================================== */
+
+.glass-topbar-profile-dropdown {
+  position: absolute;
+
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 100;
+
+  width: 265px;
+  max-width: calc(100vw - 24px);
+
+  padding: 8px;
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      145deg,
+      var(--tlp-surface-strong),
+      var(--tlp-surface)
+    );
+
+  color: var(--tlp-text);
+
+  border: 1px solid var(--tlp-line);
+  border-radius: 18px;
+
+  box-shadow: var(--tlp-shadow);
+
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glass-topbar-profile-heading {
+  padding: 12px;
+
+  border-bottom: 1px solid var(--tlp-line);
+}
+
+.glass-topbar-profile-heading p:first-child {
+  color: var(--tlp-text);
+}
+
+.glass-topbar-profile-dropdown .glass-topbar-muted {
+  color: var(--tlp-muted);
+}
+
+.glass-topbar-profile-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+
+  padding: 12px;
+
+  border: 0;
+  border-radius: 11px;
+
+  background: transparent;
+
+  color: var(--tlp-text);
+
+  text-align: left;
+  text-decoration: none;
+
+  cursor: pointer;
+
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.glass-topbar-profile-item svg {
+  flex-shrink: 0;
+  color: var(--tlp-primary);
+}
+
+.glass-topbar-profile-item:hover,
+.glass-topbar-profile-item:focus-visible {
+  background: var(--tlp-soft-primary);
+  color: var(--tlp-text);
+}
+
+.glass-topbar-profile-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.glass-topbar-profile-divider {
+  height: 1px;
+  margin: 8px 0;
+
+  background: var(--tlp-line);
+}
+
+/* ==========================================================
+   16. ACCESSIBILITY
+   ========================================================== */
+
+.tlp-page :is(button, a, input):focus-visible,
+.glass-topbar-profile-dropdown
+  :is(button, a):focus-visible {
+  outline: 2px solid var(--tlp-primary);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tlp-page *,
+  .tlp-page *::before,
+  .tlp-page *::after,
+  .glass-topbar-profile-dropdown *,
+  .glass-topbar-profile-dropdown *::before,
+  .glass-topbar-profile-dropdown *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

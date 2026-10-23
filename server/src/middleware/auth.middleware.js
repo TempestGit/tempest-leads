@@ -1,4 +1,3 @@
-
 import ApiError from "../utils/ApiError.js";
 
 import {
@@ -7,6 +6,7 @@ import {
 
 import {
   findUserById,
+  findActiveAuthSession,
 } from "../modules/auth/auth.repository.js";
 
 const PASSWORD_CHANGE_ALLOWED_PATHS = new Set([
@@ -45,12 +45,17 @@ const authMiddleware = async (req, res, next) => {
       );
     }
 
-    if (payload.type !== "access") {
+    if (
+      payload.type !== "access" ||
+      !payload.sub ||
+      typeof payload.sid !== "string" ||
+      !payload.sid
+    ) {
       throw new ApiError(
         401,
-        "Invalid access token.",
+        "Your session is no longer valid. Please sign in again.",
         [],
-        "INVALID_ACCESS_TOKEN"
+        "SESSION_REVOKED"
       );
     }
 
@@ -74,18 +79,12 @@ const authMiddleware = async (req, res, next) => {
       );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Invalidate Old Access Tokens
-    |--------------------------------------------------------------------------
-    */
-
     const currentTokenVersion = Number(
       user.token_version ?? 0
     );
 
     const presentedTokenVersion = Number(
-      payload.tokenVersion ?? 0
+      payload.tokenVersion
     );
 
     if (
@@ -100,13 +99,34 @@ const authMiddleware = async (req, res, next) => {
       );
     }
 
+    const session = await findActiveAuthSession({
+      userId: user.id,
+      sessionKey: payload.sid,
+    });
+
+    if (!session) {
+      throw new ApiError(
+        401,
+        "This login session has expired or been revoked.",
+        [],
+        "SESSION_REVOKED"
+      );
+    }
+
     req.user = {
       id: user.id,
       userCode: user.user_code,
       fullName: user.full_name,
       email: user.email,
       role: user.role,
-      mustChangePassword: Boolean(user.must_change_password),
+      mustChangePassword: Boolean(
+        user.must_change_password
+      ),
+    };
+
+    req.authSession = {
+      id: session.id,
+      sessionKey: session.session_key,
     };
 
     const pathname = req.originalUrl.split("?")[0];

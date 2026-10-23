@@ -1,4 +1,3 @@
-
 import { env } from "../../config/env.js";
 
 import {
@@ -6,7 +5,12 @@ import {
   logout,
   refreshSession,
   getCurrentUser,
+  updateMyProfile,
   changePassword,
+  getMySessions,
+  revokeMySession,
+  revokeMyOtherSessions,
+  revokeMyAllSessions,
 } from "./auth.service.js";
 
 import {
@@ -37,6 +41,13 @@ const requestContext = (req) => ({
   ipAddress: req.ip,
   userAgent: req.get("user-agent") || null,
 });
+
+const clearRefreshCookie = (res) => {
+  res.clearCookie(
+    REFRESH_COOKIE,
+    getCookieOptions()
+  );
+};
 
 export const loginController = async (req, res) => {
   const result = await login({
@@ -85,7 +96,7 @@ export const refreshController = async (req, res) => {
 export const logoutController = async (req, res) => {
   await logout(req.cookies?.[REFRESH_COOKIE]);
 
-  res.clearCookie(REFRESH_COOKIE, getCookieOptions());
+  clearRefreshCookie(res);
 
   res.status(200).json({
     success: true,
@@ -102,14 +113,36 @@ export const meController = async (req, res) => {
   });
 };
 
+export const profileController = async (req, res) => {
+  const user = await getCurrentUser(req.user.id);
+
+  res.status(200).json({
+    success: true,
+    data: { user },
+  });
+};
+
+export const updateProfileController = async (req, res) => {
+  const user = await updateMyProfile({
+    userId: req.user.id,
+    ...req.validated.body,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Profile updated successfully.",
+    data: { user },
+  });
+};
+
 export const changePasswordController = async (req, res) => {
   const result = await changePassword({
     userId: req.user.id,
-    currentPassword: req.body.currentPassword,
-    newPassword: req.body.newPassword,
+    currentPassword: req.validated.body.currentPassword,
+    newPassword: req.validated.body.newPassword,
   });
 
-  res.clearCookie(REFRESH_COOKIE, getCookieOptions());
+  clearRefreshCookie(res);
 
   res.status(200).json({
     success: true,
@@ -121,7 +154,7 @@ export const changePasswordController = async (req, res) => {
 
 export const forgotPasswordController = async (req, res) => {
   const result = await requestPasswordReset({
-    email: req.body.email,
+    email: req.validated.body.email,
   });
 
   res.status(200).json({
@@ -132,16 +165,86 @@ export const forgotPasswordController = async (req, res) => {
 
 export const resetPasswordController = async (req, res) => {
   const result = await resetPassword({
-    token: req.body.token,
-    newPassword: req.body.newPassword,
+    token: req.validated.body.token,
+    newPassword: req.validated.body.newPassword,
   });
 
-  res.clearCookie(REFRESH_COOKIE, getCookieOptions());
+  clearRefreshCookie(res);
 
   res.status(200).json({
     success: true,
     message:
       "Your password has been reset successfully. Sign in with your new password.",
+    data: result,
+  });
+};
+
+/*
+|--------------------------------------------------------------------------
+| Active Sessions
+|--------------------------------------------------------------------------
+*/
+
+export const listSessionsController = async (req, res) => {
+  const sessions = await getMySessions({
+    userId: req.user.id,
+    currentSessionId: req.authSession.id,
+  });
+
+  res.status(200).json({
+    success: true,
+    data: { sessions },
+  });
+};
+
+export const revokeSessionController = async (req, res) => {
+  const result = await revokeMySession({
+    userId: req.user.id,
+    sessionId: req.params.sessionId,
+    currentSessionId: req.authSession.id,
+  });
+
+  if (result.requiresLogin) {
+    clearRefreshCookie(res);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Session revoked successfully.",
+    data: result,
+  });
+};
+
+export const revokeOtherSessionsController = async (
+  req,
+  res
+) => {
+  const result = await revokeMyOtherSessions({
+    userId: req.user.id,
+    currentSessionId: req.authSession.id,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Other sessions revoked successfully.",
+    data: result,
+  });
+};
+
+export const revokeAllSessionsController = async (
+  req,
+  res
+) => {
+  const result = await revokeMyAllSessions({
+    userId: req.user.id,
+  });
+
+  clearRefreshCookie(res);
+
+  res.status(200).json({
+    success: true,
+    message:
+      "All sessions revoked. Please sign in again.",
     data: result,
   });
 };

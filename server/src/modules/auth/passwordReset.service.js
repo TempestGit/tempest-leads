@@ -1,4 +1,3 @@
-
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 
@@ -12,12 +11,16 @@ import {
   invalidatePasswordResetTokens,
   changeUserPassword,
   revokeAllUserTokens,
+  revokeAllAuthSessions,
 } from "./auth.repository.js";
 
 import { sendPasswordResetEmail } from "./passwordReset.email.js";
 
 const hashResetToken = (token) =>
-  crypto.createHash("sha256").update(token).digest("hex");
+  crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
 
 const GENERIC_MESSAGE =
   "If an active account exists for this email, a password reset link will be sent.";
@@ -31,12 +34,14 @@ export const requestPasswordReset = async ({ email }) => {
     return { message: GENERIC_MESSAGE };
   }
 
-  // Limit repeat reset emails for each account.
   const [recent] = await pool.query(
     `SELECT id
      FROM password_reset_tokens
      WHERE user_id = ?
-       AND created_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 60 SECOND)
+       AND created_at > DATE_SUB(
+         UTC_TIMESTAMP(),
+         INTERVAL 60 SECOND
+       )
      LIMIT 1`,
     [user.id]
   );
@@ -45,7 +50,10 @@ export const requestPasswordReset = async ({ email }) => {
     return { message: GENERIC_MESSAGE };
   }
 
-  const rawToken = crypto.randomBytes(32).toString("hex");
+  const rawToken = crypto
+    .randomBytes(32)
+    .toString("hex");
+
   const tokenHash = hashResetToken(rawToken);
 
   const connection = await pool.getConnection();
@@ -53,11 +61,17 @@ export const requestPasswordReset = async ({ email }) => {
   try {
     await connection.beginTransaction();
 
-    // Use database UTC time consistently for expiry.
     await connection.query(
       `INSERT INTO password_reset_tokens
          (user_id, token_hash, expires_at)
-       VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 MINUTE))`,
+       VALUES (
+         ?,
+         ?,
+         DATE_ADD(
+           UTC_TIMESTAMP(),
+           INTERVAL 15 MINUTE
+         )
+       )`,
       [user.id, tokenHash]
     );
 
@@ -66,7 +80,7 @@ export const requestPasswordReset = async ({ email }) => {
     try {
       await connection.rollback();
     } catch {
-      // Ignore rollback failure.
+      // Ignore rollback failures.
     }
 
     throw error;
@@ -81,7 +95,6 @@ export const requestPasswordReset = async ({ email }) => {
       token: rawToken,
     });
   } catch (error) {
-    // Do not reveal account existence or email provider details.
     console.error(
       "[Password reset] Email delivery request failed:",
       error.message
@@ -95,17 +108,20 @@ export const resetPassword = async ({
   token,
   newPassword,
 }) => {
-  const tokenHash = hashResetToken(token.toLowerCase());
+  const tokenHash = hashResetToken(
+    token.toLowerCase()
+  );
 
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
 
-    const resetRecord = await findPasswordResetTokenForUpdate(
-      tokenHash,
-      connection
-    );
+    const resetRecord =
+      await findPasswordResetTokenForUpdate(
+        tokenHash,
+        connection
+      );
 
     if (!resetRecord || resetRecord.used_at) {
       throw new ApiError(
@@ -153,7 +169,10 @@ export const resetPassword = async ({
       );
     }
 
-    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const passwordHash = await bcrypt.hash(
+      newPassword,
+      12
+    );
 
     const changed = await changeUserPassword({
       userId: resetRecord.user_id,
@@ -180,6 +199,11 @@ export const resetPassword = async ({
       connection
     );
 
+    await revokeAllAuthSessions(
+      resetRecord.user_id,
+      connection
+    );
+
     await connection.commit();
 
     return {
@@ -190,7 +214,7 @@ export const resetPassword = async ({
     try {
       await connection.rollback();
     } catch {
-      // Ignore rollback errors.
+      // Ignore rollback failures.
     }
 
     throw error;

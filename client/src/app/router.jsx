@@ -14,6 +14,8 @@ import LoginPage from "../features/auth/LoginPage";
 import ChangePasswordPage from "../features/auth/ChangePasswordPage";
 import ForgotPasswordPage from "../features/auth/ForgotPasswordPage";
 import ResetPasswordPage from "../features/auth/ResetPasswordPage";
+import MyProfilePage from "../features/auth/MyProfilePage";
+import ProfileSettingsPage from "../features/auth/ProfileSettingsPage";
 
 import CompaniesPage from "../features/companies/CompaniesPage";
 import ContactsPage from "../features/contacts/ContactsPage.jsx";
@@ -65,6 +67,14 @@ export const router = createBrowserRouter([
           {
             path: "dashboard",
             element: <DashboardPage />,
+          },
+          {
+            path: "profile",
+            element: <MyProfilePage />,
+          },
+          {
+            path: "profile/settings",
+            element: <ProfileSettingsPage />,
           },
           {
             path: "leads",

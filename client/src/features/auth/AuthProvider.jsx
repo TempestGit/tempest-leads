@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import {
+  getMeRequest,
   loginRequest,
   logoutRequest,
 } from "./auth.api";
@@ -48,15 +49,27 @@ const AuthProvider = ({ children }) => {
       setUser(null);
     };
 
-    window.addEventListener("auth:expired", handleExpired);
+    window.addEventListener(
+      "auth:expired",
+      handleExpired
+    );
 
     return () => {
-      window.removeEventListener("auth:expired", handleExpired);
+      window.removeEventListener(
+        "auth:expired",
+        handleExpired
+      );
     };
   }, []);
 
-  const login = useCallback(async ({ email, password }) => {
-    const response = await loginRequest({ email, password });
+  const login = useCallback(async ({
+    email,
+    password,
+  }) => {
+    const response = await loginRequest({
+      email,
+      password,
+    });
 
     const token = response?.data?.accessToken;
     const authenticatedUser = response?.data?.user;
@@ -71,19 +84,34 @@ const AuthProvider = ({ children }) => {
     return authenticatedUser;
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const response = await getMeRequest();
+    const refreshedUser = response?.data?.user;
+
+    if (!refreshedUser) {
+      throw new Error(
+        "Unable to load your profile information."
+      );
+    }
+
+    setUser(refreshedUser);
+    return refreshedUser;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await logoutRequest();
     } catch (error) {
-      console.error("Logout request failed:", error);
+      console.error(
+        "Logout request failed:",
+        error
+      );
     } finally {
       clearAccessToken();
       setUser(null);
     }
   }, []);
 
-  // Used after a successful password change.
-  // The server has already revoked refresh sessions.
   const clearSession = useCallback(() => {
     clearAccessToken();
     setUser(null);
@@ -94,11 +122,14 @@ const AuthProvider = ({ children }) => {
       user,
       initializing,
       authenticated: Boolean(user),
-      mustChangePassword: Boolean(user?.mustChangePassword),
+      mustChangePassword: Boolean(
+        user?.mustChangePassword
+      ),
       login,
       logout,
       clearSession,
       restoreSession,
+      refreshUser,
     }),
     [
       user,
@@ -107,6 +138,7 @@ const AuthProvider = ({ children }) => {
       logout,
       clearSession,
       restoreSession,
+      refreshUser,
     ]
   );
 
