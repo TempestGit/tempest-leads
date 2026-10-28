@@ -27,19 +27,27 @@ import {
 
 /*
 |--------------------------------------------------------------------------
+| Notification Reminder Scheduler
+|--------------------------------------------------------------------------
+*/
+
+import {
+  startNotificationReminderScheduler,
+  stopNotificationReminderScheduler,
+} from "./modules/notifications/notifications.scheduler.js";
+
+/*
+|--------------------------------------------------------------------------
 | Configuration
 |--------------------------------------------------------------------------
 */
 
-const PORT =
-  Number(
-    process.env.PORT ||
-    5000
-  );
+const PORT = Number(
+  process.env.PORT || 5000
+);
 
 const HOST =
-  process.env.HOST ||
-  "0.0.0.0";
+  process.env.HOST || "0.0.0.0";
 
 /*
 |--------------------------------------------------------------------------
@@ -49,57 +57,62 @@ const HOST =
 
 let server = null;
 
+let shuttingDown = false;
+
 /*
 |--------------------------------------------------------------------------
 | Start
 |--------------------------------------------------------------------------
 */
 
-const startServer =
-  async () => {
-    try {
-      /*
-      |--------------------------------------------------------------------------
-      | Database
-      |--------------------------------------------------------------------------
-      */
+const startServer = async () => {
+  try {
+    /*
+    |--------------------------------------------------------------------------
+    | Database
+    |--------------------------------------------------------------------------
+    */
 
-      await testDatabaseConnection();
+    await testDatabaseConnection();
 
-      /*
-      |--------------------------------------------------------------------------
-      | HTTP Server
-      |--------------------------------------------------------------------------
-      */
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP Server
+    |--------------------------------------------------------------------------
+    */
 
-      server =
-        app.listen(
-          PORT,
-          HOST,
-          () => {
-            console.log(
-              `TEMPEST LEADS API running at http://${HOST}:${PORT}`
-            );
-
-            console.log(
-              `Environment: ${
-                process.env.NODE_ENV ||
-                "development"
-              }`
-            );
-          }
+    server = app.listen(
+      PORT,
+      HOST,
+      () => {
+        console.log(
+          `TEMPEST LEADS API running at http://${HOST}:${PORT}`
         );
-    } catch (
-      error
-    ) {
-      console.error(
-        "Failed to start TEMPEST LEADS API:",
-        error
-      );
 
-      process.exit(1);
-    }
-  };
+        console.log(
+          `Environment: ${
+            process.env.NODE_ENV || "development"
+          }`
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Start Notification Reminders
+        |--------------------------------------------------------------------------
+        */
+
+        startNotificationReminderScheduler();
+      }
+    );
+  } catch (error) {
+    console.error(
+      "Failed to start TEMPEST LEADS API:",
+      error
+    );
+
+    process.exit(1);
+  }
+};
 
 /*
 |--------------------------------------------------------------------------
@@ -107,62 +120,69 @@ const startServer =
 |--------------------------------------------------------------------------
 */
 
-const shutdown =
-  async (
-    signal
-  ) => {
+const shutdown = async (signal) => {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
+
+  console.log(
+    `${signal} received. Shutting down...`
+  );
+
+  try {
+    /*
+    |--------------------------------------------------------------------------
+    | Stop Scheduler Before Closing Database
+    |--------------------------------------------------------------------------
+    */
+
+    await stopNotificationReminderScheduler();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Stop HTTP Server
+    |--------------------------------------------------------------------------
+    */
+
+    if (server) {
+      await new Promise(
+        (resolve, reject) => {
+          server.close((error) => {
+            if (error) {
+              reject(error);
+              return;
+            }
+
+            resolve();
+          });
+        }
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Close Database
+    |--------------------------------------------------------------------------
+    */
+
+    await closeDatabase();
+
     console.log(
-      `${signal} received. Shutting down...`
+      "Server shutdown complete."
     );
 
-    try {
-      if (
-        server
-      ) {
-        await new Promise(
-          (
-            resolve,
-            reject
-          ) => {
-            server.close(
-              (
-                error
-              ) => {
-                if (
-                  error
-                ) {
-                  reject(
-                    error
-                  );
-
-                  return;
-                }
-
-                resolve();
-              }
-            );
-          }
-        );
-      }
-
-      await closeDatabase();
-
-      console.log(
-        "Server shutdown complete."
-      );
-
-      process.exit(0);
-    } catch (
+    process.exit(0);
+  } catch (error) {
+    console.error(
+      "Shutdown failed:",
       error
-    ) {
-      console.error(
-        "Shutdown failed:",
-        error
-      );
+    );
 
-      process.exit(1);
-    }
-  };
+    process.exit(1);
+  }
+};
 
 /*
 |--------------------------------------------------------------------------
@@ -172,25 +192,17 @@ const shutdown =
 
 process.on(
   "SIGTERM",
-  () =>
-    shutdown(
-      "SIGTERM"
-    )
+  () => void shutdown("SIGTERM")
 );
 
 process.on(
   "SIGINT",
-  () =>
-    shutdown(
-      "SIGINT"
-    )
+  () => void shutdown("SIGINT")
 );
 
 process.on(
   "unhandledRejection",
-  (
-    reason
-  ) => {
+  (reason) => {
     console.error(
       "Unhandled promise rejection:",
       reason
@@ -200,9 +212,7 @@ process.on(
 
 process.on(
   "uncaughtException",
-  (
-    error
-  ) => {
+  (error) => {
     console.error(
       "Uncaught exception:",
       error

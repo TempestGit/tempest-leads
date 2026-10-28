@@ -1,9 +1,12 @@
 
 import {
   Bell,
+  CheckCheck,
   ChevronDown,
+  LoaderCircle,
   LogOut,
   Menu,
+  RefreshCw,
   Search,
   Settings,
   UserRound,
@@ -23,6 +26,16 @@ import {
 
 import useAuth from "../../features/auth/useAuth";
 
+import {
+  useNotificationsQuery,
+  useMarkNotificationReadMutation,
+  useMarkAllNotificationsReadMutation,
+} from "../../features/notifications/notifications.queries.js";
+
+import {
+  formatNotificationTime,
+} from "../../features/notifications/notificationTime.js";
+
 import "../../features/auth/profile-glass.css";
 
 const getInitials = (name) =>
@@ -33,6 +46,19 @@ const getInitials = (name) =>
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+
+const getErrorMessage = (error, fallback) =>
+  error?.response?.data?.message ||
+  error?.response?.data?.error?.message ||
+  error?.message ||
+  fallback;
+
+const isSafeInternalPath = (value) =>
+  typeof value === "string" &&
+  value.startsWith("/") &&
+  !value.startsWith("//") &&
+  !value.includes("\\") &&
+  !/[\r\n]/.test(value);
 
 export default function Topbar({ onOpenMobile }) {
   const { user, logout } = useAuth();
@@ -50,9 +76,46 @@ export default function Topbar({ onOpenMobile }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const [notificationError, setNotificationError] =
+    useState("");
+  const [notificationBusyId, setNotificationBusyId] =
+    useState(null);
+
+  const notificationsQuery = useNotificationsQuery({
+    filter: "all",
+    page: 1,
+    limit: 10,
+    enabled: Boolean(user?.id),
+  });
+
+  const markReadMutation =
+    useMarkNotificationReadMutation();
+
+  const markAllReadMutation =
+    useMarkAllNotificationsReadMutation();
+
+  const notifications = Array.isArray(
+    notificationsQuery.data?.notifications
+  )
+    ? notificationsQuery.data.notifications
+    : [];
+
+  const unreadCount = Math.max(
+    0,
+    Number(notificationsQuery.data?.unreadCount) || 0
+  );
+
+  const loadingNotifications =
+    notificationsQuery.isFetching;
+
+  const markingAllRead =
+    markAllReadMutation.isPending;
+
+  const notificationBusy =
+    notificationBusyId !== null || markingAllRead;
 
   useEffect(() => {
-    const onKeyDown = (event) => {
+    const handleKeyDown = (event) => {
       if (
         (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === "k"
@@ -68,12 +131,12 @@ export default function Topbar({ onOpenMobile }) {
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
       window.removeEventListener(
         "keydown",
-        onKeyDown
+        handleKeyDown
       );
     };
   }, []);
@@ -81,13 +144,14 @@ export default function Topbar({ onOpenMobile }) {
   useEffect(() => {
     setNotificationsOpen(false);
     setProfileOpen(false);
+    setNotificationError("");
     setLogoutError("");
   }, [location.pathname, location.search]);
 
   useEffect(() => {
     if (!notificationsOpen && !profileOpen) return;
 
-    const onPointerDown = (event) => {
+    const handlePointerDown = (event) => {
       if (
         notificationsOpen &&
         !notificationsRef.current?.contains(event.target)
@@ -105,13 +169,13 @@ export default function Topbar({ onOpenMobile }) {
 
     document.addEventListener(
       "pointerdown",
-      onPointerDown
+      handlePointerDown
     );
 
     return () => {
       document.removeEventListener(
         "pointerdown",
-        onPointerDown
+        handlePointerDown
       );
     };
   }, [notificationsOpen, profileOpen]);
@@ -121,13 +185,10 @@ export default function Topbar({ onOpenMobile }) {
 
     const query = search.trim();
 
-    if (!query) {
-      navigate("/leads");
-      return;
-    }
-
     navigate(
-      `/leads?search=${encodeURIComponent(query)}`
+      query
+        ? `/leads?search=${encodeURIComponent(query)}`
+        : "/leads"
     );
   };
 
@@ -141,18 +202,89 @@ export default function Topbar({ onOpenMobile }) {
       await logout();
 
       setProfileOpen(false);
-
-      navigate("/login", {
-        replace: true,
-      });
+      navigate("/login", { replace: true });
     } catch (error) {
       setLogoutError(
-        error?.response?.data?.message ||
-          error?.message ||
+        getErrorMessage(
+          error,
           "Unable to sign out. Please try again."
+        )
       );
     } finally {
       setLoggingOut(false);
+    }
+  };
+
+  const handleNotificationClick = async (notification) => {
+    if (notificationBusy) return;
+
+    setNotificationBusyId(notification.id);
+    setNotificationError("");
+
+    try {
+      if (!notification.isRead) {
+        await markReadMutation.mutateAsync(
+          notification.id
+        );
+      }
+
+      setNotificationsOpen(false);
+
+      if (isSafeInternalPath(notification.actionUrl)) {
+        navigate(notification.actionUrl);
+      }
+    } catch (error) {
+      setNotificationError(
+        getErrorMessage(
+          error,
+          "Unable to open notification."
+        )
+      );
+    } finally {
+      setNotificationBusyId(null);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    if (notificationBusy || unreadCount === 0) return;
+
+    setNotificationError("");
+
+    try {
+      await markAllReadMutation.mutateAsync();
+    } catch (error) {
+      setNotificationError(
+        getErrorMessage(
+          error,
+          "Unable to mark notifications as read."
+        )
+      );
+    }
+  };
+
+  const handleRefreshNotifications = async () => {
+    setNotificationError("");
+
+    try {
+      const result = await notificationsQuery.refetch({
+        cancelRefetch: true,
+      });
+
+      if (result.error) {
+        setNotificationError(
+          getErrorMessage(
+            result.error,
+            "Unable to refresh notifications."
+          )
+        );
+      }
+    } catch (error) {
+      setNotificationError(
+        getErrorMessage(
+          error,
+          "Unable to refresh notifications."
+        )
+      );
     }
   };
 
@@ -206,47 +338,211 @@ export default function Topbar({ onOpenMobile }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-3">
+        {/* Notifications */}
         <div
           ref={notificationsRef}
           className="relative"
         >
           <button
             type="button"
-            className="glass-topbar-icon"
+            className="glass-topbar-icon relative"
             onClick={() => {
-              setNotificationsOpen(
-                (value) => !value
-              );
+              setNotificationsOpen((current) => !current);
               setProfileOpen(false);
+              setNotificationError("");
             }}
-            aria-label="Notifications"
+            aria-label={`Notifications, ${unreadCount} unread`}
             aria-expanded={notificationsOpen}
+            aria-haspopup="dialog"
           >
             <Bell size={19} />
+
+            {unreadCount > 0 && (
+              <span
+                className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-extrabold"
+                style={{
+                  background: "var(--crm-primary)",
+                  color: "var(--crm-primary-foreground)",
+                }}
+              >
+                {unreadCount > 99
+                  ? "99+"
+                  : unreadCount}
+              </span>
+            )}
           </button>
 
           {notificationsOpen && (
-            <div className="glass-notification-panel">
-              <div className="glass-notification-heading">
-                <h3 className="text-sm font-bold">
-                  Notifications
-                </h3>
+            <div
+              className="glass-notification-panel"
+              role="dialog"
+              aria-label="Notifications"
+            >
+              <div className="glass-notification-heading flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold">
+                    Notifications
+                  </h3>
+
+                  <p className="glass-topbar-muted mt-1 text-xs">
+                    {unreadCount} unread
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRefreshNotifications}
+                    disabled={loadingNotifications}
+                    aria-label="Refresh notifications"
+                    title="Refresh notifications"
+                    className="glass-topbar-icon disabled:opacity-50"
+                  >
+                    <RefreshCw
+                      size={16}
+                      className={
+                        loadingNotifications
+                          ? "animate-spin"
+                          : ""
+                      }
+                    />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleMarkAllRead}
+                    disabled={
+                      unreadCount === 0 ||
+                      notificationBusy
+                    }
+                    aria-label="Mark all notifications as read"
+                    title="Mark all as read"
+                    className="glass-topbar-icon disabled:opacity-50"
+                  >
+                    {markingAllRead ? (
+                      <LoaderCircle
+                        size={16}
+                        className="animate-spin"
+                      />
+                    ) : (
+                      <CheckCheck size={16} />
+                    )}
+                  </button>
+                </div>
               </div>
 
-              <div className="px-5 py-6 text-center">
-                <Bell
-                  size={23}
-                  className="glass-topbar-muted mx-auto"
-                />
-
-                <p className="mt-3 text-sm font-semibold">
-                  No notifications loaded
+              {(notificationError ||
+                notificationsQuery.isError) && (
+                <p
+                  role="alert"
+                  className="tlp-alert tlp-alert-error mx-3 my-3 p-3 text-xs"
+                >
+                  {notificationError ||
+                    getErrorMessage(
+                      notificationsQuery.error,
+                      "Unable to load notifications."
+                    )}
                 </p>
+              )}
 
-                <p className="glass-topbar-muted mt-1 text-xs">
-                  Notifications will appear here
-                  when connected to your API.
-                </p>
+              {notificationsQuery.isPending &&
+                loadingNotifications && (
+                  <div className="flex items-center justify-center gap-2 px-5 py-8 text-sm">
+                    <LoaderCircle
+                      size={18}
+                      className="animate-spin"
+                    />
+                    Loading notifications...
+                  </div>
+                )}
+
+              {!notificationsQuery.isPending &&
+                !notificationsQuery.isError &&
+                notifications.length === 0 && (
+                  <div className="px-5 py-6 text-center">
+                    <Bell
+                      size={23}
+                      className="glass-topbar-muted mx-auto"
+                    />
+
+                    <p className="mt-3 text-sm font-semibold">
+                      No notifications yet
+                    </p>
+
+                    <p className="glass-topbar-muted mt-1 text-xs">
+                      Your CRM notifications will appear here.
+                    </p>
+                  </div>
+                )}
+
+              {notifications.length > 0 && (
+                <div className="max-h-96 overflow-y-auto">
+                  {notifications.map((notification) => (
+                    <button
+                      key={notification.id}
+                      type="button"
+                      disabled={notificationBusy}
+                      onClick={() =>
+                        handleNotificationClick(notification)
+                      }
+                      className="glass-topbar-profile-item flex w-full items-start gap-3 text-left disabled:opacity-50"
+                    >
+                      <span className="mt-1 shrink-0">
+                        {notificationBusyId ===
+                        notification.id ? (
+                          <LoaderCircle
+                            size={17}
+                            className="animate-spin"
+                          />
+                        ) : (
+                          <Bell size={17} />
+                        )}
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="block truncate text-sm font-bold">
+                            {notification.title}
+                          </span>
+
+                          {!notification.isRead && (
+                            <span
+                              className="h-2 w-2 shrink-0 rounded-full"
+                              style={{
+                                background:
+                                  "var(--crm-primary)",
+                              }}
+                            />
+                          )}
+                        </span>
+
+                        <span className="glass-topbar-muted mt-1 block text-xs leading-5">
+                          {notification.message}
+                        </span>
+
+                        <span className="glass-topbar-muted mt-2 block text-[11px]">
+                          {formatNotificationTime(
+                            notification.createdAt
+                          )}
+                          {" IST"}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="glass-notification-heading">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotificationsOpen(false);
+                    navigate("/notifications");
+                  }}
+                  className="glass-topbar-profile-item flex w-full items-center justify-center text-sm font-semibold"
+                >
+                  View all notifications
+                </button>
               </div>
             </div>
           )}
@@ -254,6 +550,7 @@ export default function Topbar({ onOpenMobile }) {
 
         <div className="glass-topbar-divider" />
 
+        {/* Profile */}
         <div
           ref={profileRef}
           className="relative"
@@ -261,9 +558,7 @@ export default function Topbar({ onOpenMobile }) {
           <button
             type="button"
             onClick={() => {
-              setProfileOpen(
-                (value) => !value
-              );
+              setProfileOpen((current) => !current);
               setNotificationsOpen(false);
               setLogoutError("");
             }}
@@ -291,9 +586,7 @@ export default function Topbar({ onOpenMobile }) {
             <ChevronDown
               size={15}
               className={`glass-topbar-muted glass-topbar-user-chevron transition-transform ${
-                profileOpen
-                  ? "rotate-180"
-                  : ""
+                profileOpen ? "rotate-180" : ""
               }`}
               aria-hidden="true"
             />

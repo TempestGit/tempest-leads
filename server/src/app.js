@@ -19,13 +19,12 @@ import briefRoutes from "./modules/briefs/briefs.routes.js";
 import teamAssignmentRoutes from "./modules/teamAssignments/teamAssignments.routes.js";
 import usersRoutes from "./modules/users/users.routes.js";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
+import notificationsRoutes from "./modules/notifications/notifications.routes.js";
 
 import notFoundMiddleware from "./middleware/notFound.middleware.js";
 import errorMiddleware from "./middleware/error.middleware.js";
 
 const app = express();
-
-// Testing
 
 /*
 |--------------------------------------------------------------------------
@@ -95,6 +94,7 @@ app.use("/api/briefs", briefRoutes);
 app.use("/api/team-assignments", teamAssignmentRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
 /*
 |--------------------------------------------------------------------------

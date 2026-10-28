@@ -10,47 +10,16 @@ import {
 |--------------------------------------------------------------------------
 | API Base URL
 |--------------------------------------------------------------------------
-|
-| Development:
-|
-| VITE_API_URL=/api
-|
-| Vite proxies:
-|
-| /api
-|   ↓
-| http://localhost:5000/api
-|
-|
-| Production:
-|
-| VITE_API_URL=/api
-|
-| Netlify proxies:
-|
-| /api
-|   ↓
-| https://tempest-leads-api.onrender.com/api
-|
-|
-| The React application therefore never needs to hardcode the Render URL.
-|
 */
 
-const rawApiUrl =
-  String(
-    import.meta.env
-      .VITE_API_URL ??
-      "/api"
-  ).trim();
+const rawApiUrl = String(
+  import.meta.env.VITE_API_URL ?? "/api"
+).trim();
 
 export const API_BASE_URL =
   rawApiUrl === "/"
     ? "/"
-    : rawApiUrl.replace(
-        /\/+$/,
-        ""
-      );
+    : rawApiUrl.replace(/\/+$/, "");
 
 /*
 |--------------------------------------------------------------------------
@@ -59,408 +28,265 @@ export const API_BASE_URL =
 */
 
 const axiosDefaults = {
-  baseURL:
-    API_BASE_URL,
-
-  withCredentials:
-    true,
-
+  baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
-    Accept:
-      "application/json",
-
-    "Content-Type":
-      "application/json",
+    Accept: "application/json",
+    "Content-Type": "application/json",
   },
+  timeout: 20000,
+};
 
-  timeout:
-    20000,
+const apiClient = axios.create({
+  ...axiosDefaults,
+});
+
+const refreshClient = axios.create({
+  ...axiosDefaults,
+});
+
+/*
+|--------------------------------------------------------------------------
+| Authentication Helpers
+|--------------------------------------------------------------------------
+*/
+
+const AUTH_EXPIRED_EVENT = "auth:expired";
+
+const INVALID_SESSION_CODES = new Set([
+  "SESSION_REVOKED",
+  "INVALID_REFRESH_TOKEN",
+  "REFRESH_TOKEN_EXPIRED",
+  "REFRESH_TOKEN_REUSED",
+  "REFRESH_TOKEN_MISSING",
+  "INVALID_ACCESS_TOKEN",
+]);
+
+const getErrorCode = (error) =>
+  error?.response?.data?.code ||
+  error?.response?.data?.error?.code ||
+  null;
+
+const notifySessionExpired = () => {
+  clearAccessToken();
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new Event(AUTH_EXPIRED_EVENT)
+    );
+  }
 };
 
 /*
 |--------------------------------------------------------------------------
-| Main API Client
+| Refresh State
 |--------------------------------------------------------------------------
-|
-| Used by:
-|
-| /leads
-| /companies
-| /contacts
-| /meetings
-| /followups
-| etc.
-|
 */
 
-const apiClient =
-  axios.create({
-    ...axiosDefaults,
-  });
+let refreshPromise = null;
 
 /*
 |--------------------------------------------------------------------------
-| Refresh-only Client
+| Authentication Generation
 |--------------------------------------------------------------------------
 |
-| IMPORTANT:
+| Incrementing this counter invalidates pending refresh results.
 |
-| This client deliberately does NOT use the main response interceptor.
-|
-| Otherwise:
-|
-| /auth/refresh
-|      ↓
-| 401
-|      ↓
-| interceptor
-|      ↓
-| /auth/refresh
-|
-| would create a refresh loop.
+| Call invalidateAuthSession() when the user explicitly logs out
+| or clears their session.
 |
 */
 
-const refreshClient =
-  axios.create({
-    ...axiosDefaults,
-  });
+let authGeneration = 0;
+
+export const invalidateAuthSession = () => {
+  authGeneration += 1;
+  clearAccessToken();
+};
 
 /*
 |--------------------------------------------------------------------------
 | Attach Access Token
 |--------------------------------------------------------------------------
-|
-| Access token stays in memory.
-|
-| Refresh token stays in the HTTP-only cookie.
-|
 */
 
 apiClient.interceptors.request.use(
   (config) => {
-    const token =
-      getAccessToken();
+    const token = getAccessToken();
 
-    if (!token) {
-      return config;
+    config.headers = config.headers || {};
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      delete config.headers.Authorization;
     }
-
-    config.headers =
-      config.headers ||
-      {};
-
-    config.headers.Authorization =
-      `Bearer ${token}`;
 
     return config;
   },
-
-  (error) => {
-    return Promise.reject(
-      error
-    );
-  }
+  (error) => Promise.reject(error)
 );
 
 /*
 |--------------------------------------------------------------------------
-| Refresh Lock
+| Single-flight Refresh
 |--------------------------------------------------------------------------
-|
-| Example:
-|
-| 5 API requests receive 401 simultaneously.
-|
-| Without lock:
-|
-| 5 refresh requests
-| → refresh-token rotation conflicts
-| → REFRESH_TOKEN_REUSED
-|
-| With lock:
-|
-| Request 1 → refreshes
-| Request 2 → waits
-| Request 3 → waits
-| Request 4 → waits
-| Request 5 → waits
-|
-| Only one refresh request is executed.
-|
 */
 
-let refreshPromise =
-  null;
-
-export const refreshSession =
-  async () => {
-    if (
-      refreshPromise
-    ) {
-      return refreshPromise;
-    }
-
-    refreshPromise =
-      refreshClient
-        .post(
-          "/auth/refresh"
-        )
-        .then(
-          (
-            response
-          ) => {
-            const data =
-              response
-                ?.data
-                ?.data;
-
-            const accessToken =
-              data
-                ?.accessToken;
-
-            if (
-              !accessToken
-            ) {
-              throw new Error(
-                "Refresh response did not contain an access token."
-              );
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Update In-memory Access Token
-            |--------------------------------------------------------------------------
-            */
-
-            setAccessToken(
-              accessToken
-            );
-
-            return data;
-          }
-        )
-        .catch(
-          (
-            error
-          ) => {
-            clearAccessToken();
-
-            throw error;
-          }
-        )
-        .finally(
-          () => {
-            refreshPromise =
-              null;
-          }
-        );
-
+export const refreshSession = async () => {
+  if (refreshPromise) {
     return refreshPromise;
-  };
+  }
+
+  const generationAtStart = authGeneration;
+
+  const promise = refreshClient
+    .post("/auth/refresh")
+    .then((response) => {
+      const data = response?.data?.data;
+      const accessToken = data?.accessToken;
+
+      if (!accessToken) {
+        throw new Error(
+          "Refresh response did not contain an access token."
+        );
+      }
+
+      if (generationAtStart !== authGeneration) {
+        throw new Error(
+          "Authentication session was cleared during refresh."
+        );
+      }
+
+      setAccessToken(accessToken);
+
+      return data;
+    })
+    .catch((error) => {
+      if (generationAtStart === authGeneration) {
+        clearAccessToken();
+      }
+
+      throw error;
+    })
+    .finally(() => {
+      if (refreshPromise === promise) {
+        refreshPromise = null;
+      }
+    });
+
+  refreshPromise = promise;
+
+  return promise;
+};
 
 /*
 |--------------------------------------------------------------------------
 | Response Interceptor
 |--------------------------------------------------------------------------
-|
-| If a normal API request receives 401:
-|
-| 1. Refresh the access token.
-| 2. Replace Authorization header.
-| 3. Retry the original request once.
-|
 */
 
 apiClient.interceptors.response.use(
-  (
-    response
-  ) => {
-    return response;
-  },
+  (response) => response,
 
-  async (
-    error
-  ) => {
-    const originalRequest =
-      error?.config;
+  async (error) => {
+    const originalRequest = error?.config;
+    const status = error?.response?.status;
+    const code = getErrorCode(error);
 
-    const status =
-      error
-        ?.response
-        ?.status;
+    if (status !== 401 || !originalRequest) {
+      return Promise.reject(error);
+    }
+
+    const url = String(originalRequest.url || "");
 
     /*
     |--------------------------------------------------------------------------
-    | Non-authentication Error
+    | Never refresh authentication endpoints.
     |--------------------------------------------------------------------------
     */
 
     if (
-      status !== 401 ||
-      !originalRequest
+      url.includes("/auth/login") ||
+      url.includes("/auth/refresh") ||
+      url.includes("/auth/logout") ||
+      url.includes("/auth/forgot-password") ||
+      url.includes("/auth/reset-password")
     ) {
-      return Promise.reject(
-        error
-      );
-    }
-
-    const url =
-      String(
-        originalRequest
-          ?.url ||
-          ""
-      );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Never Refresh Authentication Endpoints
-    |--------------------------------------------------------------------------
-    |
-    | Login:
-    | Invalid credentials should remain a normal 401.
-    |
-    | Refresh:
-    | Prevent refresh recursion.
-    |
-    | Logout:
-    | Do not try to create another session during logout.
-    |
-    */
-
-    if (
-      url.includes(
-        "/auth/login"
-      ) ||
-      url.includes(
-        "/auth/refresh"
-      ) ||
-      url.includes(
-        "/auth/logout"
-      )
-    ) {
-      return Promise.reject(
-        error
-      );
+      return Promise.reject(error);
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Prevent Retry Loop
+    | Explicitly revoked sessions must not be refreshed.
     |--------------------------------------------------------------------------
     */
 
     if (
-      originalRequest
-        ._retry
+      code === "SESSION_REVOKED" ||
+      code === "REFRESH_TOKEN_REUSED"
     ) {
-      return Promise.reject(
-        error
-      );
+      invalidateAuthSession();
+
+      notifySessionExpired();
+
+      return Promise.reject(error);
     }
 
-    originalRequest
-      ._retry =
-      true;
+    /*
+    |--------------------------------------------------------------------------
+    | Prevent infinite retries.
+    |--------------------------------------------------------------------------
+    */
+
+    if (originalRequest._retry) {
+      if (INVALID_SESSION_CODES.has(code)) {
+        invalidateAuthSession();
+        notifySessionExpired();
+      }
+
+      return Promise.reject(error);
+    }
+
+    originalRequest._retry = true;
+
+    const generationAtStart = authGeneration;
 
     try {
-      /*
-      |--------------------------------------------------------------------------
-      | Refresh Session
-      |--------------------------------------------------------------------------
-      */
+      const session = await refreshSession();
 
-      const session =
-        await refreshSession();
+      if (generationAtStart !== authGeneration) {
+        throw new Error(
+          "Authentication session changed during refresh."
+        );
+      }
 
-      const accessToken =
-        session
-          ?.accessToken;
+      const accessToken = session?.accessToken;
 
-      if (
-        !accessToken
-      ) {
+      if (!accessToken) {
         throw new Error(
           "Unable to restore authenticated session."
         );
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Replace Access Token
-      |--------------------------------------------------------------------------
-      */
-
       originalRequest.headers =
-        originalRequest
-          .headers ||
-        {};
+        originalRequest.headers || {};
 
-      originalRequest
-        .headers
-        .Authorization =
+      originalRequest.headers.Authorization =
         `Bearer ${accessToken}`;
 
-      /*
-      |--------------------------------------------------------------------------
-      | Retry Original Request
-      |--------------------------------------------------------------------------
-      */
-
-      return apiClient(
-        originalRequest
-      );
-    } catch (
-      refreshError
-    ) {
-      /*
-      |--------------------------------------------------------------------------
-      | Refresh Failed
-      |--------------------------------------------------------------------------
-      */
-
-      clearAccessToken();
-
-      /*
-      |--------------------------------------------------------------------------
-      | Inform Auth Provider
-      |--------------------------------------------------------------------------
-      |
-      | AuthProvider / ProtectedRoute can listen for:
-      |
-      | window.addEventListener(
-      |   "auth:expired",
-      |   ...
-      | );
-      |
-      */
-
-      if (
-        typeof window !==
-        "undefined"
-      ) {
-        window.dispatchEvent(
-          new Event(
-            "auth:expired"
-          )
-        );
+      return apiClient(originalRequest);
+    } catch (refreshError) {
+      if (generationAtStart === authGeneration) {
+        invalidateAuthSession();
+        notifySessionExpired();
       }
 
-      return Promise.reject(
-        refreshError
-      );
+      return Promise.reject(refreshError);
     }
   }
 );
 
-/*
-|--------------------------------------------------------------------------
-| Exports
-|--------------------------------------------------------------------------
-*/
-
-export {
-  refreshClient,
-};
+export { refreshClient };
 
 export default apiClient;

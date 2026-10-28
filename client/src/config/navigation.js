@@ -1,6 +1,7 @@
 import {
   Activity,
   BarChart3,
+  Bell,
   BellRing,
   BriefcaseBusiness,
   Building2,
@@ -54,6 +55,11 @@ export const workspaceNavigation = [
     label: "Follow-ups",
     path: "/followups",
     icon: ListChecks,
+  },
+  {
+    label: "Notifications",
+    path: "/notifications",
+    icon: Bell,
   },
 ];
 
