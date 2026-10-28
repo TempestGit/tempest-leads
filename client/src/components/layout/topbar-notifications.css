@@ -1,0 +1,285 @@
+
+/*
+ * Tempest Leads CRM
+ * Topbar Notification Dropdown
+ *
+ * Scoped styling only.
+ * Layout and spacing are handled with Tailwind.
+ */
+
+.glass-notification-dropdown {
+  --gnd-text: var(--crm-heading);
+  --gnd-muted: var(--crm-text);
+  --gnd-primary: var(--crm-primary);
+
+  --gnd-surface: var(--gn-palette-080);
+  --gnd-surface-strong: var(--gn-palette-081);
+
+  --gnd-border: var(--gn-palette-097);
+  --gnd-hover: var(--gn-palette-114);
+  --gnd-unread: var(--gn-palette-075);
+
+  --gnd-primary-soft: var(--gn-palette-019);
+
+  --gnd-warning: var(--gn-palette-055);
+  --gnd-warning-soft: var(--gn-palette-054);
+
+  --gnd-info: var(--gn-palette-020);
+  --gnd-info-soft: var(--gn-palette-019);
+
+  --gnd-danger: var(--gn-palette-093);
+  --gnd-danger-soft: var(--gn-palette-092);
+
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+
+  width: min(390px, calc(100vw - 24px));
+  max-height: min(580px, calc(100dvh - 90px));
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  color: var(--gnd-text);
+  background: var(--gnd-surface);
+
+  border: 1px solid var(--gnd-border);
+  border-radius: 18px;
+
+  box-shadow: 0 16px 48px var(--gn-palette-096);
+
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+
+  z-index: 1000;
+}
+
+/* HEADER */
+
+.glass-notification-dropdown-header {
+  flex-shrink: 0;
+  background: var(--gnd-surface-strong);
+  border-bottom: 1px solid var(--gnd-border);
+}
+
+.glass-notification-muted,
+.glass-notification-time {
+  color: var(--gnd-muted);
+}
+
+.glass-notification-accent {
+  color: var(--gnd-primary);
+}
+
+.glass-notification-unread-count {
+  color: var(--gnd-primary);
+  background: var(--gnd-primary-soft);
+}
+
+.glass-notification-badge {
+  color: var(--crm-primary-foreground);
+  background: var(--crm-primary);
+}
+
+/* HEADER ACTIONS */
+
+.glass-notification-dropdown .glass-notification-action {
+  padding: 0;
+  color: var(--gnd-muted);
+  background: transparent;
+  background-image: none;
+  border: 1px solid transparent;
+  box-shadow: none;
+
+  transition:
+    color 160ms ease,
+    background 160ms ease;
+}
+
+.glass-notification-dropdown .glass-notification-action:hover:not(:disabled) {
+  color: var(--gnd-primary);
+  background: var(--gnd-hover);
+}
+
+.glass-notification-dropdown .glass-notification-action:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* SCROLLABLE LIST */
+
+.glass-notification-list {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: transparent;
+}
+
+.glass-notification-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.glass-notification-list::-webkit-scrollbar-thumb {
+  background: var(--gnd-border);
+  border-radius: 999px;
+}
+
+/* NOTIFICATION ROWS */
+
+.glass-notification-dropdown .glass-notification-item {
+  position: relative;
+
+  width: 100%;
+  margin: 0;
+
+  color: var(--gnd-text);
+  background: transparent;
+  background-image: none;
+
+  border: 0;
+  border-bottom: 1px solid var(--gnd-border);
+  border-radius: 0;
+
+  box-shadow: none;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+
+  cursor: pointer;
+
+  transition: background 160ms ease;
+}
+
+.glass-notification-dropdown .glass-notification-item:last-child {
+  border-bottom: 0;
+}
+
+.glass-notification-dropdown .glass-notification-item:hover:not(:disabled) {
+  background: var(--gnd-hover);
+}
+
+.glass-notification-dropdown .glass-notification-item-unread {
+  background: var(--gnd-unread);
+}
+
+.glass-notification-dropdown .glass-notification-item-unread::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--gnd-primary);
+}
+
+.glass-notification-dropdown .glass-notification-item:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.glass-notification-item-title {
+  display: block;
+  color: var(--gnd-text);
+  overflow-wrap: anywhere;
+}
+
+.glass-notification-dot {
+  background: var(--gnd-primary);
+}
+
+/* CATEGORY ICONS */
+
+.glass-notification-type-icon {
+  border: 1px solid transparent;
+}
+
+.glass-notification-tone-primary {
+  color: var(--gnd-primary);
+  background: var(--gnd-primary-soft);
+}
+
+.glass-notification-tone-warning {
+  color: var(--gnd-warning);
+  background: var(--gnd-warning-soft);
+}
+
+.glass-notification-tone-info {
+  color: var(--gnd-info);
+  background: var(--gnd-info-soft);
+}
+
+.glass-notification-tone-neutral {
+  color: var(--gnd-muted);
+  background: var(--gnd-hover);
+}
+
+/* EMPTY STATE */
+
+.glass-notification-empty-icon {
+  color: var(--gnd-primary);
+  background: var(--gnd-primary-soft);
+  border: 1px solid var(--gnd-border);
+}
+
+/* FOOTER */
+
+.glass-notification-dropdown-footer {
+  flex-shrink: 0;
+  background: var(--gnd-surface-strong);
+  border-top: 1px solid var(--gnd-border);
+}
+
+.glass-notification-dropdown .glass-notification-view-all {
+  color: var(--gnd-primary);
+  background: var(--gnd-primary-soft);
+  background-image: none;
+
+  border: 1px solid transparent;
+  box-shadow: none;
+
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.glass-notification-dropdown .glass-notification-view-all:hover {
+  background: var(--gnd-hover);
+  border-color: var(--gnd-border);
+}
+
+/* ERRORS */
+
+.glass-notification-error {
+  color: var(--gnd-danger);
+  background: var(--gnd-danger-soft);
+  border: 1px solid var(--gnd-border);
+}
+
+/* ACCESSIBILITY */
+
+.glass-notification-dropdown button:focus-visible {
+  outline: 2px solid var(--gnd-primary);
+  outline-offset: -2px;
+}
+
+/* SMALL SCREENS */
+
+@media (max-width: 480px) {
+  .glass-notification-dropdown {
+    width: min(360px, calc(100vw - 20px));
+    right: -64px;
+    max-height: min(520px, calc(100dvh - 85px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-notification-dropdown *,
+  .glass-notification-dropdown *::before,
+  .glass-notification-dropdown *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}

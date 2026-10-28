@@ -1,6 +1,8 @@
 
 import {
+  AlertCircle,
   Bell,
+  CalendarClock,
   Check,
   CheckCheck,
   ChevronLeft,
@@ -10,20 +12,12 @@ import {
   LoaderCircle,
   RefreshCw,
   Trash2,
+  Users,
 } from "lucide-react";
 
-import {
-  useEffect,
-  useState,
-} from "react";
-
-import {
-  useNavigate,
-} from "react-router-dom";
-
-import {
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 
 import useAuth from "../auth/useAuth";
 
@@ -32,8 +26,15 @@ import {
   useNotificationsQuery,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
-  useDeleteNotificationMutation,
 } from "./notifications.queries.js";
+
+import {
+  deleteNotificationRequest,
+} from "./notifications.api.js";
+
+import {
+  clearNotificationsRequest,
+} from "./notifications.api.js";
 
 import {
   formatNotificationTime,
@@ -42,6 +43,7 @@ import {
 import "./notifications-glass.css";
 
 const PAGE_SIZE = 15;
+const CLEAR_PAGE_SIZE = 100;
 
 const FILTERS = [
   { value: "all", label: "All notifications" },
@@ -63,12 +65,86 @@ const isSafeInternalPath = (value) =>
   !/[\r\n]/.test(value);
 
 const normalizeCount = (value, fallback = 0) => {
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+
   const number = Number(value);
 
   return Number.isSafeInteger(number) && number >= 0
     ? number
     : fallback;
 };
+
+const getNotificationMeta = (notification) => {
+  const type = String(
+    notification?.notificationType ||
+      notification?.type ||
+      ""
+  ).toUpperCase();
+
+  if (type.includes("FOLLOWUP") || type.includes("FOLLOW_UP")) {
+    return {
+      label: "Follow-up",
+      Icon: Clock3,
+      tone: "warning",
+    };
+  }
+
+  if (type.includes("MEETING")) {
+    return {
+      label: "Meeting",
+      Icon: CalendarClock,
+      tone: "info",
+    };
+  }
+
+  if (type.includes("LEAD")) {
+    return {
+      label: "Lead",
+      Icon: Users,
+      tone: "primary",
+    };
+  }
+
+  if (
+    type.includes("COMPLETE") ||
+    type.includes("SUCCESS") ||
+    type.includes("APPROVED")
+  ) {
+    return {
+      label: "Activity",
+      Icon: CheckCheck,
+      tone: "success",
+    };
+  }
+
+  return {
+    label: "General",
+    Icon: Bell,
+    tone: "neutral",
+  };
+};
+
+const SummaryCard = ({ label, value, Icon, tone }) => (
+  <div className="gnc-summary-card flex min-w-0 items-center justify-between gap-4 rounded-2xl p-5">
+    <div className="min-w-0">
+      <p className="gnc-muted text-xs font-medium">
+        {label}
+      </p>
+
+      <p className="gnc-heading mt-2 text-3xl font-bold tracking-tight">
+        {value}
+      </p>
+    </div>
+
+    <span
+      className={`gnc-summary-icon gnc-tone-${tone} flex h-11 w-11 shrink-0 items-center justify-center rounded-xl`}
+    >
+      <Icon size={20} strokeWidth={1.8} />
+    </span>
+  </div>
+);
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
@@ -78,6 +154,7 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [busyId, setBusyId] = useState(null);
+  const [clearing, setClearing] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
   const notificationsQuery = useNotificationsQuery({
@@ -92,9 +169,6 @@ export default function NotificationsPage() {
 
   const markAllReadMutation =
     useMarkAllNotificationsReadMutation();
-
-  const deleteMutation =
-    useDeleteNotificationMutation();
 
   const data = notificationsQuery.data;
 
@@ -131,28 +205,30 @@ export default function NotificationsPage() {
         ? null
         : Math.max(0, totalCount - unreadCount);
 
-  const loading =
-    notificationsQuery.isPending &&
-    notificationsQuery.isFetching;
+  const loading = notificationsQuery.isPending;
 
   const refreshing =
     notificationsQuery.isFetching && !loading;
 
   const isBusy =
     busyId !== null ||
-    markAllReadMutation.isPending ||
-    deleteMutation.isPending ||
-    markReadMutation.isPending;
+    clearing ||
+    markReadMutation.isPending ||
+    markAllReadMutation.isPending;
 
   useEffect(() => {
     if (
       !notificationsQuery.isPending &&
+      !notificationsQuery.isError &&
+      !notificationsQuery.isPlaceholderData &&
       page > totalPages
     ) {
       setPage(totalPages);
     }
   }, [
     notificationsQuery.isPending,
+    notificationsQuery.isError,
+    notificationsQuery.isPlaceholderData,
     page,
     totalPages,
   ]);
@@ -179,9 +255,13 @@ export default function NotificationsPage() {
     setFeedback(null);
 
     try {
-      await notificationsQuery.refetch({
+      const result = await notificationsQuery.refetch({
         cancelRefetch: true,
       });
+
+      if (result.error) {
+        throw result.error;
+      }
     } catch (error) {
       setFeedback({
         type: "error",
@@ -216,29 +296,6 @@ export default function NotificationsPage() {
     }
   };
 
-  const handleMarkRead = async (notification) => {
-    if (isBusy || notification.isRead) return;
-
-    setBusyId(notification.id);
-    setFeedback(null);
-
-    try {
-      await markReadMutation.mutateAsync(notification.id);
-
-      setFeedback({
-        type: "success",
-        message: "Notification marked as read.",
-      });
-    } catch (error) {
-      setFeedback({
-        type: "error",
-        message: getErrorMessage(error),
-      });
-    } finally {
-      setBusyId(null);
-    }
-  };
-
   const handleMarkAllRead = async () => {
     if (isBusy || unreadCount === 0) return;
 
@@ -259,81 +316,91 @@ export default function NotificationsPage() {
     }
   };
 
-  const handleDelete = async (notification) => {
-    if (isBusy) return;
+  /*
+   * Clear all notifications using the existing
+   * single-notification delete endpoint.
+   *
+   * A dedicated bulk-delete backend endpoint would be
+   * preferable for larger notification histories.
+   */
+  const handleClearNotifications = async () => {
+    if (isBusy || totalCount === 0) return;
 
     const confirmed = window.confirm(
-      "Delete this notification?"
+      "Are you sure you want to clear all notifications? This action cannot be undone."
     );
 
     if (!confirmed) return;
 
-    setBusyId(notification.id);
+    setClearing(true);
     setFeedback(null);
 
     try {
-      await deleteMutation.mutateAsync(notification.id);
+      const result = await clearNotificationsRequest();
+
+      const deletedCount = Number(
+        result?.deletedCount ?? 0
+      );
+
+      setPage(1);
+      setFilter("all");
+
+      await queryClient.invalidateQueries({
+        queryKey: notificationQueryKeys.all,
+      });
 
       setFeedback({
         type: "success",
-        message: "Notification deleted.",
+        message:
+          deletedCount === 0
+            ? "No notifications to clear."
+            : `${deletedCount} notification${
+                deletedCount === 1 ? "" : "s"
+              } cleared successfully.`,
       });
-
-      if (notifications.length === 1 && page > 1) {
-        setPage((current) => Math.max(1, current - 1));
-      } else {
-        await invalidateNotifications();
-      }
     } catch (error) {
       setFeedback({
         type: "error",
         message: getErrorMessage(error),
       });
     } finally {
-      setBusyId(null);
+      setClearing(false);
     }
   };
 
-  const queryError =
-    notificationsQuery.isError
-      ? getErrorMessage(notificationsQuery.error)
-      : "";
+  const queryError = notificationsQuery.isError
+    ? getErrorMessage(notificationsQuery.error)
+    : "";
 
   return (
-    <div className="tlp-notifications-page mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-      {/* Page header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-4">
-          <div className="tlp-notification-header-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl">
-            <Bell size={25} />
+    <div className="gnc-page mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      {/* HEADER */}
+
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="gnc-heading text-2xl font-bold tracking-tight">
+              Notifications
+            </h1>
+
+            {unreadCount > 0 && (
+              <span className="gnc-header-count inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold">
+                {unreadCount} unread
+              </span>
+            )}
           </div>
 
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-                Notifications
-              </h1>
-
-              {unreadCount > 0 && (
-                <span className="tlp-notification-count rounded-full px-2.5 py-1 text-xs font-bold">
-                  {unreadCount} new
-                </span>
-              )}
-            </div>
-
-            <p className="tlp-notification-muted mt-1 text-sm">
-              Stay informed about leads, meetings,
-              follow-ups and CRM activity.
-            </p>
-          </div>
+          <p className="gnc-muted mt-1 text-sm">
+            Manage your CRM alerts and activity updates.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleRefresh}
-            disabled={notificationsQuery.isFetching}
-            className="tlp-notification-button inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+            disabled={notificationsQuery.isFetching || isBusy}
+            className="gnc-btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
           >
             <RefreshCw
               size={16}
@@ -350,7 +417,7 @@ export default function NotificationsPage() {
             type="button"
             onClick={handleMarkAllRead}
             disabled={isBusy || unreadCount === 0}
-            className="tlp-notification-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+            className="gnc-btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
           >
             {markAllReadMutation.isPending ? (
               <LoaderCircle
@@ -360,251 +427,260 @@ export default function NotificationsPage() {
             ) : (
               <CheckCheck size={16} />
             )}
+            Mark all as read
+          </button>
 
-            Mark all read
+          <button
+            type="button"
+            onClick={handleClearNotifications}
+            disabled={isBusy || totalCount === 0}
+            className="gnc-btn-danger inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+          >
+            {clearing ? (
+              <LoaderCircle
+                size={16}
+                className="animate-spin"
+              />
+            ) : (
+              <Trash2 size={16} />
+            )}
+
+            {clearing
+              ? "Clearing..."
+              : "Clear Notifications"}
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="tlp-notification-stat flex items-center gap-4 rounded-2xl p-4">
-          <span className="tlp-notification-stat-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
-            <Inbox size={20} />
-          </span>
+      {/* SUMMARY CARDS */}
 
-          <div>
-            <p className="tlp-notification-muted text-xs font-semibold">
-              Total notifications
-            </p>
+      {/* <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <SummaryCard
+          label="Total notifications"
+          value={totalCount ?? "—"}
+          Icon={Inbox}
+          tone="primary"
+        />
 
-            <p className="mt-1 text-2xl font-extrabold">
-              {totalCount ?? "—"}
-            </p>
-          </div>
+        <SummaryCard
+          label="Unread notifications"
+          value={unreadCount}
+          Icon={Bell}
+          tone="warning"
+        />
+
+        <SummaryCard
+          label="Read notifications"
+          value={readCount ?? "—"}
+          Icon={CheckCheck}
+          tone="success"
+        />
+      </div> */}
+
+      {/* FEEDBACK */}
+
+      {feedback?.type === "success" && (
+        <div
+          role="status"
+          className="gnc-feedback-success flex items-center gap-2 rounded-xl px-4 py-3 text-sm"
+        >
+          <Check size={17} />
+          {feedback.message}
         </div>
+      )}
 
-        <div className="tlp-notification-stat flex items-center gap-4 rounded-2xl p-4">
-          <span className="tlp-notification-stat-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
-            <Bell size={20} />
+      {(queryError || feedback?.type === "error") && (
+        <div
+          role="alert"
+          className="gnc-feedback-error flex items-start gap-3 rounded-xl px-4 py-3 text-sm"
+        >
+          <AlertCircle size={18} className="mt-0.5 shrink-0" />
+
+          <span>
+            {feedback?.type === "error"
+              ? feedback.message
+              : queryError}
           </span>
-
-          <div>
-            <p className="tlp-notification-muted text-xs font-semibold">
-              Unread
-            </p>
-
-            <p className="mt-1 text-2xl font-extrabold">
-              {unreadCount}
-            </p>
-          </div>
         </div>
+      )}
 
-        <div className="tlp-notification-stat flex items-center gap-4 rounded-2xl p-4">
-          <span className="tlp-notification-stat-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
-            <CheckCheck size={20} />
-          </span>
+      {/* NOTIFICATION INBOX */}
 
+      <section className="gnc-inbox overflow-hidden rounded-2xl">
+        <div className="gnc-inbox-toolbar flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
           <div>
-            <p className="tlp-notification-muted text-xs font-semibold">
-              Read
+            <h2 className="gnc-heading text-base font-semibold">
+              Notification inbox
+            </h2>
+
+            <p className="gnc-muted mt-1 text-xs">
+              Your recent updates in one place
             </p>
-
-            <p className="mt-1 text-2xl font-extrabold">
-              {readCount ?? "—"}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Notification list */}
-      <section className="tlp-notification-panel overflow-hidden rounded-2xl">
-        <div className="tlp-notification-toolbar flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
-          <div
-            className="flex flex-wrap items-center gap-2"
-            role="group"
-            aria-label="Notification filters"
-          >
-            {FILTERS.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => changeFilter(item.value)}
-                aria-pressed={filter === item.value}
-                className={`tlp-notification-filter rounded-xl px-4 py-2 text-sm font-semibold ${
-                  filter === item.value ? "is-active" : ""
-                }`}
-              >
-                {item.label}
-
-                {item.value === "unread" &&
-                  unreadCount > 0 && (
-                    <span className="tlp-notification-filter-count ml-2 rounded-full px-2 py-0.5 text-xs">
-                      {unreadCount}
-                    </span>
-                  )}
-              </button>
-            ))}
           </div>
 
           <div className="flex items-center gap-2">
             {refreshing && (
               <RefreshCw
                 size={14}
-                className="tlp-notification-muted animate-spin"
+                className="gnc-accent animate-spin"
               />
             )}
 
-            <span className="tlp-notification-muted text-xs font-medium">
-              {filteredTotal} notifications
+            <span className="gnc-muted text-xs font-medium">
+              {filteredTotal} results
             </span>
           </div>
         </div>
 
-        {(queryError || feedback?.type === "error") && (
-          <div
-            role="alert"
-            className="tlp-notification-error mx-4 my-3 rounded-xl p-4 text-sm"
-          >
-            {feedback?.type === "error"
-              ? feedback.message
-              : queryError}
-          </div>
-        )}
+        {/* FILTER TABS */}
 
-        {feedback?.type === "success" && (
-          <div
-            role="status"
-            className="tlp-notification-success mx-4 my-3 rounded-xl p-4 text-sm"
-          >
-            {feedback.message}
-          </div>
-        )}
+        <div
+          className="gnc-tabs mt-4 flex items-center gap-6 overflow-x-auto px-5 sm:px-6"
+          role="group"
+          aria-label="Notification filters"
+        >
+          {FILTERS.map((item) => {
+            const active = filter === item.value;
+
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => changeFilter(item.value)}
+                aria-pressed={active}
+                className={`gnc-tab ${
+                  active ? "gnc-tab-active" : ""
+                } inline-flex shrink-0 items-center gap-2 pb-3 text-sm font-medium`}
+              >
+                {item.label}
+
+                {item.value === "unread" && unreadCount > 0 && (
+                  <span className="gnc-tab-count inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* LOADING */}
 
         {loading && (
           <div className="flex flex-col items-center justify-center gap-3 px-6 py-20">
             <LoaderCircle
               size={25}
-              className="tlp-notification-muted animate-spin"
+              className="gnc-accent animate-spin"
             />
 
-            <p className="tlp-notification-muted text-sm">
-              Loading your notifications...
+            <p className="gnc-muted text-sm">
+              Loading notifications...
             </p>
           </div>
         )}
+
+        {/* EMPTY STATE */}
 
         {!loading &&
           !notificationsQuery.isError &&
           notifications.length === 0 && (
             <div className="flex flex-col items-center px-6 py-20 text-center">
-              <div className="tlp-notification-empty-icon flex h-20 w-20 items-center justify-center rounded-3xl">
-                <Inbox size={34} />
-              </div>
+              <span className="gnc-empty-icon flex h-16 w-16 items-center justify-center rounded-2xl">
+                <Inbox size={28} />
+              </span>
 
-              <h2 className="mt-5 text-lg font-bold">
+              <h3 className="gnc-heading mt-5 text-base font-semibold">
                 {filter === "unread"
-                  ? "You're all caught up!"
+                  ? "You're all caught up"
                   : filter === "read"
                     ? "No read notifications"
                     : "No notifications yet"}
-              </h2>
+              </h3>
 
-              <p className="tlp-notification-muted mt-2 max-w-md text-sm leading-6">
+              <p className="gnc-muted mt-2 max-w-sm text-sm leading-6">
                 {filter === "unread"
-                  ? "You don't have any unread notifications right now."
+                  ? "There are no unread notifications at the moment."
                   : filter === "read"
-                    ? "Notifications you've opened will appear here."
-                    : "Updates about your CRM activity will appear here."}
+                    ? "Notifications you open will appear here."
+                    : "Your CRM notifications will appear here when activity occurs."}
               </p>
             </div>
           )}
 
+        {/* NOTIFICATION ROWS */}
+
         {!loading && notifications.length > 0 && (
-          <div className="flex flex-col gap-3 p-3 sm:p-4">
-            {notifications.map((notification) => (
-              <article
-                key={notification.id}
-                className={`tlp-notification-item flex flex-col gap-4 rounded-2xl p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5 ${
-                  notification.isRead ? "" : "is-unread"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleOpen(notification)}
-                  disabled={isBusy}
-                  className="flex min-w-0 flex-1 items-start gap-4 text-left disabled:opacity-50"
+          <div className="gnc-rows">
+            {notifications.map((notification) => {
+              const meta = getNotificationMeta(notification);
+              const Icon = meta.Icon;
+              const unread = !notification.isRead;
+              const rowBusy = busyId === notification.id;
+
+              return (
+                <article
+                  key={notification.id}
+                  className={`gnc-row ${
+                    unread ? "gnc-row-unread" : ""
+                  } flex items-start gap-3 px-4 py-4 sm:gap-4 sm:px-6`}
                 >
-                  <span className="tlp-notification-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
-                    {busyId === notification.id ? (
-                      <LoaderCircle
-                        size={19}
-                        className="animate-spin"
-                      />
-                    ) : (
-                      <Bell size={19} />
-                    )}
+                  <span
+                    className={`gnc-row-icon gnc-tone-${meta.tone} mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl`}
+                  >
+                    <Icon size={18} strokeWidth={1.8} />
                   </span>
-
-                  <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-bold sm:text-base">
-                        {notification.title}
-                      </span>
-
-                      {!notification.isRead && (
-                        <span className="tlp-notification-unread-dot h-2 w-2 shrink-0 rounded-full" />
-                      )}
-                    </span>
-
-                    <span className="tlp-notification-muted mt-1.5 block text-sm leading-6">
-                      {notification.message}
-                    </span>
-
-                    <span className="tlp-notification-muted mt-3 flex items-center gap-1.5 text-xs">
-                      <Clock3 size={13} />
-
-                      {formatNotificationTime(
-                        notification.createdAt
-                      )}
-
-                      <span>IST</span>
-                    </span>
-                  </span>
-                </button>
-
-                <div className="flex shrink-0 items-center gap-2 self-end sm:self-start">
-                  {!notification.isRead && (
-                    <button
-                      type="button"
-                      onClick={() => handleMarkRead(notification)}
-                      disabled={isBusy}
-                      title="Mark as read"
-                      aria-label="Mark as read"
-                      className="tlp-notification-button rounded-xl p-2.5 disabled:opacity-50"
-                    >
-                      <Check size={17} />
-                    </button>
-                  )}
 
                   <button
                     type="button"
-                    onClick={() => handleDelete(notification)}
+                    onClick={() => handleOpen(notification)}
                     disabled={isBusy}
-                    title="Delete notification"
-                    aria-label="Delete notification"
-                    className="tlp-notification-button tlp-notification-delete rounded-xl p-2.5 disabled:opacity-50"
+                    className="gnc-row-content min-w-0 flex-1 text-left"
                   >
-                    <Trash2 size={17} />
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="gnc-row-title text-sm font-semibold leading-6">
+                        {notification.title}
+                      </span>
+
+                      {unread && (
+                        <span className="gnc-unread-dot h-2 w-2 shrink-0 rounded-full" />
+                      )}
+                    </span>
+
+                    <span className="gnc-row-message mt-1 block text-sm leading-6">
+                      {notification.message}
+                    </span>
+
+                    <span className="mt-2.5 flex flex-wrap items-center gap-3">
+                      <span className="gnc-category inline-flex items-center rounded-md px-2 py-1 text-xs font-medium">
+                        {meta.label}
+                      </span>
+
+                      <span className="gnc-row-time inline-flex items-center gap-1.5 text-xs">
+                        <Clock3 size={12} />
+                        {formatNotificationTime(
+                          notification.createdAt
+                        )}{" "}
+                        IST
+                      </span>
+                    </span>
                   </button>
-                </div>
-              </article>
-            ))}
+
+                  {rowBusy && (
+                    <LoaderCircle
+                      size={17}
+                      className="gnc-accent mt-2 shrink-0 animate-spin"
+                    />
+                  )}
+                </article>
+              );
+            })}
           </div>
         )}
 
-        <div className="tlp-notification-footer flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
-          <p className="tlp-notification-muted text-xs">
+        {/* PAGINATION */}
+
+        <footer className="gnc-pagination flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-6">
+          <p className="gnc-muted text-xs">
             Page {page} of {totalPages}
             {" · "}
             {filteredTotal} notifications
@@ -621,11 +697,15 @@ export default function NotificationsPage() {
               onClick={() =>
                 setPage((current) => Math.max(1, current - 1))
               }
-              className="tlp-notification-button rounded-xl p-2.5 disabled:opacity-40"
+              className="gnc-page-btn flex h-9 w-9 items-center justify-center rounded-lg"
               aria-label="Previous page"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={17} />
             </button>
+
+            <span className="gnc-muted min-w-10 text-center text-xs font-medium">
+              {page} / {totalPages}
+            </span>
 
             <button
               type="button"
@@ -637,13 +717,13 @@ export default function NotificationsPage() {
               onClick={() =>
                 setPage((current) => current + 1)
               }
-              className="tlp-notification-button rounded-xl p-2.5 disabled:opacity-40"
+              className="gnc-page-btn flex h-9 w-9 items-center justify-center rounded-lg"
               aria-label="Next page"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={17} />
             </button>
           </div>
-        </div>
+        </footer>
       </section>
     </div>
   );

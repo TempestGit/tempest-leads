@@ -56,11 +56,11 @@ export const workspaceNavigation = [
     path: "/followups",
     icon: ListChecks,
   },
-  {
-    label: "Notifications",
-    path: "/notifications",
-    icon: Bell,
-  },
+  // {
+  //   label: "Notifications",
+  //   path: "/notifications",
+  //   icon: Bell,
+  // },
 ];
 
 export const lifecycleNavigation = [

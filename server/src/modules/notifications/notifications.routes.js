@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 
 import authMiddleware from "../../middleware/auth.middleware.js";
@@ -8,6 +7,7 @@ import {
   markNotificationReadController,
   markAllNotificationsReadController,
   deleteNotificationController,
+  clearNotificationsController,
 } from "./notifications.controller.js";
 
 const router = Router();
@@ -33,6 +33,13 @@ router.patch(
   asyncRoute(markNotificationReadController)
 );
 
+// Clear all notifications for the logged-in user.
+router.delete(
+  "/",
+  asyncRoute(clearNotificationsController)
+);
+
+// Keep individual deletion for existing consumers.
 router.delete(
   "/:notificationId",
   asyncRoute(deleteNotificationController)

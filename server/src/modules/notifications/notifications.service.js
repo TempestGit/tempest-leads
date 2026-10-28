@@ -1,4 +1,3 @@
-
 import ApiError from "../../utils/ApiError.js";
 
 import {
@@ -7,6 +6,7 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
   deleteNotification,
+  clearNotifications,
 } from "./notifications.repository.js";
 
 const allowedTypes = new Set([
@@ -39,11 +39,15 @@ export const createNotificationService = async (
     !Number.isSafeInteger(Number(recipientUserId)) ||
     Number(recipientUserId) <= 0
   ) {
-    throw new Error("A valid notification recipient is required.");
+    throw new Error(
+      "A valid notification recipient is required."
+    );
   }
 
   if (!allowedTypes.has(type)) {
-    throw new Error(`Unsupported notification type: ${type}`);
+    throw new Error(
+      `Unsupported notification type: ${type}`
+    );
   }
 
   const normalizedTitle = String(title ?? "").trim();
@@ -157,4 +161,14 @@ export const deleteNotificationService = async ({
   }
 
   return { deleted: true };
+};
+
+export const clearNotificationsService = async (
+  userId
+) => {
+  const deletedCount = await clearNotifications(userId);
+
+  return {
+    deletedCount,
+  };
 };

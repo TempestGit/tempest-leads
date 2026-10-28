@@ -1,4 +1,3 @@
-
 import pool from "../../config/db.js";
 
 const dbFor = (connection) => connection || pool;
@@ -212,4 +211,20 @@ export const deleteNotification = async ({
   );
 
   return result.affectedRows > 0;
+};
+
+/*
+ * Bulk-delete notifications belonging to the
+ * authenticated user only.
+ */
+export const clearNotifications = async (userId) => {
+  const [result] = await pool.query(
+    `
+      DELETE FROM notifications
+      WHERE user_id = ?
+    `,
+    [userId]
+  );
+
+  return result.affectedRows;
 };

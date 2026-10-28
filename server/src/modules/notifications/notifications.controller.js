@@ -1,9 +1,9 @@
-
 import {
   getNotificationsService,
   markNotificationReadService,
   markAllNotificationsReadService,
   deleteNotificationService,
+  clearNotificationsService,
 } from "./notifications.service.js";
 
 import ApiError from "../../utils/ApiError.js";
@@ -103,6 +103,26 @@ export const deleteNotificationController = async (
   res.status(200).json({
     success: true,
     message: "Notification deleted.",
+    data,
+  });
+};
+
+export const clearNotificationsController = async (
+  req,
+  res
+) => {
+  const data = await clearNotificationsService(
+    req.user.id
+  );
+
+  res.status(200).json({
+    success: true,
+    message:
+      data.deletedCount === 0
+        ? "No notifications to clear."
+        : `${data.deletedCount} notification${
+            data.deletedCount === 1 ? "" : "s"
+          } cleared successfully.`,
     data,
   });
 };

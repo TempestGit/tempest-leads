@@ -1,4 +1,3 @@
-
 import apiClient from "../../lib/apiClient.js";
 
 const BASE_URL = "/notifications";
@@ -37,19 +36,26 @@ export const getNotificationsRequest = ({
         ? normalizedFilter
         : "all",
       page: positiveInteger(page, 1),
-      limit: Math.min(MAX_LIMIT, positiveInteger(limit, 20)),
+      limit: Math.min(
+        MAX_LIMIT,
+        positiveInteger(limit, 20)
+      ),
     },
     ...(signal ? { signal } : {}),
   });
 };
 
-export const getUnreadNotificationsRequest = (options = {}) =>
+export const getUnreadNotificationsRequest = (
+  options = {}
+) =>
   getNotificationsRequest({
     ...options,
     filter: "unread",
   });
 
-export const getReadNotificationsRequest = (options = {}) =>
+export const getReadNotificationsRequest = (
+  options = {}
+) =>
   getNotificationsRequest({
     ...options,
     filter: "read",
@@ -68,8 +74,13 @@ export const getUnreadNotificationCountRequest = async ({
 
   const unreadCount = Number(data?.unreadCount);
 
-  if (!Number.isSafeInteger(unreadCount) || unreadCount < 0) {
-    throw new Error("Invalid unread notification count.");
+  if (
+    !Number.isSafeInteger(unreadCount) ||
+    unreadCount < 0
+  ) {
+    throw new Error(
+      "Invalid unread notification count."
+    );
   }
 
   return { unreadCount };
@@ -77,7 +88,9 @@ export const getUnreadNotificationCountRequest = async ({
 
 export const markNotificationReadRequest = (id) =>
   apiClient.patch(
-    `${BASE_URL}/${encodeURIComponent(validateId(id))}/read`
+    `${BASE_URL}/${encodeURIComponent(
+      validateId(id)
+    )}/read`
   );
 
 export const markAllNotificationsReadRequest = () =>
@@ -85,13 +98,38 @@ export const markAllNotificationsReadRequest = () =>
 
 export const deleteNotificationRequest = (id) =>
   apiClient.delete(
-    `${BASE_URL}/${encodeURIComponent(validateId(id))}`
+    `${BASE_URL}/${encodeURIComponent(
+      validateId(id)
+    )}`
   );
 
-// Compatibility aliases for existing React Query consumers.
+/*
+ * New bulk-clear API.
+ *
+ * DELETE /api/notifications
+ *
+ * Response:
+ * {
+ *   success: true,
+ *   message: "...",
+ *   data: {
+ *     deletedCount: 3
+ *   }
+ * }
+ */
+export const clearNotificationsRequest = async () => {
+  const response = await apiClient.delete(BASE_URL);
+
+  return response?.data?.data ?? response?.data;
+};
+
+// Compatibility aliases for existing consumers.
+
 export const getNotifications = async (options = {}) => {
   const response = await getNotificationsRequest({
-    filter: options.unreadOnly ? "unread" : options.filter,
+    filter: options.unreadOnly
+      ? "unread"
+      : options.filter,
     page: options.page,
     limit: options.limit,
     signal: options.signal,
@@ -100,14 +138,19 @@ export const getNotifications = async (options = {}) => {
   return response.data?.data ?? response.data;
 };
 
-export const getUnreadNotificationCount = async (options = {}) =>
-  getUnreadNotificationCountRequest(options);
+export const getUnreadNotificationCount = async (
+  options = {}
+) => getUnreadNotificationCountRequest(options);
 
-export const markNotificationAsRead = ({ notificationId }) =>
-  markNotificationReadRequest(notificationId);
+export const markNotificationAsRead = ({
+  notificationId,
+}) => markNotificationReadRequest(notificationId);
 
 export const markAllNotificationsAsRead = () =>
   markAllNotificationsReadRequest();
+
+export const clearAllNotifications = () =>
+  clearNotificationsRequest();
 
 export default {
   getNotificationsRequest,
@@ -117,8 +160,10 @@ export default {
   markNotificationReadRequest,
   markAllNotificationsReadRequest,
   deleteNotificationRequest,
+  clearNotificationsRequest,
   getNotifications,
   getUnreadNotificationCount,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  clearAllNotifications,
 };

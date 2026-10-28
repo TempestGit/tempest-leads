@@ -1,8 +1,11 @@
 
 import {
   Bell,
+  CalendarClock,
   CheckCheck,
   ChevronDown,
+  Clock3,
+  Inbox,
   LoaderCircle,
   LogOut,
   Menu,
@@ -10,6 +13,7 @@ import {
   Search,
   Settings,
   UserRound,
+  Users,
   X,
 } from "lucide-react";
 
@@ -37,6 +41,7 @@ import {
 } from "../../features/notifications/notificationTime.js";
 
 import "../../features/auth/profile-glass.css";
+import "./topbar-notifications.css";
 
 const getInitials = (name) =>
   String(name || "User")
@@ -60,6 +65,43 @@ const isSafeInternalPath = (value) =>
   !value.includes("\\") &&
   !/[\r\n]/.test(value);
 
+const getNotificationMeta = (notification) => {
+  const type = String(
+    notification?.notificationType ||
+      notification?.type ||
+      ""
+  ).toUpperCase();
+
+  if (
+    type.includes("FOLLOWUP") ||
+    type.includes("FOLLOW_UP")
+  ) {
+    return {
+      Icon: Clock3,
+      tone: "warning",
+    };
+  }
+
+  if (type.includes("MEETING")) {
+    return {
+      Icon: CalendarClock,
+      tone: "info",
+    };
+  }
+
+  if (type.includes("LEAD")) {
+    return {
+      Icon: Users,
+      tone: "primary",
+    };
+  }
+
+  return {
+    Icon: Bell,
+    tone: "neutral",
+  };
+};
+
 export default function Topbar({ onOpenMobile }) {
   const { user, logout } = useAuth();
 
@@ -82,7 +124,7 @@ export default function Topbar({ onOpenMobile }) {
     useState(null);
 
   const notificationsQuery = useNotificationsQuery({
-    filter: "all",
+    filter: "unread",
     page: 1,
     limit: 10,
     enabled: Boolean(user?.id),
@@ -97,7 +139,9 @@ export default function Topbar({ onOpenMobile }) {
   const notifications = Array.isArray(
     notificationsQuery.data?.notifications
   )
-    ? notificationsQuery.data.notifications
+    ? notificationsQuery.data.notifications.filter(
+        (notification) => !notification.isRead
+      )
     : [];
 
   const unreadCount = Math.max(
@@ -112,7 +156,8 @@ export default function Topbar({ onOpenMobile }) {
     markAllReadMutation.isPending;
 
   const notificationBusy =
-    notificationBusyId !== null || markingAllRead;
+    notificationBusyId !== null ||
+    markingAllRead;
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -271,12 +316,7 @@ export default function Topbar({ onOpenMobile }) {
       });
 
       if (result.error) {
-        setNotificationError(
-          getErrorMessage(
-            result.error,
-            "Unable to refresh notifications."
-          )
-        );
+        throw result.error;
       }
     } catch (error) {
       setNotificationError(
@@ -338,7 +378,8 @@ export default function Topbar({ onOpenMobile }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-3">
-        {/* Notifications */}
+        {/* NOTIFICATIONS */}
+
         <div
           ref={notificationsRef}
           className="relative"
@@ -358,13 +399,7 @@ export default function Topbar({ onOpenMobile }) {
             <Bell size={19} />
 
             {unreadCount > 0 && (
-              <span
-                className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-extrabold"
-                style={{
-                  background: "var(--crm-primary)",
-                  color: "var(--crm-primary-foreground)",
-                }}
-              >
+              <span className="glass-notification-badge absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-extrabold">
                 {unreadCount > 99
                   ? "99+"
                   : unreadCount}
@@ -374,29 +409,46 @@ export default function Topbar({ onOpenMobile }) {
 
           {notificationsOpen && (
             <div
-              className="glass-notification-panel"
+              className="glass-notification-panel glass-notification-dropdown"
               role="dialog"
               aria-label="Notifications"
             >
-              <div className="glass-notification-heading flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold">
-                    Notifications
-                  </h3>
+              {/* DROPDOWN HEADER */}
 
-                  <p className="glass-topbar-muted mt-1 text-xs">
-                    {unreadCount} unread
+              <div className="glass-notification-dropdown-header flex items-center justify-between gap-3 px-4 py-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold">
+                      Notifications
+                    </h3>
+
+                    {unreadCount > 0 && (
+                      <span className="glass-notification-unread-count rounded-full px-2 py-0.5 text-[11px] font-semibold">
+                        {unreadCount} new
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="glass-notification-muted mt-1 text-xs">
+                    {unreadCount === 0
+                      ? "You're all caught up"
+                      : `${unreadCount} unread notification${
+                          unreadCount === 1 ? "" : "s"
+                        }`}
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
                     onClick={handleRefreshNotifications}
-                    disabled={loadingNotifications}
+                    disabled={
+                      loadingNotifications ||
+                      notificationBusy
+                    }
                     aria-label="Refresh notifications"
                     title="Refresh notifications"
-                    className="glass-topbar-icon disabled:opacity-50"
+                    className="glass-notification-action flex h-9 w-9 items-center justify-center rounded-lg"
                   >
                     <RefreshCw
                       size={16}
@@ -417,7 +469,7 @@ export default function Topbar({ onOpenMobile }) {
                     }
                     aria-label="Mark all notifications as read"
                     title="Mark all as read"
-                    className="glass-topbar-icon disabled:opacity-50"
+                    className="glass-notification-action flex h-9 w-9 items-center justify-center rounded-lg"
                   >
                     {markingAllRead ? (
                       <LoaderCircle
@@ -431,53 +483,63 @@ export default function Topbar({ onOpenMobile }) {
                 </div>
               </div>
 
+              {/* ERROR MESSAGE */}
+
               {(notificationError ||
                 notificationsQuery.isError) && (
-                <p
+                <div
                   role="alert"
-                  className="tlp-alert tlp-alert-error mx-3 my-3 p-3 text-xs"
+                  className="glass-notification-error mx-3 my-3 rounded-lg p-3 text-xs"
                 >
                   {notificationError ||
                     getErrorMessage(
                       notificationsQuery.error,
                       "Unable to load notifications."
                     )}
-                </p>
+                </div>
               )}
 
-              {notificationsQuery.isPending &&
-                loadingNotifications && (
-                  <div className="flex items-center justify-center gap-2 px-5 py-8 text-sm">
-                    <LoaderCircle
-                      size={18}
-                      className="animate-spin"
-                    />
-                    Loading notifications...
-                  </div>
-                )}
+              {/* NOTIFICATION LIST */}
 
-              {!notificationsQuery.isPending &&
-                !notificationsQuery.isError &&
-                notifications.length === 0 && (
-                  <div className="px-5 py-6 text-center">
-                    <Bell
-                      size={23}
-                      className="glass-topbar-muted mx-auto"
-                    />
+              <div className="glass-notification-list">
+                {notificationsQuery.isPending &&
+                  loadingNotifications && (
+                    <div className="flex flex-col items-center justify-center gap-3 px-5 py-12">
+                      <LoaderCircle
+                        size={22}
+                        className="glass-notification-accent animate-spin"
+                      />
 
-                    <p className="mt-3 text-sm font-semibold">
-                      No notifications yet
-                    </p>
+                      <p className="glass-notification-muted text-xs">
+                        Loading notifications...
+                      </p>
+                    </div>
+                  )}
 
-                    <p className="glass-topbar-muted mt-1 text-xs">
-                      Your CRM notifications will appear here.
-                    </p>
-                  </div>
-                )}
+                {!notificationsQuery.isPending &&
+                  !notificationsQuery.isError &&
+                  notifications.length === 0 && (
+                    <div className="flex flex-col items-center px-6 py-12 text-center">
+                      <span className="glass-notification-empty-icon flex h-12 w-12 items-center justify-center rounded-xl">
+                        <Inbox size={23} />
+                      </span>
 
-              {notifications.length > 0 && (
-                <div className="max-h-96 overflow-y-auto">
-                  {notifications.map((notification) => (
+                      <p className="mt-4 text-sm font-semibold">
+                        No notifications yet
+                      </p>
+
+                      <p className="glass-notification-muted mt-1 text-xs leading-5">
+                        Your CRM activity updates will appear here.
+                      </p>
+                    </div>
+                  )}
+
+                {notifications.map((notification) => {
+                  const meta = getNotificationMeta(notification);
+                  const Icon = meta.Icon;
+                  const unread = !notification.isRead;
+
+                  return (
                     <button
                       key={notification.id}
                       type="button"
@@ -485,61 +547,62 @@ export default function Topbar({ onOpenMobile }) {
                       onClick={() =>
                         handleNotificationClick(notification)
                       }
-                      className="glass-topbar-profile-item flex w-full items-start gap-3 text-left disabled:opacity-50"
+                      className={`glass-notification-item ${
+                        unread
+                          ? "glass-notification-item-unread"
+                          : ""
+                      } flex w-full items-start gap-3 px-4 py-3.5 text-left`}
                     >
-                      <span className="mt-1 shrink-0">
-                        {notificationBusyId ===
-                        notification.id ? (
+                      <span
+                        className={`glass-notification-type-icon glass-notification-tone-${meta.tone} flex h-9 w-9 shrink-0 items-center justify-center rounded-lg`}
+                      >
+                        {notificationBusyId === notification.id ? (
                           <LoaderCircle
                             size={17}
                             className="animate-spin"
                           />
                         ) : (
-                          <Bell size={17} />
+                          <Icon size={17} />
                         )}
                       </span>
 
                       <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-2">
-                          <span className="block truncate text-sm font-bold">
+                        <span className="flex items-start justify-between gap-2">
+                          <span className="glass-notification-item-title text-sm font-semibold leading-5">
                             {notification.title}
                           </span>
 
-                          {!notification.isRead && (
-                            <span
-                              className="h-2 w-2 shrink-0 rounded-full"
-                              style={{
-                                background:
-                                  "var(--crm-primary)",
-                              }}
-                            />
+                          {unread && (
+                            <span className="glass-notification-dot mt-1.5 h-2 w-2 shrink-0 rounded-full" />
                           )}
                         </span>
 
-                        <span className="glass-topbar-muted mt-1 block text-xs leading-5">
+                        <span className="glass-notification-muted mt-1 block text-xs leading-5">
                           {notification.message}
                         </span>
 
-                        <span className="glass-topbar-muted mt-2 block text-[11px]">
+                        <span className="glass-notification-time mt-2 block text-[11px]">
                           {formatNotificationTime(
                             notification.createdAt
-                          )}
-                          {" IST"}
+                          )}{" "}
+                          IST
                         </span>
                       </span>
                     </button>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
 
-              <div className="glass-notification-heading">
+              {/* DROPDOWN FOOTER */}
+
+              <div className="glass-notification-dropdown-footer p-3">
                 <button
                   type="button"
                   onClick={() => {
                     setNotificationsOpen(false);
                     navigate("/notifications");
                   }}
-                  className="glass-topbar-profile-item flex w-full items-center justify-center text-sm font-semibold"
+                  className="glass-notification-view-all flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"
                 >
                   View all notifications
                 </button>
@@ -550,7 +613,8 @@ export default function Topbar({ onOpenMobile }) {
 
         <div className="glass-topbar-divider" />
 
-        {/* Profile */}
+        {/* PROFILE */}
+
         <div
           ref={profileRef}
           className="relative"
