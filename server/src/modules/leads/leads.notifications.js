@@ -1,3 +1,4 @@
+
 import {
   createNotificationService,
 } from "../notifications/notifications.service.js";
@@ -50,17 +51,13 @@ const createLeadNotification = async (
     {
       recipientUserId: recipientId,
 
-      actorUserId:
-        normalizeId(actorUserId),
+      actorUserId: normalizeId(actorUserId),
 
       type,
-
       title,
-
       message,
 
       entityType: "LEAD",
-
       entityId,
 
       actionUrl: `/leads/${entityId}`,
@@ -98,7 +95,6 @@ export const notifyLeadCreated = async (
   return createLeadNotification(
     {
       recipientUserId: ownerId,
-
       actorUserId,
 
       type: "LEAD_ASSIGNED",
@@ -132,6 +128,13 @@ export const notifyLeadOwnerChanged = async (
   },
   connection
 ) => {
+  /*
+   * The reason remains available to the
+   * lead service/audit trail, but it is not
+   * included in notification messages.
+   */
+  void reason;
+
   const oldOwner = normalizeId(previousOwnerId);
   const newOwner = normalizeId(newOwnerId);
 
@@ -144,12 +147,9 @@ export const notifyLeadOwnerChanged = async (
     `#${leadId}`
   );
 
-  const reasonText = normalizeText(reason);
-
   return createLeadNotification(
     {
       recipientUserId: newOwner,
-
       actorUserId,
 
       type: "LEAD_ASSIGNED",
@@ -157,11 +157,8 @@ export const notifyLeadOwnerChanged = async (
       title: "Lead assigned to you",
 
       message:
-        `Lead ${leadLabel} has been reassigned ` +
-        "to you." +
-        (reasonText
-          ? ` Reason: ${reasonText}.`
-          : ""),
+        `Lead ${leadLabel} has been ` +
+        "reassigned to you.",
 
       leadId,
     },
@@ -187,6 +184,12 @@ export const notifyLeadStageChanged = async (
   },
   connection
 ) => {
+  /*
+   * Stage-change reasons are intentionally
+   * excluded from notification messages.
+   */
+  void reason;
+
   const previous = normalizeText(
     previousStage,
     "Unknown"
@@ -206,24 +209,18 @@ export const notifyLeadStageChanged = async (
     `#${leadId}`
   );
 
-  const reasonText = normalizeText(reason);
-
   return createLeadNotification(
     {
       recipientUserId: ownerId,
-
       actorUserId,
 
       type: "LEAD_STAGE_CHANGED",
 
-      title: "Lead stage updated",
+      title: "Lead stage changed",
 
       message:
         `Lead ${leadLabel} moved from ` +
-        `${previous} to ${next}.` +
-        (reasonText
-          ? ` Reason: ${reasonText}.`
-          : ""),
+        `${previous} to ${next}.`,
 
       leadId,
     },

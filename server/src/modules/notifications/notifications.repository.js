@@ -1,3 +1,4 @@
+
 import pool from "../../config/db.js";
 
 const dbFor = (connection) => connection || pool;
@@ -32,15 +33,29 @@ const toUtcIso = (value) => {
 
 const mapNotification = (row) => ({
   id: String(row.id),
+
   recipientUserId: String(row.user_id),
-  actorUserId: null,
+
+  actorUserId:
+    row.actor_user_id == null
+      ? null
+      : String(row.actor_user_id),
+
   type: row.notification_type,
+
   title: row.title,
   message: row.message,
-  entityType: row.lead_id == null ? null : "LEAD",
+
+  entityType:
+    row.lead_id == null ? null : "LEAD",
+
   entityId:
-    row.lead_id == null ? null : String(row.lead_id),
+    row.lead_id == null
+      ? null
+      : String(row.lead_id),
+
   actionUrl: row.action_url,
+
   isRead: row.read_at != null,
   readAt: toUtcIso(row.read_at),
   createdAt: toUtcIso(row.created_at),
@@ -59,8 +74,6 @@ export const insertNotification = async (
   },
   connection = null
 ) => {
-  void actorUserId;
-
   const leadId =
     entityType === "LEAD" && entityId != null
       ? entityId
@@ -70,6 +83,7 @@ export const insertNotification = async (
     `
       INSERT INTO notifications (
         user_id,
+        actor_user_id,
         lead_id,
         notification_type,
         title,
@@ -77,10 +91,13 @@ export const insertNotification = async (
         action_url,
         created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())
+      VALUES (
+        ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP()
+      )
     `,
     [
       recipientUserId,
+      actorUserId,
       leadId,
       type,
       title,
@@ -90,6 +107,63 @@ export const insertNotification = async (
   );
 
   return result.insertId;
+};
+
+export const findActiveSuperAdminIds = async (
+  connection = null
+) => {
+  const [rows] = await dbFor(connection).query(
+    `
+      SELECT id
+      FROM users
+      WHERE role = 'SUPER_ADMIN'
+        AND status = 'ACTIVE'
+        AND deleted_at IS NULL
+    `
+  );
+
+  return rows.map((row) => Number(row.id));
+};
+
+export const findNotificationUserDetails = async (
+  userIds,
+  connection = null
+) => {
+  const ids = [
+    ...new Set(
+      userIds
+        .map(Number)
+        .filter(
+          (id) =>
+            Number.isSafeInteger(id) &&
+            id > 0
+        )
+    ),
+  ];
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const placeholders = ids.map(() => "?").join(", ");
+
+  const [rows] = await dbFor(connection).query(
+    `
+      SELECT
+        id,
+        full_name,
+        role
+      FROM users
+      WHERE id IN (${placeholders})
+    `,
+    ids
+  );
+
+  return rows.map((row) => ({
+    id: Number(row.id),
+    fullName: row.full_name,
+    role: row.role,
+  }));
 };
 
 export const findNotifications = async ({
@@ -112,6 +186,7 @@ export const findNotifications = async ({
       SELECT
         id,
         user_id,
+        actor_user_id,
         lead_id,
         notification_type,
         title,
@@ -132,23 +207,44 @@ export const findNotifications = async ({
     `
       SELECT
         COUNT(*) AS total_count,
+
         COALESCE(
-          SUM(CASE WHEN read_at IS NULL THEN 1 ELSE 0 END),
+          SUM(
+            CASE
+              WHEN read_at IS NULL THEN 1
+              ELSE 0
+            END
+          ),
           0
         ) AS unread_count,
+
         COALESCE(
-          SUM(CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END),
+          SUM(
+            CASE
+              WHEN read_at IS NOT NULL THEN 1
+              ELSE 0
+            END
+          ),
           0
         ) AS read_count
+
       FROM notifications
       WHERE user_id = ?
     `,
     [userId]
   );
 
-  const totalCount = Number(countRows[0]?.total_count ?? 0);
-  const unreadCount = Number(countRows[0]?.unread_count ?? 0);
-  const readCount = Number(countRows[0]?.read_count ?? 0);
+  const totalCount = Number(
+    countRows[0]?.total_count ?? 0
+  );
+
+  const unreadCount = Number(
+    countRows[0]?.unread_count ?? 0
+  );
+
+  const readCount = Number(
+    countRows[0]?.read_count ?? 0
+  );
 
   const total =
     filter === "unread"
@@ -173,7 +269,10 @@ export const markNotificationRead = async ({
   const [result] = await pool.query(
     `
       UPDATE notifications
-      SET read_at = COALESCE(read_at, UTC_TIMESTAMP())
+      SET read_at = COALESCE(
+        read_at,
+        UTC_TIMESTAMP()
+      )
       WHERE id = ?
         AND user_id = ?
     `,
@@ -183,7 +282,9 @@ export const markNotificationRead = async ({
   return result.affectedRows > 0;
 };
 
-export const markAllNotificationsRead = async (userId) => {
+export const markAllNotificationsRead = async (
+  userId
+) => {
   const [result] = await pool.query(
     `
       UPDATE notifications
@@ -213,11 +314,9 @@ export const deleteNotification = async ({
   return result.affectedRows > 0;
 };
 
-/*
- * Bulk-delete notifications belonging to the
- * authenticated user only.
- */
-export const clearNotifications = async (userId) => {
+export const clearNotifications = async (
+  userId
+) => {
   const [result] = await pool.query(
     `
       DELETE FROM notifications
